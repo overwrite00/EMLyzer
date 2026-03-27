@@ -1,0 +1,13 @@
+# EMLyzer - Dipendenze Opzionali NLP
+#
+# Installa SOLO se usi Python 3.11, 3.12 o 3.13.
+# Python 3.14 non e' ancora supportato da scikit-learn (marzo 2026).
+#
+# Installazione:
+#   pip install -r requirements_optional.txt
+#
+# Queste dipendenze abilitano il classificatore bayesiano nel modulo NLP
+# (funzionalita' prevista nella roadmap, non ancora attiva nel core).
+
+scikit-learn>=1.4.2
+nltk>=3.8.1

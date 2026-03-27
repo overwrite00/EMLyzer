@@ -1,0 +1,39 @@
+From: "GitHub" <noreply@github.com>
+To: developer@example.com
+Subject: [GitHub] Your pull request was merged
+Date: Tue, 02 Jan 2024 14:30:00 +0000
+Message-ID: <pr-merged-98765@github.com>
+Return-Path: <noreply@github.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="----=_GH_boundary_002"
+Authentication-Results: mx.example.com;
+    spf=pass (sender IP is 192.30.252.0) smtp.mailfrom=github.com;
+    dkim=pass header.d=github.com;
+    dmarc=pass action=none header.from=github.com
+X-Mailer: GitHub.com
+
+------=_GH_boundary_002
+Content-Type: text/plain; charset=UTF-8
+
+Your pull request #42 "Fix authentication bug" has been merged into main.
+
+Repository: myorg/myrepo
+Branch: main
+
+View the pull request: https://github.com/myorg/myrepo/pull/42
+
+Thanks,
+The GitHub Team
+
+------=_GH_boundary_002
+Content-Type: text/html; charset=UTF-8
+
+<html>
+<body>
+<p>Your pull request <strong>#42</strong> "Fix authentication bug" has been merged into <code>main</code>.</p>
+<p><a href="https://github.com/myorg/myrepo/pull/42">View the pull request</a></p>
+<p>Thanks,<br>The GitHub Team</p>
+</body>
+</html>
+
+------=_GH_boundary_002--

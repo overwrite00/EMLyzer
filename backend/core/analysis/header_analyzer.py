@@ -1,0 +1,258 @@
+"""
+core/analysis/header_analyzer.py
+
+Analisi forense degli header email:
+- Mismatch di identità (From vs Return-Path vs Reply-To)
+- Ricostruzione percorso SMTP (Received chain)
+- Rilevamento header forging / injection
+- Tool di invio massivo
+- Risultati SPF/DKIM/DMARC
+"""
+
+import re
+from dataclasses import dataclass, field
+from typing import Optional
+
+from core.analysis.email_parser import ParsedEmail
+from utils.i18n import t
+
+
+# Noti tool di invio massivo (X-Mailer / User-Agent)
+BULK_SENDER_PATTERNS = [
+    r"mailchimp", r"sendgrid", r"mailgun", r"constant.?contact",
+    r"aweber", r"getresponse", r"klaviyo", r"brevo", r"sendinblue",
+    r"phpmailer", r"swiftmailer", r"massmailer", r"bulkmailer",
+    r"gmass", r"lemlist", r"woodpecker", r"outreach", r"salesloft",
+]
+
+# Pattern sospetti nei campi header (injection)
+HEADER_INJECTION_PATTERNS = [
+    r"\r\n", r"\n\n", r"%0a", r"%0d", r"\x00",
+]
+
+# IP privati / loopback (non dovrebbero apparire in X-Originating-IP legittimi)
+PRIVATE_IP_PATTERN = re.compile(
+    r"^(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|"
+    r"192\.168\.\d+\.\d+|127\.\d+\.\d+\.\d+|::1)$"
+)
+
+
+@dataclass
+class HeaderFinding:
+    field: str
+    severity: str  # info / low / medium / high
+    description: str
+    evidence: str = ""
+
+
+@dataclass
+class HeaderAnalysisResult:
+    findings: list[HeaderFinding] = field(default_factory=list)
+    identity_mismatches: list[str] = field(default_factory=list)
+    bulk_sender_detected: bool = False
+    bulk_sender_tool: str = ""
+    spf_ok: bool = False
+    dkim_ok: bool = False
+    dmarc_ok: bool = False
+    auth_summary: str = ""
+    received_hops: list[dict] = field(default_factory=list)
+    injection_attempts: list[str] = field(default_factory=list)
+    score_contribution: float = 0.0
+
+
+def _extract_domain(address: str) -> str:
+    """Estrae il dominio da un indirizzo email, ignorando il display name."""
+    m = re.search(r"@([\w.\-]+)", address)
+    return m.group(1).lower() if m else ""
+
+
+def _check_identity_mismatch(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """Confronta From, Return-Path, Reply-To per individuare mismatch."""
+    from_domain = _extract_domain(parsed.mail_from)
+    rp_domain = _extract_domain(parsed.return_path)
+    rt_domain = _extract_domain(parsed.reply_to)
+
+    if from_domain and rp_domain and from_domain != rp_domain:
+        desc = f"From domain '{from_domain}' ≠ Return-Path domain '{rp_domain}'"
+        result.identity_mismatches.append(desc)
+        result.findings.append(HeaderFinding(
+            field="From/Return-Path",
+            severity="high",
+            description=t("header.from_rp_mismatch"),
+            evidence=desc,
+        ))
+
+    if from_domain and rt_domain and from_domain != rt_domain:
+        desc = f"From domain '{from_domain}' ≠ Reply-To domain '{rt_domain}'"
+        result.identity_mismatches.append(desc)
+        result.findings.append(HeaderFinding(
+            field="From/Reply-To",
+            severity="medium",
+            description=t("header.from_rt_mismatch"),
+            evidence=desc,
+        ))
+
+
+def _check_auth(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """Valuta i risultati SPF / DKIM / DMARC."""
+    spf = parsed.spf_result.lower()
+    dkim = parsed.dkim_result.lower()
+    dmarc = parsed.dmarc_result.lower()
+
+    result.spf_ok = spf in ("pass",)
+    result.dkim_ok = dkim in ("pass",)
+    result.dmarc_ok = dmarc in ("pass",)
+
+    if spf and spf not in ("pass", ""):
+        result.findings.append(HeaderFinding(
+            field="SPF",
+            severity="high" if spf in ("fail", "hardfail") else "medium",
+            description=t("header.spf_result", result=spf),
+            evidence=f"Received-SPF / Authentication-Results: spf={spf}",
+        ))
+
+    if dkim and not result.dkim_ok:
+        result.findings.append(HeaderFinding(
+            field="DKIM",
+            severity="high",
+            description=t("header.dkim_result", result=dkim),
+            evidence=f"Authentication-Results: dkim={dkim}",
+        ))
+
+    if dmarc and not result.dmarc_ok:
+        result.findings.append(HeaderFinding(
+            field="DMARC",
+            severity="high",
+            description=t("header.dmarc_result", result=dmarc),
+            evidence=f"Authentication-Results: dmarc={dmarc}",
+        ))
+
+    failed = sum([not result.spf_ok and bool(spf),
+                  not result.dkim_ok and bool(dkim),
+                  not result.dmarc_ok and bool(dmarc)])
+    if failed == 3:
+        result.auth_summary = t("header.auth_all_fail")
+    elif failed > 0:
+        result.auth_summary = t("header.auth_partial", n=failed)
+    else:
+        result.auth_summary = t("header.auth_ok") if (spf or dkim or dmarc) else t("header.auth_absent")
+
+
+def _check_bulk_sender(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """Rileva tool di invio massivo tramite X-Mailer / User-Agent."""
+    mailer = parsed.x_mailer.lower()
+    if not mailer:
+        return
+    for pattern in BULK_SENDER_PATTERNS:
+        if re.search(pattern, mailer, re.IGNORECASE):
+            result.bulk_sender_detected = True
+            result.bulk_sender_tool = parsed.x_mailer
+            result.findings.append(HeaderFinding(
+                field="X-Mailer",
+                severity="info",
+                description=t("header.bulk_sender", tool=parsed.x_mailer),
+                evidence=f"X-Mailer: {parsed.x_mailer}",
+            ))
+            break
+
+
+def _check_header_injection(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """Cerca sequenze di header injection nei campi critici."""
+    fields_to_check = {
+        "Subject": parsed.mail_subject,
+        "From": parsed.mail_from,
+        "Reply-To": parsed.reply_to,
+        "Message-ID": parsed.message_id,
+    }
+    for field_name, value in fields_to_check.items():
+        if not value:
+            continue
+        for pattern in HEADER_INJECTION_PATTERNS:
+            if re.search(pattern, value, re.IGNORECASE):
+                result.injection_attempts.append(field_name)
+                result.findings.append(HeaderFinding(
+                    field=field_name,
+                    severity="high",
+                    description=t("header.injection", field=field_name),
+                    evidence=repr(value[:200]),
+                ))
+
+
+def _parse_received_chain(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """Analizza la catena Received per ricostruire il percorso SMTP."""
+    for i, received in enumerate(parsed.received_chain):
+        hop: dict = {"hop": i + 1, "raw": received[:300]}
+
+        # Estrai IP
+        ip_m = re.search(r"\[(\d{1,3}(?:\.\d{1,3}){3})\]", received)
+        if ip_m:
+            hop["ip"] = ip_m.group(1)
+            if PRIVATE_IP_PATTERN.match(hop["ip"]):
+                hop["private_ip"] = True
+
+        # Estrai "by" hostname
+        by_m = re.search(r"\bby\s+([\w.\-]+)", received, re.IGNORECASE)
+        if by_m:
+            hop["by"] = by_m.group(1)
+
+        # Estrai timestamp
+        ts_m = re.search(r";\s*(.+)$", received.strip())
+        if ts_m:
+            hop["timestamp"] = ts_m.group(1).strip()
+
+        result.received_hops.append(hop)
+
+
+def _check_originating_ip(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """Controlla X-Originating-IP per IP privati o anomali."""
+    ip = parsed.x_originating_ip.strip()
+    if not ip:
+        return
+    # Rimuovi parentesi quadre se presenti
+    ip = ip.strip("[]")
+    if PRIVATE_IP_PATTERN.match(ip):
+        result.findings.append(HeaderFinding(
+            field="X-Originating-IP",
+            severity="medium",
+            description=t("header.private_ip", ip=ip),
+            evidence=ip,
+        ))
+
+
+def _check_missing_fields(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """Segnala assenza di campi importanti."""
+    if not parsed.message_id:
+        result.findings.append(HeaderFinding(
+            field="Message-ID",
+            severity="medium",
+            description=t("header.no_message_id"),
+        ))
+    if not parsed.mail_date:
+        result.findings.append(HeaderFinding(
+            field="Date",
+            severity="low",
+            description=t("header.no_date"),
+        ))
+
+
+def _compute_score(result: HeaderAnalysisResult) -> float:
+    """Calcola un punteggio di rischio parziale basato sui findings."""
+    weights = {"info": 0, "low": 5, "medium": 15, "high": 25}
+    score = sum(weights.get(f.severity, 0) for f in result.findings)
+    return min(score, 100.0)
+
+
+def analyze_headers(parsed: ParsedEmail) -> HeaderAnalysisResult:
+    """Entry point: esegue tutte le analisi header e restituisce HeaderAnalysisResult."""
+    result = HeaderAnalysisResult()
+
+    _check_identity_mismatch(parsed, result)
+    _check_auth(parsed, result)
+    _check_bulk_sender(parsed, result)
+    _check_header_injection(parsed, result)
+    _parse_received_chain(parsed, result)
+    _check_originating_ip(parsed, result)
+    _check_missing_fields(parsed, result)
+
+    result.score_contribution = _compute_score(result)
+    return result
