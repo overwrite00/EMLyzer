@@ -1,108 +1,28 @@
 @echo off
-:: EMLyzer v0.3.3 - Avvio (Windows)
-:: Seleziona automaticamente la versione corretta di Python
-:: se nel sistema sono installate piu' versioni.
-
-title EMLyzer v0.3.3
-
-echo.
-echo  ============================================
-echo   EMLyzer v0.3.3
-echo  ============================================
-echo.
+:: EMLyzer - Avvio (Windows)
+:: Compatibile con Windows 10/11, Python 3.11+
+setlocal enabledelayedexpansion
 
 set "BACKEND_DIR=%~dp0backend"
 set "VENV_DIR=%~dp0.venv"
 set "VENV_PYTHON=%~dp0.venv\Scripts\python.exe"
 set "FOUND_PYTHON="
+set "FOUND_VER="
+set "VERSION=0.3.3"
 
-:: ── Cerca la versione migliore di Python disponibile ─────────────────────────
-:: Ordine di preferenza: 3.13 > 3.12 > 3.11
-:: Python Launcher (py.exe) e' disponibile se Python e' installato con l'installer ufficiale
+:: ── Leggi versione da config.py usando Python (piu' affidabile di for/f) ──────
+:: Viene fatto dopo aver trovato Python, quindi piu' avanti nello script.
+:: Per ora usiamo il valore hardcoded sopra come fallback.
 
-echo [INFO] Ricerca versione Python compatibile...
+title EMLyzer v%VERSION%
 
-:: Prova con il Python Launcher (py.exe) - disponibile su Windows con installer ufficiale
-where py >nul 2>&1
-if not errorlevel 1 (
-    :: Prova 3.13
-    py -3.13 --version >nul 2>&1
-    if not errorlevel 1 (
-        set "FOUND_PYTHON=py -3.13"
-        echo [INFO] Trovato Python 3.13 tramite launcher ^(py -3.13^)
-        goto :python_found
-    )
-    :: Prova 3.12
-    py -3.12 --version >nul 2>&1
-    if not errorlevel 1 (
-        set "FOUND_PYTHON=py -3.12"
-        echo [INFO] Trovato Python 3.12 tramite launcher ^(py -3.12^)
-        goto :python_found
-    )
-    :: Prova 3.11
-    py -3.11 --version >nul 2>&1
-    if not errorlevel 1 (
-        set "FOUND_PYTHON=py -3.11"
-        echo [INFO] Trovato Python 3.11 tramite launcher ^(py -3.11^)
-        goto :python_found
-    )
-    :: Prova 3.14 come ultima spiaggia
-    py -3.14 --version >nul 2>&1
-    if not errorlevel 1 (
-        set "FOUND_PYTHON=py -3.14"
-        echo [AVVISO] Trovato solo Python 3.14 - alcune librerie potrebbero non funzionare.
-        echo          Si consiglia di installare Python 3.13: https://www.python.org/downloads/
-        echo.
-        goto :python_found
-    )
-)
-
-:: Fallback: prova python3.13, python3.12, python3.11 nel PATH
-for %%V in (3.13 3.12 3.11) do (
-    python%%V --version >nul 2>&1
-    if not errorlevel 1 (
-        if not defined FOUND_PYTHON (
-            set "FOUND_PYTHON=python%%V"
-            echo [INFO] Trovato Python %%V nel PATH ^(python%%V^)
-        )
-    )
-)
-if defined FOUND_PYTHON goto :python_found
-
-:: Fallback finale: python generico nel PATH
-python --version >nul 2>&1
-if not errorlevel 1 (
-    :: Controlla che non sia una versione troppo vecchia
-    for /f "tokens=2" %%V in ('python --version 2^>^&1') do set "GENERIC_VER=%%V"
-    :: Accetta 3.11, 3.12, 3.13, 3.14 — blocca < 3.11
-    if "%GENERIC_VER:~0,4%"=="3.11" ( set "FOUND_PYTHON=python" & echo [INFO] Trovato Python %GENERIC_VER% nel PATH & goto :python_found )
-    if "%GENERIC_VER:~0,4%"=="3.12" ( set "FOUND_PYTHON=python" & echo [INFO] Trovato Python %GENERIC_VER% nel PATH & goto :python_found )
-    if "%GENERIC_VER:~0,4%"=="3.13" ( set "FOUND_PYTHON=python" & echo [INFO] Trovato Python %GENERIC_VER% nel PATH & goto :python_found )
-    if "%GENERIC_VER:~0,4%"=="3.14" (
-        set "FOUND_PYTHON=python"
-        echo [AVVISO] Python %GENERIC_VER% - alcune librerie potrebbero non funzionare.
-        echo          Si consiglia Python 3.13: https://www.python.org/downloads/
-        goto :python_found
-    )
-    echo [ERRORE] Python %GENERIC_VER% e' troppo vecchio. Richiesto 3.11 o superiore.
-    echo          Installalo da https://python.org
-    pause
-    exit /b 1
-)
-
-:: Nessuna versione trovata
-echo [ERRORE] Python non trovato nel sistema.
-echo          Installalo da https://python.org (versione consigliata: 3.13)
-echo          Durante l'installazione spunta "Add Python to PATH"
 echo.
-pause
-exit /b 1
-
-:python_found
-echo [INFO] Usero': %FOUND_PYTHON%
+echo  ============================================
+echo   EMLyzer v%VERSION%
+echo  ============================================
 echo.
 
-:: Controlla che il backend esista
+:: ── Controlla che il backend esista ──────────────────────────────────────────
 if not exist "%BACKEND_DIR%\main.py" (
     echo [ERRORE] File backend\main.py non trovato.
     echo          Esegui start.bat dalla cartella EMLyzer\
@@ -111,30 +31,132 @@ if not exist "%BACKEND_DIR%\main.py" (
     exit /b 1
 )
 
-:: ── Crea virtual environment con la versione corretta ────────────────────────
-if not exist "%VENV_PYTHON%" (
-    echo [INFO] Creazione virtual environment con %FOUND_PYTHON%...
-    %FOUND_PYTHON% -m venv "%VENV_DIR%"
-    if errorlevel 1 (
-        echo [ERRORE] Impossibile creare il virtual environment.
-        echo          Prova manualmente: %FOUND_PYTHON% -m venv "%VENV_DIR%"
-        echo.
-        pause
-        exit /b 1
-    )
-    echo [INFO] Virtual environment creato.
+:: ── Controlla che la porta 8000 sia libera ────────────────────────────────────
+netstat -an 2>nul | findstr ":8000 " | findstr "LISTENING" >nul 2>&1
+if not errorlevel 1 (
+    echo [AVVISO] La porta 8000 e' gia' in uso.
+    echo          Un'altra istanza di EMLyzer potrebbe essere attiva,
+    echo          oppure un altro programma usa la porta 8000.
+    echo          Fermalo prima di avviare EMLyzer.
     echo.
-) else (
-    :: Verifica che il venv esistente usi una versione accettabile
-    "%VENV_PYTHON%" --version >nul 2>&1
-    if errorlevel 1 (
-        echo [AVVISO] Virtual environment esistente non valido. Ricreazione...
-        rmdir /s /q "%VENV_DIR%"
-        %FOUND_PYTHON% -m venv "%VENV_DIR%"
-        echo [INFO] Virtual environment ricreato.
-        echo.
+    echo          Per trovare il processo: netstat -ano ^| findstr :8000
+    echo.
+    pause
+    exit /b 1
+)
+
+:: ── Cerca Python compatibile ─────────────────────────────────────────────────
+echo [INFO] Ricerca versione Python compatibile...
+
+:: Priorita' 1: Python Launcher (py.exe) - disponibile con installer ufficiale
+where py >nul 2>&1
+if not errorlevel 1 (
+    for %%V in (3.13 3.12 3.11 3.14) do (
+        if not defined FOUND_PYTHON (
+            py -%%V --version >nul 2>&1
+            if not errorlevel 1 (
+                set "FOUND_PYTHON=py -%%V"
+                set "FOUND_VER=%%V"
+                echo [INFO] Trovato Python %%V tramite launcher ^(py -%%V^)
+            )
+        )
     )
 )
+if defined FOUND_PYTHON goto :python_found
+
+:: Priorita' 2: python.exe generico nel PATH
+:: Usa Python stesso per estrarre la versione — piu' affidabile di stringhe batch
+python --version >nul 2>&1
+if errorlevel 1 goto :python_not_found
+
+python -c "import sys; v=sys.version_info; exit(0 if v.major==3 and v.minor>=11 else 1)" >nul 2>&1
+if errorlevel 1 (
+    :: Versione troppo vecchia — mostra quale versione e' installata
+    for /f "tokens=2" %%V in ('python --version 2^>^&1') do (
+        echo [ERRORE] Python %%V e' troppo vecchio. Richiesto 3.11+.
+    )
+    echo          Installa Python 3.13 da https://www.python.org/downloads/
+    echo          Durante l'installazione spunta "Add Python to PATH"
+    echo.
+    pause
+    exit /b 1
+)
+
+:: Versione accettabile — leggi major.minor per il titolo
+for /f "tokens=*" %%V in ('python -c "import sys; print(str(sys.version_info.major)+'.'+str(sys.version_info.minor))"') do (
+    set "FOUND_VER=%%V"
+)
+set "FOUND_PYTHON=python"
+
+:: Avviso per 3.14+
+python -c "import sys; exit(0 if sys.version_info.minor >= 14 else 1)" >nul 2>&1
+if not errorlevel 1 (
+    echo [AVVISO] Python !FOUND_VER! - alcune librerie potrebbero non essere supportate.
+    echo          Si consiglia Python 3.13: https://www.python.org/downloads/
+    echo.
+)
+
+for /f "tokens=2" %%V in ('python --version 2^>^&1') do (
+    echo [INFO] Trovato Python %%V nel PATH
+)
+goto :python_found
+
+:python_not_found
+echo [ERRORE] Python non trovato nel sistema.
+echo          Installa Python 3.13 da https://www.python.org/downloads/
+echo          Durante l'installazione spunta "Add Python to PATH"
+echo.
+pause
+exit /b 1
+
+:python_found
+echo [INFO] Uso: %FOUND_PYTHON%
+echo.
+
+:: ── Aggiorna titolo con versione reale da config.py ──────────────────────────
+:: Ora che abbiamo Python, usiamolo per leggere la versione
+for /f "tokens=*" %%V in ('%FOUND_PYTHON% -c "import re,sys; m=re.search(chr(39)+'([0-9.]+)'+chr(39), open(sys.argv[1]).read() if __import__(chr(111)+chr(115)).path.exists(sys.argv[1]) else chr(39)+chr(39)); print(m.group(1) if m else chr(48))" "%BACKEND_DIR%\utils\config.py" 2^>nul') do (
+    if not "%%V"=="0" set "VERSION=%%V"
+)
+title EMLyzer v%VERSION%
+
+:: ── Gestione virtual environment ─────────────────────────────────────────────
+if exist "%VENV_PYTHON%" (
+    "%VENV_PYTHON%" --version >nul 2>&1
+    if errorlevel 1 (
+        echo [AVVISO] Virtual environment corrotto. Ricreazione...
+        rmdir /s /q "%VENV_DIR%"
+        goto :create_venv
+    )
+    :: Confronta versione venv con versione trovata
+    "%VENV_PYTHON%" -c "import sys; v=sys.version_info; print(str(v.major)+'.'+str(v.minor))" > "%TEMP%\emlyzer_venv_ver.txt" 2>nul
+    set /p VENV_VER= < "%TEMP%\emlyzer_venv_ver.txt"
+    del "%TEMP%\emlyzer_venv_ver.txt" >nul 2>&1
+    if not "!VENV_VER!"=="!FOUND_VER!" (
+        echo [INFO] Venv usa Python !VENV_VER!, versione corrente e' !FOUND_VER!.
+        echo [INFO] Ricreazione virtual environment...
+        rmdir /s /q "%VENV_DIR%"
+        goto :create_venv
+    )
+    goto :install_deps
+)
+
+:create_venv
+echo [INFO] Creazione virtual environment con %FOUND_PYTHON%...
+%FOUND_PYTHON% -m venv "%VENV_DIR%"
+if errorlevel 1 (
+    echo [ERRORE] Impossibile creare il virtual environment.
+    echo          Prova manualmente: %FOUND_PYTHON% -m venv "%VENV_DIR%"
+    echo.
+    pause
+    exit /b 1
+)
+echo [INFO] Virtual environment creato.
+echo.
+
+:install_deps
+:: ── Aggiorna pip silenziosamente ─────────────────────────────────────────────
+"%VENV_PYTHON%" -m pip install --upgrade pip -q >nul 2>&1
 
 :: ── Installa/aggiorna dipendenze ─────────────────────────────────────────────
 echo [INFO] Installazione dipendenze...
@@ -142,7 +164,7 @@ echo [INFO] Installazione dipendenze...
 if errorlevel 1 (
     echo.
     echo [ERRORE] Installazione dipendenze fallita.
-    echo          Prova manualmente per vedere l'errore:
+    echo          Riesegui senza -q per vedere i dettagli:
     echo          "%VENV_PYTHON%" -m pip install -r "%BACKEND_DIR%\requirements.txt"
     echo.
     pause
@@ -151,7 +173,7 @@ if errorlevel 1 (
 echo [INFO] Dipendenze OK.
 echo.
 
-:: ── Crea .env se non esiste ──────────────────────────────────────────────────
+:: ── Crea .env se non esiste ───────────────────────────────────────────────────
 if not exist "%BACKEND_DIR%\.env" (
     if exist "%BACKEND_DIR%\.env.example" (
         copy "%BACKEND_DIR%\.env.example" "%BACKEND_DIR%\.env" >nul
@@ -161,11 +183,10 @@ if not exist "%BACKEND_DIR%\.env" (
     )
 )
 
-:: ── Mostra versione Python effettivamente usata nel venv ─────────────────────
+:: ── Mostra info finali ────────────────────────────────────────────────────────
 echo [INFO] Python nel venv:
 "%VENV_PYTHON%" --version
 echo.
-
 echo  ============================================
 echo   Applicazione pronta
 echo  ============================================
@@ -178,6 +199,8 @@ echo   Premi CTRL+C per fermare
 echo  ============================================
 echo.
 
+:: ── Avvio server ─────────────────────────────────────────────────────────────
+:: Nota: --reload rimosso perche' causa crash con multiprocessing su Windows
 cd /d "%BACKEND_DIR%"
 "%VENV_PYTHON%" -m uvicorn main:app --host 0.0.0.0 --port 8000
 
