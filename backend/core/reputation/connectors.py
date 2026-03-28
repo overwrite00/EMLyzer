@@ -206,7 +206,9 @@ def _load_openphish():
     if _openphish_loaded:
         return
     try:
-        resp = requests.get("https://openphish.com/feed.txt", timeout=REQUEST_TIMEOUT)
+        resp = requests.get("https://openphish.com/feed.txt",
+            headers={"User-Agent": "EMLyzer/0.3.2 (email forensics tool)"},
+            timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         _openphish_cache = {l.strip().lower() for l in resp.text.splitlines() if l.strip()}
         _openphish_loaded = True
@@ -273,7 +275,9 @@ def check_hash_malwarebazaar(sha256: str) -> ReputationResult:
     try:
         _rate_limit("malwarebazaar")
         resp = requests.post("https://mb-api.abuse.ch/api/v1/",
-            data={"query": "get_info", "hash": sha256}, timeout=REQUEST_TIMEOUT)
+            data={"query": "get_info", "hash": sha256},
+            headers={"User-Agent": "EMLyzer/0.3.2 (email forensics tool)"},
+            timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
         st = data.get("query_status", "")
