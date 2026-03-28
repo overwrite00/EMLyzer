@@ -103,7 +103,13 @@ async def run_analysis(
                 "top_features":         getattr(body_result.nlp_result, "top_features", []),
             } if body_result.nlp_result else None,
         },
-        url_indicators=_dataclass_to_dict(url_result),
+        url_indicators={
+            **_dataclass_to_dict(url_result),
+            "urls": [
+                {**_dataclass_to_dict(u), "whois_attempted": do_whois}
+                for u in url_result.urls
+            ],
+        },
         attachment_indicators=_dataclass_to_dict(attachment_result),
         risk_score=risk.score,
         risk_label=risk.label,
