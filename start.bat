@@ -1,13 +1,13 @@
 @echo off
-:: EMLyzer v0.3.0 - Avvio (Windows)
+:: EMLyzer v0.3.3 - Avvio (Windows)
 :: Seleziona automaticamente la versione corretta di Python
 :: se nel sistema sono installate piu' versioni.
 
-title EMLyzer v0.3.0
+title EMLyzer v0.3.3
 
 echo.
 echo  ============================================
-echo   EMLyzer v0.3.0
+echo   EMLyzer v0.3.3
 echo  ============================================
 echo.
 
