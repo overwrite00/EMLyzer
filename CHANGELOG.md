@@ -6,6 +6,16 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
 ---
 
+## [0.3.3] — 2026
+
+### Modificato
+- **MalwareBazaar ora richiede API key** — il servizio ha introdotto l'obbligo di registrazione (marzo 2026); aggiunta la chiave `MALWAREBAZAAR_API_KEY` in `config.py` e `.env.example`; il connettore invia ora l'header `Auth-Key`; la documentazione è stata aggiornata con le istruzioni di registrazione
+
+### Corretto
+- **Stato "Pulito" mostrato in presenza di errori** — la condizione `elif errors and queried == 0` mostrava errore solo se nessuna chiamata era stata completata; con `queried=1` ed errore presente il servizio mostrava "Pulito"; corretto in `elif errors`
+
+---
+
 ## [0.3.2] — 2026
 
 ### Corretto

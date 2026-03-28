@@ -49,7 +49,9 @@ Puoi cambiare anche dal pulsante IT/EN nell'interfaccia. Per renderla permanente
 ## Configurare le API key per la reputazione
 
 I servizi di reputazione sono **completamente opzionali**.
-Due funzionano senza chiave: **OpenPhish** e **MalwareBazaar**.
+Un servizio funziona senza chiave: **OpenPhish**.
+
+> ⚠️ **MalwareBazaar** richiedeva un tempo nessuna API key, ma da marzo 2026 la registrazione è obbligatoria. Registrati su [bazaar.abuse.ch/account/](https://bazaar.abuse.ch/account/) e aggiungi `MALWAREBAZAAR_API_KEY` nel file `.env`.
 
 ---
 
@@ -113,6 +115,21 @@ LANGUAGE=it
 ABUSEIPDB_API_KEY=abc123def456ghi789jkl012
 VIRUSTOTAL_API_KEY=xyz987uvw654rst321opq098
 PHISHTANK_API_KEY=qrs111tuvw222xyz333abc444
+```
+
+---
+
+### MalwareBazaar — Hash malware allegati
+
+Verifica gli hash degli allegati nel database di campioni malware.
+
+**Come registrarsi:**
+1. Vai su [https://bazaar.abuse.ch/account/](https://bazaar.abuse.ch/account/)
+2. Crea un account gratuito
+3. Nella pagina account copia la tua API key
+
+```env
+MALWAREBAZAAR_API_KEY=incolla_qui_la_tua_chiave
 ```
 
 ---

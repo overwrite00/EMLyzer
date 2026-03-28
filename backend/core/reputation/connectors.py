@@ -271,12 +271,22 @@ def check_url_phishtank(url: str) -> ReputationResult:
 # ---------------------------------------------------------------------------
 
 def check_hash_malwarebazaar(sha256: str) -> ReputationResult:
-    r = ReputationResult(source="MalwareBazaar", entity=sha256, entity_type="hash", queried=True)
+    r = ReputationResult(source="MalwareBazaar", entity=sha256, entity_type="hash")
+
+    if not settings.MALWAREBAZAAR_API_KEY:
+        r.skipped = True
+        r.skip_reason = "MALWAREBAZAAR_API_KEY non configurata — registrati su bazaar.abuse.ch/account/"
+        return r
+
+    r.queried = True
     try:
         _rate_limit("malwarebazaar")
         resp = requests.post("https://mb-api.abuse.ch/api/v1/",
             data={"query": "get_info", "hash": sha256},
-            headers={"User-Agent": "EMLyzer/0.3.2 (email forensics tool)"},
+            headers={
+                "User-Agent": "EMLyzer/0.3.2 (email forensics tool)",
+                "Auth-Key": settings.MALWAREBAZAAR_API_KEY,
+            },
             timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
@@ -307,7 +317,7 @@ _SERVICE_DEFS = [
     ("VirusTotal",    "ip+url+hash",  True,  "Analisi multi-engine IP, URL e hash (piano free: 4 req/min)"),
     ("OpenPhish",     "url",          False, "Feed URL phishing — no API key richiesta"),
     ("PhishTank",     "url",          True,  "Database URL phishing verificati dalla community"),
-    ("MalwareBazaar", "hash",         False, "Hash allegati nel database malware — no API key richiesta"),
+    ("MalwareBazaar", "hash",         True,  "Hash allegati nel database malware (API key richiesta — bazaar.abuse.ch)"),
 ]
 
 def _build_service_registry(all_results: list[ReputationResult]) -> list[dict]:
@@ -320,7 +330,7 @@ def _build_service_registry(all_results: list[ReputationResult]) -> list[dict]:
         "VirusTotal":   bool(settings.VIRUSTOTAL_API_KEY),
         "OpenPhish":    True,
         "PhishTank":    bool(settings.PHISHTANK_API_KEY),
-        "MalwareBazaar": True,
+        "MalwareBazaar": bool(settings.MALWAREBAZAAR_API_KEY),
     }
 
     registry = []
@@ -338,7 +348,7 @@ def _build_service_registry(all_results: list[ReputationResult]) -> list[dict]:
             state_detail = skip_msgs[0] if skip_msgs else (
                 f"Aggiungi la chiave API nel file .env" if requires_key else "Servizio disabilitato"
             )
-        elif errors and queried == 0:
+        elif errors:
             state = "error"
             state_detail = errors[0]
         elif malicious > 0:
@@ -418,7 +428,12 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
             summary.url_results.append(check_url_virustotal(url))
 
     for sha256 in hashes[:10]:
-        summary.hash_results.append(check_hash_malwarebazaar(sha256))
+        if settings.MALWAREBAZAAR_API_KEY:
+            summary.hash_results.append(check_hash_malwarebazaar(sha256))
+        else:
+            r = ReputationResult(source="MalwareBazaar", entity=sha256, entity_type="hash",
+                skipped=True, skip_reason="MALWAREBAZAAR_API_KEY non configurata")
+            summary.hash_results.append(r)
         if settings.VIRUSTOTAL_API_KEY:
             summary.hash_results.append(check_hash_virustotal(sha256))
 

@@ -289,7 +289,7 @@ function ServicePreview({ lang }) {
     { name: 'VirusTotal',    needs_key: true,  type: 'ip+url+hash', desc_it: 'Multi-engine (IP, URL, hash)',    desc_en: 'Multi-engine (IP, URL, hash)' },
     { name: 'OpenPhish',     needs_key: false, type: 'url',      desc_it: 'Feed URL phishing (no chiave)',       desc_en: 'Phishing URL feed (no key)' },
     { name: 'PhishTank',     needs_key: true,  type: 'url',      desc_it: 'URL phishing verificati',            desc_en: 'Verified phishing URLs' },
-    { name: 'MalwareBazaar', needs_key: false, type: 'hash',     desc_it: 'Hash malware (no chiave)',           desc_en: 'Malware hashes (no key)' },
+    { name: 'MalwareBazaar', needs_key: true,  type: 'hash',     desc_it: 'Hash malware (API key richiesta)',   desc_en: 'Malware hashes (API key required)' },
   ]
   return (
     <div style={{

@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "EMLyzer"
-    VERSION: str = "0.3.2"
+    VERSION: str = "0.3.3"
     DEBUG: bool = False
 
     # CORS - frontend dev server
@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     ABUSEIPDB_API_KEY: str = ""
     VIRUSTOTAL_API_KEY: str = ""
     PHISHTANK_API_KEY: str = ""
+    MALWAREBAZAAR_API_KEY: str = ""
 
     # Lingua interfaccia: it (italiano) o en (english)
     LANGUAGE: str = "it"

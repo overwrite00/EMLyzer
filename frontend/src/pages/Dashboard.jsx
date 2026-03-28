@@ -111,7 +111,7 @@ export default function Dashboard() {
           marginLeft: 4, padding: '1px 8px', borderRadius: 4,
           background: 'var(--bg-card)', border: '1px solid var(--border)',
           fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
-        }}>v0.3.2</span>
+        }}>v0.3.3</span>
         <div style={{ flex: 1 }} />
         <LanguageSwitcher />
       </header>
