@@ -9,10 +9,11 @@ VENV_PYTHON="$VENV_DIR/bin/python"
 PORT=8000
 
 # ── Versione Python — modifica SOLO queste righe per aggiornare ───────────────
-# Per passare a Python 3.14: cambia TARGET="3.14" e MIN_MINOR="14"
+# Per passare a Python 3.14: cambia TARGET="3.14", TARGET_MINOR="14", MAX_MINOR="14"
 PYTHON_TARGET="3.13"        # Versione esatta da usare e installare
 PYTHON_TARGET_MINOR="13"    # Minor di TARGET — usato nei confronti numerici
-PYTHON_MIN_MINOR="11"       # Minor minimo accettabile come fallback
+PYTHON_MIN_MINOR="11"       # Minor minimo accettabile (compatibilità minima)
+PYTHON_MAX_MINOR="13"       # Minor massimo accettabile (versioni > NON sono supportate)
 
 # ── Leggi versione da config.py ───────────────────────────────────────────────
 VERSION=$(grep -oP '(?<=VERSION: str = ")[^"]+' "$BACKEND_DIR/utils/config.py" 2>/dev/null || echo "0.3.3")
@@ -140,81 +141,118 @@ run_privileged() {
 
 # ════════════════════════════════════════════════════════════════════════════
 # RICERCA PYTHON
-# Strategia: cerca PRIMA la versione esatta target (es. python3.13),
-# poi accetta versioni compatibili come fallback con avviso.
-# Per aggiornare la versione target: modifica PYTHON_TARGET in cima allo script.
+# Strategia:
+#   1. Cerca la versione esatta target (python3.13)
+#   2. Accetta versioni compatibili nel range [MIN..MAX] come fallback
+#   3. Se trova SOLO versioni > MAX (es. 3.14+): segnala e forza installazione
+#   4. Se trova SOLO versioni < MIN (es. 3.10): segnala e forza installazione
+# Per aggiornare: modifica PYTHON_TARGET/MAX_MINOR in cima allo script.
 # ════════════════════════════════════════════════════════════════════════════
 FOUND_PYTHON=""
 FOUND_PYTHON_VER=""
+NEED_INSTALL=0      # 1 = nessuna versione accettabile trovata, serve installare
 
-# Controlla se un candidato è valido e aggiorna FOUND_PYTHON/FOUND_PYTHON_VER
-_check_python_candidate() {
+# Ritorna il minor number di un candidato, o "" se non valido/non trovato
+_get_python_minor() {
     local candidate="$1"
     command -v "$candidate" &>/dev/null || return 1
-    local ver major minor
+    local ver minor
     ver=$("$candidate" -c "import sys; print('{}.{}'.format(sys.version_info.major, sys.version_info.minor))" 2>/dev/null)
     [ -z "$ver" ] && return 1
-    major="${ver%%.*}"
+    [ "${ver%%.*}" = "3" ] || return 1   # deve essere Python 3
     minor="${ver##*.}"
     minor="${minor//[^0-9]/}"
     [ -z "$minor" ] && return 1
-    [ "$major" = "3" ] && [ "$minor" -ge "$PYTHON_MIN_MINOR" ] 2>/dev/null || return 1
+    echo "$minor"
+}
+
+# Controlla se un candidato è nel range accettabile [MIN_MINOR..MAX_MINOR]
+# e aggiorna FOUND_PYTHON/FOUND_PYTHON_VER se sì.
+# Codici di uscita:
+#   0 = trovato e accettabile
+#   1 = non trovato / non Python 3
+#   2 = trovato ma versione troppo vecchia (< MIN)
+#   3 = trovato ma versione troppo nuova  (> MAX)
+_check_python_candidate() {
+    local candidate="$1"
+    local minor
+    minor=$(_get_python_minor "$candidate") || return 1
+    local ver="3.${minor}"
+    if [ "$minor" -lt "$PYTHON_MIN_MINOR" ] 2>/dev/null; then
+        return 2   # troppo vecchia
+    fi
+    if [ "$minor" -gt "$PYTHON_MAX_MINOR" ] 2>/dev/null; then
+        return 3   # troppo nuova — non supportata
+    fi
     FOUND_PYTHON="$candidate"
     FOUND_PYTHON_VER="$ver"
     return 0
 }
 
 find_python() {
-    # Passo 1: cerca ESATTAMENTE la versione target (python3.13, py3.13, ecc.)
+    NEED_INSTALL=0
+    local too_new_found=0   # flag: trovata versione > MAX ma nessuna accettabile
+    local too_new_ver=""    # versione troppo nuova trovata (per messaggio)
+
+    # ── Passo 1: cerca ESATTAMENTE la versione target ─────────────────────────
     local target_cmd="python${PYTHON_TARGET}"
     if _check_python_candidate "$target_cmd"; then
-        echo "[INFO] Python $PYTHON_TARGET trovato: $target_cmd ($FOUND_PYTHON_VER)"
+        echo "[INFO] Python $PYTHON_TARGET trovato: $target_cmd"
         return 0
     fi
 
-    # Passo 2: python3 generico che potrebbe già essere la versione giusta
-    if _check_python_candidate "python3"; then
-        local minor="${FOUND_PYTHON_VER##*.}"
-        minor="${minor//[^0-9]/}"
-        if [ "$minor" = "$PYTHON_TARGET_MINOR" ]; then
-            echo "[INFO] Python $PYTHON_TARGET trovato come 'python3' ($FOUND_PYTHON_VER)"
-            return 0
-        fi
-        # Salva come candidato fallback ma continua a cercare
-        local fallback_py="$FOUND_PYTHON"
-        local fallback_ver="$FOUND_PYTHON_VER"
-        FOUND_PYTHON=""
-        FOUND_PYTHON_VER=""
+    # ── Passo 2: scansiona tutti i candidati nell'ordine di preferenza ────────
+    # Cerca prima versioni specifiche, poi generiche
+    local candidates=()
+    # Versioni compatibili in ordine decrescente (target già provato)
+    for m in 12 11; do
+        candidates+=("python3.${m}")
+    done
+    candidates+=("python3" "python")
 
-        # Passo 3: versioni alternative compatibili (fallback)
-        for candidate in "python3.12" "python3.11" "python3" "python"; do
-            if _check_python_candidate "$candidate"; then
-                echo "[AVVISO] Python $PYTHON_TARGET non trovato."
-                echo "[AVVISO] Uso Python $FOUND_PYTHON_VER come fallback ($candidate)."
-                echo "         Per usare Python $PYTHON_TARGET: esegui './start.sh' dopo l'installazione."
-                return 0
-            fi
-        done
+    local best_py="" best_ver="" best_minor=0
 
-        # Usa il python3 trovato prima come ultima risorsa
-        if [ -n "$fallback_py" ]; then
-            FOUND_PYTHON="$fallback_py"
-            FOUND_PYTHON_VER="$fallback_ver"
-            echo "[AVVISO] Python $PYTHON_TARGET non trovato."
-            echo "[AVVISO] Uso Python $FOUND_PYTHON_VER come fallback."
-            return 0
+    for candidate in "${candidates[@]}"; do
+        local minor
+        minor=$(_get_python_minor "$candidate") || continue
+
+        if [ "$minor" -gt "$PYTHON_MAX_MINOR" ] 2>/dev/null; then
+            # Versione troppo nuova — registra ma non usare
+            too_new_found=1
+            too_new_ver="3.${minor}"
+            continue
         fi
-    else
-        # Passo 3 diretto: nessun python3, cerca versioni specifiche
-        for candidate in "python3.12" "python3.11" "python3.14" "python"; do
-            if _check_python_candidate "$candidate"; then
-                echo "[AVVISO] Python $PYTHON_TARGET non trovato."
-                echo "[AVVISO] Uso Python $FOUND_PYTHON_VER come fallback ($candidate)."
-                return 0
-            fi
-        done
+        if [ "$minor" -lt "$PYTHON_MIN_MINOR" ] 2>/dev/null; then
+            continue   # troppo vecchia
+        fi
+        # Versione nel range accettabile — tieni la più alta trovata
+        if [ "$minor" -gt "$best_minor" ] 2>/dev/null; then
+            best_minor="$minor"
+            best_py="$candidate"
+            best_ver="3.${minor}"
+        fi
+    done
+
+    if [ -n "$best_py" ]; then
+        FOUND_PYTHON="$best_py"
+        FOUND_PYTHON_VER="$best_ver"
+        if [ "$best_minor" = "$PYTHON_TARGET_MINOR" ]; then
+            echo "[INFO] Python $PYTHON_TARGET trovato come '$best_py'"
+        else
+            echo "[AVVISO] Python $PYTHON_TARGET non trovato nel sistema."
+            echo "[AVVISO] Uso Python $best_ver come versione compatibile ($best_py)."
+            echo "         Riesegui start.sh per installare Python $PYTHON_TARGET."
+        fi
+        return 0
     fi
 
+    # ── Nessuna versione accettabile trovata ──────────────────────────────────
+    NEED_INSTALL=1
+    if [ "$too_new_found" = "1" ]; then
+        echo "[AVVISO] Python $too_new_ver trovato ma NON supportato da EMLyzer."
+        echo "         EMLyzer richiede Python $PYTHON_TARGET (max $PYTHON_MAX_MINOR)."
+        echo "         Python $too_new_ver rimarra' intatto — installo $PYTHON_TARGET in parallelo."
+    fi
     return 1
 }
 
@@ -433,17 +471,14 @@ install_python_pyenv() {
 }
 
 # ════════════════════════════════════════════════════════════════════════════
-# LOGICA PRINCIPALE: cerca Python, installalo se manca
+# LOGICA PRINCIPALE: cerca Python, installalo se manca o se troppo nuovo
 # ════════════════════════════════════════════════════════════════════════════
-echo "[INFO] Ricerca Python $PYTHON_TARGET (o compatibile >= 3.$PYTHON_MIN_MINOR) nel sistema..."
+echo "[INFO] Ricerca Python $PYTHON_TARGET (range accettabile: 3.$PYTHON_MIN_MINOR - 3.$PYTHON_MAX_MINOR)..."
+echo ""
 
-if ! find_python; then
-    echo ""
-    echo "[AVVISO] Python $PYTHON_TARGET (o compatibile) non trovato."
-    echo "[INFO] Provo ad installarlo automaticamente per $DISTRO_ID..."
-    echo ""
-
-    install_ok=0
+_do_install_python() {
+    # Tenta installazione via package manager della distro, poi pyenv come fallback
+    local install_ok=0
     case "$DISTRO_FAMILY" in
         ubuntu)   install_python_ubuntu   && install_ok=1 ;;
         debian)   install_python_debian   && install_ok=1 ;;
@@ -457,48 +492,63 @@ if ! find_python; then
             ;;
     esac
 
-    # Se l'installazione via package manager è riuscita, cerca di nuovo
     if [ "$install_ok" = "1" ]; then
-        hash -r  # Aggiorna cache comandi
-        if ! find_python; then
-            echo "[AVVISO] Installazione completata ma Python non trovato nel PATH."
-            echo "         Riavvia il terminale e riesegui start.sh"
-            exit 1
+        hash -r
+        if find_python; then
+            return 0
         fi
-    else
-        # Fallback: pyenv
-        echo "[INFO] Installazione via package manager fallita o non disponibile."
-        if install_python_pyenv; then
-            hash -r
-            find_python || {
-                echo "[ERRORE] pyenv installato ma Python non trovato."
-                exit 1
-            }
-        else
-            echo ""
-            echo "[ERRORE] Impossibile installare Python automaticamente."
-            echo ""
-            echo "  Installa manualmente Python 3.$PYTHON_MIN_MINOR+ con:"
-            case "$DISTRO_FAMILY" in
-                ubuntu|debian)
-                    echo "    sudo apt install python3 python3-venv python3-pip" ;;
-                fedora)
-                    echo "    sudo dnf install python3 python3-pip" ;;
-                rhel)
-                    echo "    sudo dnf install python3 python3-pip" ;;
-                arch)
-                    echo "    sudo pacman -S python python-pip" ;;
-                opensuse)
-                    echo "    sudo zypper install python3 python3-pip" ;;
-                macos)
-                    echo "    brew install python3" ;;
-                *)
-                    echo "    Visita: https://www.python.org/downloads/" ;;
-            esac
-            echo "  oppure usa pyenv: https://github.com/pyenv/pyenv"
-            exit 1
-        fi
+        echo "[AVVISO] Installazione completata ma Python $PYTHON_TARGET non trovato nel PATH."
+        echo "         Riavvia il terminale e riesegui start.sh"
+        exit 1
     fi
+
+    # Fallback: pyenv (compila da sorgente, non richiede sudo, non tocca il sistema)
+    echo "[INFO] Package manager non disponibile o installazione fallita."
+    echo "[INFO] Provo con pyenv (compila Python $PYTHON_TARGET senza modificare il sistema)..."
+    if install_python_pyenv; then
+        hash -r
+        find_python && return 0
+        echo "[ERRORE] pyenv installato ma Python $PYTHON_TARGET non trovato."
+        exit 1
+    fi
+
+    # Nessun metodo riuscito
+    echo ""
+    echo "[ERRORE] Impossibile installare Python $PYTHON_TARGET automaticamente."
+    echo ""
+    echo "  Installa manualmente Python $PYTHON_TARGET:"
+    case "$DISTRO_FAMILY" in
+        ubuntu|debian)
+            echo "    sudo apt install python${PYTHON_TARGET} python${PYTHON_TARGET}-venv python${PYTHON_TARGET}-pip"
+            echo "    (se non disponibile: sudo add-apt-repository ppa:deadsnakes/ppa)"
+            ;;
+        fedora)
+            echo "    sudo dnf install python${PYTHON_TARGET} python${PYTHON_TARGET}-pip" ;;
+        rhel)
+            echo "    sudo dnf install python${PYTHON_TARGET}"
+            echo "    (se non disponibile: sudo dnf install epel-release)"
+            ;;
+        arch)
+            echo "    sudo pacman -S python  (Arch ha sempre l'ultima versione stabile)" ;;
+        opensuse)
+            local pkg="${PYTHON_TARGET/./}"
+            echo "    sudo zypper install python${pkg}" ;;
+        macos)
+            echo "    brew install python@${PYTHON_TARGET}" ;;
+        *)
+            echo "    Visita: https://www.python.org/downloads/" ;;
+    esac
+    echo ""
+    echo "  Oppure usa pyenv (senza sudo): https://github.com/pyenv/pyenv"
+    exit 1
+}
+
+if ! find_python; then
+    echo ""
+    echo "[INFO] Installo Python $PYTHON_TARGET per $DISTRO_ID $DISTRO_VERSION..."
+    echo "       (il Python di sistema rimarra' intatto)"
+    echo ""
+    _do_install_python
 fi
 
 echo ""
