@@ -152,96 +152,117 @@ FOUND_PYTHON=""
 FOUND_PYTHON_VER=""
 NEED_INSTALL=0      # 1 = nessuna versione accettabile trovata, serve installare
 
-# Ritorna il minor number di un candidato, o "" se non valido/non trovato
-_get_python_minor() {
+# Risolve un candidato Python e ne verifica la versione.
+# Setta le variabili globali _RESOLVED_BIN e _RESOLVED_MINOR.
+# Cerca nel PATH e nei percorsi assoluti standard (per binari appena installati).
+# Ritorna 0 se trovato e valido, 1 altrimenti.
+_RESOLVED_BIN=""
+_RESOLVED_MINOR=""
+
+_resolve_python() {
     local candidate="$1"
-    command -v "$candidate" &>/dev/null || return 1
+    local python_bin=""
+
+    # Cerca prima nel PATH
+    if command -v "$candidate" &>/dev/null; then
+        python_bin=$(command -v "$candidate")
+    else
+        # Percorsi assoluti standard — copre il caso "appena installato, non ancora in PATH"
+        local dir
+        for dir in /usr/bin /usr/local/bin /opt/homebrew/bin; do
+            if [ -x "$dir/$candidate" ]; then
+                python_bin="$dir/$candidate"
+                break
+            fi
+        done
+        # macOS homebrew con versione specifica (python@3.13)
+        local ver_path="/opt/homebrew/opt/python@${candidate#python}/bin/$candidate"
+        [ -z "$python_bin" ] && [ -x "$ver_path" ] && python_bin="$ver_path"
+    fi
+
+    # pyenv — gestisce versioni installate senza sudo
+    if [ -z "$python_bin" ]; then
+        local pyenv_root="${PYENV_ROOT:-$HOME/.pyenv}"
+        # pyenv shims (se 'pyenv init' è stato eseguito)
+        [ -x "$pyenv_root/shims/$candidate" ] && python_bin="$pyenv_root/shims/$candidate"
+        # pyenv versione specifica
+        if [ -z "$python_bin" ]; then
+            local pyenv_bin
+            pyenv_bin=$(find "$pyenv_root/versions" -name "$candidate"                 -path "*/bin/$candidate" 2>/dev/null | sort -V | tail -1)
+            [ -n "$pyenv_bin" ] && [ -x "$pyenv_bin" ] && python_bin="$pyenv_bin"
+        fi
+    fi
+
+    # RHEL Software Collections (SCL) — percorsi non standard
+    if [ -z "$python_bin" ]; then
+        local scl_ver="${candidate#python}"   # "3.13" da "python3.13"
+        local scl_pkg="${scl_ver/./}"         # "313"
+        for scl_path in             "/opt/rh/python${scl_pkg}/root/usr/bin/${candidate}"             "/opt/rh/rh-python${scl_pkg}/root/usr/bin/${candidate}"; do
+            if [ -x "$scl_path" ]; then python_bin="$scl_path"; break; fi
+        done
+    fi
+
+    [ -z "$python_bin" ] && return 1
+
     local ver minor
-    ver=$("$candidate" -c "import sys; print('{}.{}'.format(sys.version_info.major, sys.version_info.minor))" 2>/dev/null)
+    ver=$("$python_bin" -c "import sys; print('{}.{}'.format(sys.version_info.major, sys.version_info.minor))" 2>/dev/null)
     [ -z "$ver" ] && return 1
-    [ "${ver%%.*}" = "3" ] || return 1   # deve essere Python 3
+    [ "${ver%%.*}" = "3" ] || return 1
     minor="${ver##*.}"
     minor="${minor//[^0-9]/}"
     [ -z "$minor" ] && return 1
-    echo "$minor"
-}
 
-# Controlla se un candidato è nel range accettabile [MIN_MINOR..MAX_MINOR]
-# e aggiorna FOUND_PYTHON/FOUND_PYTHON_VER se sì.
-# Codici di uscita:
-#   0 = trovato e accettabile
-#   1 = non trovato / non Python 3
-#   2 = trovato ma versione troppo vecchia (< MIN)
-#   3 = trovato ma versione troppo nuova  (> MAX)
-_check_python_candidate() {
-    local candidate="$1"
-    local minor
-    minor=$(_get_python_minor "$candidate") || return 1
-    local ver="3.${minor}"
-    if [ "$minor" -lt "$PYTHON_MIN_MINOR" ] 2>/dev/null; then
-        return 2   # troppo vecchia
-    fi
-    if [ "$minor" -gt "$PYTHON_MAX_MINOR" ] 2>/dev/null; then
-        return 3   # troppo nuova — non supportata
-    fi
-    FOUND_PYTHON="$candidate"
-    FOUND_PYTHON_VER="$ver"
+    _RESOLVED_BIN="$python_bin"
+    _RESOLVED_MINOR="$minor"
     return 0
 }
 
+
 find_python() {
     NEED_INSTALL=0
-    local too_new_found=0   # flag: trovata versione > MAX ma nessuna accettabile
-    local too_new_ver=""    # versione troppo nuova trovata (per messaggio)
+    local too_new_found=0
+    local too_new_ver=""
 
     # ── Passo 1: cerca ESATTAMENTE la versione target ─────────────────────────
-    local target_cmd="python${PYTHON_TARGET}"
-    if _check_python_candidate "$target_cmd"; then
-        echo "[INFO] Python $PYTHON_TARGET trovato: $target_cmd"
-        return 0
+    if _resolve_python "python${PYTHON_TARGET}"; then
+        if [ "$_RESOLVED_MINOR" -ge "$PYTHON_MIN_MINOR" ] &&            [ "$_RESOLVED_MINOR" -le "$PYTHON_MAX_MINOR" ] 2>/dev/null; then
+            FOUND_PYTHON="$_RESOLVED_BIN"
+            FOUND_PYTHON_VER="3.${_RESOLVED_MINOR}"
+            echo "[INFO] Python $PYTHON_TARGET trovato: $FOUND_PYTHON"
+            return 0
+        fi
     fi
 
-    # ── Passo 2: scansiona tutti i candidati nell'ordine di preferenza ────────
-    # Cerca prima versioni specifiche, poi generiche
-    local candidates=()
-    # Versioni compatibili in ordine decrescente (target già provato)
-    for m in 12 11; do
-        candidates+=("python3.${m}")
-    done
-    candidates+=("python3" "python")
+    # ── Passo 2: scansiona le versioni compatibili ────────────────────────────
+    local best_bin="" best_ver="" best_minor=0
 
-    local best_py="" best_ver="" best_minor=0
+    for candidate in "python3.12" "python3.11" "python3" "python"; do
+        _resolve_python "$candidate" || continue
 
-    for candidate in "${candidates[@]}"; do
-        local minor
-        minor=$(_get_python_minor "$candidate") || continue
-
-        if [ "$minor" -gt "$PYTHON_MAX_MINOR" ] 2>/dev/null; then
-            # Versione troppo nuova — registra ma non usare
+        if [ "$_RESOLVED_MINOR" -gt "$PYTHON_MAX_MINOR" ] 2>/dev/null; then
             too_new_found=1
-            too_new_ver="3.${minor}"
+            too_new_ver="3.${_RESOLVED_MINOR}"
             continue
         fi
-        if [ "$minor" -lt "$PYTHON_MIN_MINOR" ] 2>/dev/null; then
-            continue   # troppo vecchia
+        if [ "$_RESOLVED_MINOR" -lt "$PYTHON_MIN_MINOR" ] 2>/dev/null; then
+            continue
         fi
-        # Versione nel range accettabile — tieni la più alta trovata
-        if [ "$minor" -gt "$best_minor" ] 2>/dev/null; then
-            best_minor="$minor"
-            best_py="$candidate"
-            best_ver="3.${minor}"
+        if [ "$_RESOLVED_MINOR" -gt "$best_minor" ] 2>/dev/null; then
+            best_minor="$_RESOLVED_MINOR"
+            best_bin="$_RESOLVED_BIN"
+            best_ver="3.${_RESOLVED_MINOR}"
         fi
     done
 
-    if [ -n "$best_py" ]; then
-        FOUND_PYTHON="$best_py"
+    if [ -n "$best_bin" ]; then
+        FOUND_PYTHON="$best_bin"
         FOUND_PYTHON_VER="$best_ver"
         if [ "$best_minor" = "$PYTHON_TARGET_MINOR" ]; then
-            echo "[INFO] Python $PYTHON_TARGET trovato come '$best_py'"
+            echo "[INFO] Python $PYTHON_TARGET trovato: $FOUND_PYTHON"
         else
             echo "[AVVISO] Python $PYTHON_TARGET non trovato nel sistema."
-            echo "[AVVISO] Uso Python $best_ver come versione compatibile ($best_py)."
-            echo "         Riesegui start.sh per installare Python $PYTHON_TARGET."
+            echo "[AVVISO] Uso Python $best_ver come compatibile ($FOUND_PYTHON)."
+            echo "         Riesegui start.sh dopo aver installato Python $PYTHON_TARGET."
         fi
         return 0
     fi
@@ -250,7 +271,7 @@ find_python() {
     NEED_INSTALL=1
     if [ "$too_new_found" = "1" ]; then
         echo "[AVVISO] Python $too_new_ver trovato ma NON supportato da EMLyzer."
-        echo "         EMLyzer richiede Python $PYTHON_TARGET (max $PYTHON_MAX_MINOR)."
+        echo "         EMLyzer richiede Python $PYTHON_TARGET (max 3.$PYTHON_MAX_MINOR)."
         echo "         Python $too_new_ver rimarra' intatto — installo $PYTHON_TARGET in parallelo."
     fi
     return 1
@@ -327,14 +348,17 @@ install_python_debian() {
 # --- Fedora ---
 install_python_fedora() {
     echo "[INFO] Distribuzione Fedora rilevata."
-    # Prova prima la versione target, poi le fallback
     for ver in "$PYTHON_TARGET" "3.12" "3.11"; do
-        if run_privileged dnf install -y "python${ver}" "python${ver}-pip" 2>/dev/null; then
+        # Su Fedora il pacchetto python3.X include già venv;
+        # python3.X-pip esiste solo su alcune versioni (non obbligatorio)
+        if run_privileged dnf install -y "python${ver}" 2>/dev/null; then
             echo "[INFO] Python $ver installato."
+            # Installa pip se disponibile come pacchetto separato (non fatale se manca)
+            run_privileged dnf install -y "python${ver}-pip" 2>/dev/null || true
+            run_privileged dnf install -y python3-pip 2>/dev/null || true
             return 0
         fi
     done
-    # Fallback: python3 generico di sistema
     run_privileged dnf install -y python3 python3-pip python3-virtualenv 2>/dev/null
     return $?
 }
@@ -369,8 +393,11 @@ install_python_rhel() {
 # --- Arch Linux / Manjaro ---
 install_python_arch() {
     echo "[INFO] Distribuzione Arch-based rilevata."
-    # Arch ha sempre python=ultima versione stabile
+    # Arch installa sempre l'ultima versione stabile di Python come 'python'.
+    # Non è possibile installare versioni specifiche tramite pacman —
+    # se la versione di sistema è > MAX, usiamo pyenv (gestito dopo).
     run_privileged pacman -Sy --noconfirm python python-pip python-virtualenv 2>/dev/null
+    # Su Arch, venv è sempre incluso nel pacchetto python — nessuna azione extra
     return $?
 }
 
@@ -484,7 +511,19 @@ _do_install_python() {
         debian)   install_python_debian   && install_ok=1 ;;
         fedora)   install_python_fedora   && install_ok=1 ;;
         rhel)     install_python_rhel     && install_ok=1 ;;
-        arch)     install_python_arch     && install_ok=1 ;;
+        arch)
+            # Arch installa solo l'ultima versione Python — se è > MAX, pyenv
+            install_python_arch && install_ok=1
+            if [ "$install_ok" = "1" ]; then
+                # Verifica se la versione installata è accettabile
+                hash -r
+                if ! find_python; then
+                    echo "[INFO] La versione Python di sistema su Arch non e' compatibile."
+                    echo "[INFO] Uso pyenv per installare Python $PYTHON_TARGET in parallelo..."
+                    install_ok=0
+                fi
+            fi
+            ;;
         opensuse) install_python_opensuse && install_ok=1 ;;
         macos)    install_python_macos    && install_ok=1 ;;
         *)
@@ -493,11 +532,21 @@ _do_install_python() {
     esac
 
     if [ "$install_ok" = "1" ]; then
-        hash -r
+        hash -r  # aggiorna cache bash
+        # Cerca anche nei percorsi assoluti standard — la sessione bash corrente
+        # potrebbe non avere ancora python3.13 nella cache PATH
         if find_python; then
             return 0
         fi
-        echo "[AVVISO] Installazione completata ma Python $PYTHON_TARGET non trovato nel PATH."
+        # Ultimo tentativo: percorso assoluto diretto
+        local abs="/usr/bin/python${PYTHON_TARGET}"
+        if [ -x "$abs" ]; then
+            FOUND_PYTHON="$abs"
+            FOUND_PYTHON_VER="$PYTHON_TARGET"
+            echo "[INFO] Python $PYTHON_TARGET trovato in $abs"
+            return 0
+        fi
+        echo "[ERRORE] Python $PYTHON_TARGET installato ma non accessibile."
         echo "         Riavvia il terminale e riesegui start.sh"
         exit 1
     fi
@@ -574,7 +623,8 @@ ensure_venv_support() {
             run_privileged apt-get install -y "python${ver}-venv" "python${ver}-pip" 2>/dev/null || \
             run_privileged apt-get install -y python3-venv python3-pip 2>/dev/null ;;
         fedora|rhel)
-            run_privileged dnf install -y "python${ver}-pip" python3-virtualenv 2>/dev/null ;;
+            # Su Fedora/RHEL venv è incluso in python3.X — installiamo pip se manca
+            run_privileged dnf install -y "python${ver}-pip" 2>/dev/null ||             run_privileged dnf install -y python3-pip python3-virtualenv 2>/dev/null || true ;;
         arch)
             run_privileged pacman -Sy --noconfirm python-virtualenv 2>/dev/null ;;
         opensuse)
