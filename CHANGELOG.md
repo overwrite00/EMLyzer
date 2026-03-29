@@ -6,6 +6,47 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
 ---
 
+## [0.3.4] — 2026-03-29
+
+### Aggiunto
+
+- **Nuovi servizi reputazionali (4 aggiunti, tutti gratuiti senza API key)**
+  - **Spamhaus DROP** — controlla ogni IP contro la blocklist Spamhaus di alto profilo; caricata una volta e tenuta in cache per la sessione
+  - **ASN Lookup** (ipinfo.io) — per ogni IP riporta Autonomous System, organizzazione, città e paese; utile per identificare provider di hosting abusivi
+  - **crt.sh** — certificati TLS emessi per ogni dominio negli URL; permette di stimare l'età reale del sito e individuare domini appena registrati
+  - **Redirect Chain** — segue la catena di redirect degli URL shortener (bit.ly, tinyurl, ecc.) e degli URL HTTP, riportando la destinazione finale
+
+- **Estrazione completa degli indicatori per i check reputazionali**
+  - `X-Originating-IP` dall'header email inviato ad AbuseIPDB e VirusTotal
+  - IP diretti negli URL (es. `http://185.1.2.3/phish`) inviati anche ad AbuseIPDB come IP, non solo come URL
+  - IP risolti via DNS per i domini negli URL
+  - Link offuscati (`actual_href` dove testo visibile ≠ URL reale) inviati come URL ai servizi reputazionali
+  - Deduplicazione completa: ogni IP/URL/hash appare una sola volta indipendentemente da quante fonti lo individuano
+
+- **Conteggio entità analizzate nella UI** — nuove pill nella scheda Reputazione mostrano quanti IP, URL e hash sono stati effettivamente inviati ai servizi
+
+- **Icone distinte per servizi informativi** — ASN Lookup, crt.sh e Redirect Chain mostrano ℹ️ invece di ✅ nella vista dettaglio, per distinguerli dai check di sicurezza veri e propri
+
+- **Servizi skipped mostrano motivo** — AbuseIPDB, VirusTotal, PhishTank ora mostrano esplicitamente "chiave non configurata" anche quando skippati, coerentemente con MalwareBazaar
+
+### Corretto
+
+- **`_extract_indicators`: nome campi errato nel DB** — il dataclass `URLAnalysis` viene serializzato con i nomi Python originali (`original_url`, `is_ip_address`), non con alias abbreviati (`url`, `is_ip`). La funzione cercava i nomi sbagliati causando:
+  - URL estratti solo grazie a un fallback implicito (`or u.get('original_url')`) — funzionava per caso
+  - IP diretti negli URL **mai estratti** (`is_ip` non esiste nel DB, `is_ip_address` ignorato)
+  - Corretti tutti i riferimenti ai nomi reali dei campi serializzati
+
+- **`x_originating_ip` non letto dal record** — il campo è una colonna diretta di `EmailAnalysis`, non dentro `header_indicators`; la versione precedente cercava `hi.get('x_originating_ip')` trovando sempre `None`; corretto in `record.x_originating_ip`
+
+- **`_is_public_ip` più rigoroso** — aggiunto controllo `is_loopback`, `is_link_local`, `is_multicast`, `is_reserved` oltre a `is_private`
+
+### Modificato
+
+- **Descrizione scheda Reputazione aggiornata** — riflette i 9 servizi disponibili e le 5 fonti gratuite
+- **`rep.no_api_keys`** — il messaggio precisa che i servizi gratuiti funzionano sempre anche senza chiavi API
+
+---
+
 ## [0.3.3] — 2026
 
 ### Modificato

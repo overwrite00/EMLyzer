@@ -163,8 +163,8 @@ export const translations = {
 
   // ── Reputation tab ────────────────────────────────────────────────────────────
   "rep.description": {
-    it: "Esegui i controlli di reputazione su IP, URL e hash degli allegati tramite fonti open.",
-    en: "Run reputation checks on IPs, URLs and attachment hashes using open sources.",
+    it: "Verifica IP (header SMTP, X-Originating-IP, IP negli URL), URL del body (inclusi link offuscati) e hash degli allegati tramite 9 fonti — 5 gratuite senza chiave.",
+    en: "Checks IPs (SMTP headers, X-Originating-IP, direct IPs in URLs), body URLs (including obfuscated links) and attachment hashes via 9 sources — 5 free, no key required.",
   },
   "rep.run_btn": { it: "Avvia controllo reputazione", en: "Start reputation check" },
   "rep.rerun_btn": { it: "↻ Ri-esegui", en: "↻ Re-run" },
@@ -172,8 +172,30 @@ export const translations = {
   "rep.malicious": { it: "Indicatori malevoli", en: "Malicious indicators" },
   "rep.malicious_label": { it: "⚠ MALEVOLO", en: "⚠ MALICIOUS" },
   "rep.no_api_keys": {
-    it: "Nessuna API key configurata. Imposta ABUSEIPDB_API_KEY nel file .env per abilitare i connettori.",
-    en: "No API keys configured. Set ABUSEIPDB_API_KEY in the .env file to enable connectors.",
+    it: "Nessuna API key configurata. Imposta ABUSEIPDB_API_KEY nel file .env per abilitare i connettori a pagamento. I servizi gratuiti (Spamhaus, ASN, OpenPhish, Redirect Chain, crt.sh) funzionano sempre.",
+    en: "No API keys configured. Set ABUSEIPDB_API_KEY in .env to enable paid connectors. Free services (Spamhaus, ASN, OpenPhish, Redirect Chain, crt.sh) always work.",
+  },
+
+  // Entità analizzate
+  "rep.entities_ips":    { it: "IP analizzati",    en: "IPs analyzed" },
+  "rep.entities_urls":   { it: "URL analizzati",   en: "URLs analyzed" },
+  "rep.entities_hashes": { it: "Hash analizzati",  en: "Hashes analyzed" },
+
+  // Etichette servizi specifici
+  "rep.service.spamhaus":       { it: "Spamhaus DROP",  en: "Spamhaus DROP" },
+  "rep.service.asn":            { it: "ASN Lookup",     en: "ASN Lookup" },
+  "rep.service.redirect_chain": { it: "Redirect Chain", en: "Redirect Chain" },
+  "rep.service.crtsh":          { it: "crt.sh",         en: "crt.sh" },
+
+  // Fonti IP — tooltip
+  "rep.ip_sources": {
+    it: "IP estratti da: catena SMTP (Received), X-Originating-IP, IP diretti negli URL, IP risolti via DNS",
+    en: "IPs extracted from: SMTP chain (Received), X-Originating-IP, direct IPs in URLs, DNS-resolved IPs",
+  },
+  // Fonti URL — tooltip
+  "rep.url_sources": {
+    it: "URL estratti da: body email, link offuscati (href ≠ testo visibile)",
+    en: "URLs extracted from: email body, obfuscated links (href ≠ visible text)",
   },
 
   // ── Analyst notes

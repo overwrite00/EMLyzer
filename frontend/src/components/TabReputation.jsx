@@ -78,6 +78,25 @@ export default function TabReputation({ data, loading, error, onRun, t, lang }) 
           label={lang === 'it' ? 'Chiave mancante' : 'Key missing'}
           color="var(--text-muted)"
         />
+        {data.entities_analyzed && (<>
+          <SummaryPill
+            value={String(data.entities_analyzed.ips ?? 0)}
+            label={t('rep.entities_ips')}
+            color="var(--text-muted)"
+          />
+          <SummaryPill
+            value={String(data.entities_analyzed.urls ?? 0)}
+            label={t('rep.entities_urls')}
+            color="var(--text-muted)"
+          />
+          {(data.entities_analyzed.hashes ?? 0) > 0 && (
+            <SummaryPill
+              value={String(data.entities_analyzed.hashes)}
+              label={t('rep.entities_hashes')}
+              color="var(--text-muted)"
+            />
+          )}
+        </>)}
         <SummaryPill
           value={String(registry.filter(s => s.state === 'not_applicable').length)}
           label={lang === 'it' ? 'N/A per questa email' : 'N/A for this email'}
@@ -227,11 +246,19 @@ function ServiceCard({ svc, expanded, onToggle, lang }) {
 
 // ── Riga dettaglio singola entità ─────────────────────────────────────────────
 function DetailRow({ r, lang }) {
-  const icon = r.is_malicious ? '🔴' : r.error ? '⚠️' : '✅'
+  // Servizi informativi: non malevoli per natura, mostrano dati contestuali
+  const isInfoService = ['ASN Lookup', 'crt.sh', 'Redirect Chain'].includes(r.source)
+  const icon = r.is_malicious ? '🔴'
+             : r.error        ? '⚠️'
+             : isInfoService  ? 'ℹ️'
+             : '✅'
+  const bgColor = r.is_malicious ? 'var(--risk-high-bg)'
+                : isInfoService  ? 'var(--bg-tertiary, var(--bg-secondary))'
+                : 'var(--bg-secondary)'
   return (
     <div style={{
       padding: '6px 10px', borderRadius: 6,
-      background: r.is_malicious ? 'var(--risk-high-bg)' : 'var(--bg-secondary)',
+      background: bgColor,
       border: `1px solid ${r.is_malicious ? 'var(--risk-high)33' : 'var(--border)'}`,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -285,11 +312,18 @@ function DetailRow({ r, lang }) {
 // ── Anteprima servizi prima dell'esecuzione ───────────────────────────────────
 function ServicePreview({ lang }) {
   const services = [
-    { name: 'AbuseIPDB',     needs_key: true,  type: 'ip',       desc_it: 'Reputazione IP',                     desc_en: 'IP reputation' },
-    { name: 'VirusTotal',    needs_key: true,  type: 'ip+url+hash', desc_it: 'Multi-engine (IP, URL, hash)',    desc_en: 'Multi-engine (IP, URL, hash)' },
-    { name: 'OpenPhish',     needs_key: false, type: 'url',      desc_it: 'Feed URL phishing (no chiave)',       desc_en: 'Phishing URL feed (no key)' },
-    { name: 'PhishTank',     needs_key: true,  type: 'url',      desc_it: 'URL phishing verificati',            desc_en: 'Verified phishing URLs' },
-    { name: 'MalwareBazaar', needs_key: true,  type: 'hash',     desc_it: 'Hash malware (API key richiesta)',   desc_en: 'Malware hashes (API key required)' },
+    // ── IP ───────────────────────────────────────────────────────────────────
+    { name: 'AbuseIPDB',      needs_key: true,  type: 'ip',          desc_it: 'Reputazione IP (header SMTP, X-Originating-IP, IP negli URL)', desc_en: 'IP reputation (SMTP hops, X-Originating-IP, direct IPs)' },
+    { name: 'VirusTotal',     needs_key: true,  type: 'ip+url+hash', desc_it: 'Multi-engine: IP, URL e hash allegati',                        desc_en: 'Multi-engine: IP, URL and attachment hashes' },
+    { name: 'Spamhaus DROP',  needs_key: false, type: 'ip',          desc_it: 'Blocklist IP malevoli di alto profilo — no chiave',             desc_en: 'High-profile malicious IP blocklist — no key' },
+    { name: 'ASN Lookup',     needs_key: false, type: 'ip',          desc_it: 'Autonomous System per ogni IP (ipinfo.io) — no chiave',         desc_en: 'ASN info for each IP (ipinfo.io) — no key' },
+    // ── URL ──────────────────────────────────────────────────────────────────
+    { name: 'OpenPhish',      needs_key: false, type: 'url',         desc_it: 'Feed URL phishing aggiornato — no chiave',                      desc_en: 'Live phishing URL feed — no key' },
+    { name: 'PhishTank',      needs_key: true,  type: 'url',         desc_it: 'URL phishing verificati dalla community',                       desc_en: 'Community-verified phishing URLs' },
+    { name: 'Redirect Chain', needs_key: false, type: 'url',         desc_it: 'Segue i redirect degli URL shortener — no chiave',              desc_en: 'Follows URL shortener redirects — no key' },
+    { name: 'crt.sh',         needs_key: false, type: 'url',         desc_it: 'Certificati TLS del dominio (età, sottodomini) — no chiave',    desc_en: 'Domain TLS certificates (age, subdomains) — no key' },
+    // ── Hash ─────────────────────────────────────────────────────────────────
+    { name: 'MalwareBazaar',  needs_key: true,  type: 'hash',        desc_it: 'Hash allegati nel database malware (API key richiesta)',         desc_en: 'Attachment hashes in malware database (API key required)' },
   ]
   return (
     <div style={{
