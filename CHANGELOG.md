@@ -5,6 +5,53 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
 ---
 
+## [Unreleased] — Roadmap
+
+Questa sezione raccoglie tutto ciò che è pianificato ma non ancora implementato.
+Le funzionalità sono ordinate per priorità di implementazione.
+Ogni voce passa a una sezione con numero di versione quando viene completata.
+
+### Reputazione — nuovi servizi (priorità alta)
+
+- [ ] **Shodan InternetDB** — porte aperte e CVE per IP; no API key, endpoint JSON pubblico
+- [ ] **Abuse.ch URLhaus** — database URL malware attivi; no API key, stesso ecosistema di MalwareBazaar
+- [ ] **ThreatFox** (abuse.ch) — IOC unificati (URL, IP, hash, domini); no API key
+- [ ] **CIRCL Passive DNS** — storico risoluzione DNS per IP e domini; gratuito con registrazione
+- [ ] **GreyNoise Community** — distingue scanner innocui da attori malevoli, riduce falsi positivi; free tier 100 req/g
+- [ ] **URLScan.io** — analisi completa URL con screenshot; free tier 100 req/h
+- [ ] **Pulsedive** — threat intel aggregata su IP/URL/domini; free tier 30 req/min
+- [ ] **Criminal IP** — threat score IP con geolocalizzazione; free tier
+- [ ] **SecurityTrails** — Passive DNS e WHOIS storico per tracciare infrastrutture; 50 req/mese free
+- [ ] **Hybrid Analysis** — analisi statica avanzata hash allegati; gratuito con registrazione
+
+### Header analysis (priorità media)
+
+- [ ] **List-Unsubscribe** — analisi link di unsubscribe (dominio diverso dal mittente, URL sospetti)
+- [ ] **X-Campaign-ID** — analisi del campo già estratto: correlazione campagne bulk, pattern sospetti
+- [ ] **ARC chain** (Authenticated Received Chain) — rilevante per phishing via account compromessi e forwarding
+- [ ] **DKIM-Signature parsing** — estrazione selettore, dominio firmatario, algoritmo; ora si verifica solo il risultato
+
+### Body analysis (priorità media)
+
+- [ ] **Rilevamento errori grammaticali** — integrazione LanguageTool (locale o API) per testi tradotti/generati automaticamente
+- [ ] **Logistic regression NLP** — miglioramento classificatore attuale (Naive Bayes); migliore calibrazione probabilità
+- [ ] **Dataset Enron/Nazario** — riaddestramento modello NLP con dataset pubblici per migliorare la generalizzazione
+- [ ] **Omoglifi e Unicode spoofing** — rilevamento caratteri Unicode visivamente identici a caratteri latini nel testo (es. `а` cirillica)
+
+### Report (priorità media)
+
+- [ ] **Sezione Campagne nel .docx** — la sezione Campagne Rilevate esiste nella UI ma non viene inclusa nel report Word generato
+
+### Infrastruttura (priorità bassa)
+
+- [ ] **PostgreSQL** — supporto database alternativo a SQLite per deployment multi-utente
+- [ ] **Sistema plugin** — architettura modulare per aggiungere connettori e analizzatori senza modificare il core
+- [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
+- [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
+- [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
+
+---
+
 ## [0.3.5] — 2026-03-30
 
 ### Aggiunto
