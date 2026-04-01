@@ -79,6 +79,17 @@ def _extract_auth_result(value: str, keyword: str) -> str:
     m = re.search(pattern, value, re.IGNORECASE)
     return m.group(1).rstrip(";").lower() if m else ""
 
+def _extract_auth_results(values: list[str], keyword: str) -> str:
+    """Extract pass/fail/none/neutral from the LAST Authentication-Results header."""
+    if not values or not isinstance(values, list):
+        return ""
+    last_header = values[-1]
+    last_header_clean = " ".join(last_header.split())
+    pattern = rf"{keyword}=(\S+)"
+    m = re.search(pattern, last_header_clean, re.IGNORECASE)
+    if m:
+        return m.group(1).rstrip(";").strip("'\"").lower()
+    return ""
 
 def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
     """Parse a raw .eml file."""
@@ -97,6 +108,10 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
     def get_header(name: str) -> str:
         val = msg.get(name, "")
         return str(val).strip() if val else ""
+    
+    def get_headers(name: str) -> str:
+        vals = msg.get_all(name, "")
+        return [str(val).strip() if val else "" for val in vals]
 
     parsed.mail_from = get_header("From")
     parsed.mail_subject = get_header("Subject")
@@ -119,10 +134,10 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
     parsed.received_chain = [str(r).strip() for r in (msg.get_all("Received") or [])]
 
     # Auth-Results
-    auth_results = get_header("Authentication-Results")
-    parsed.spf_result = _extract_auth_result(auth_results, "spf")
-    parsed.dkim_result = _extract_auth_result(auth_results, "dkim")
-    parsed.dmarc_result = _extract_auth_result(auth_results, "dmarc")
+    auth_results = get_headers("Authentication-Results")
+    parsed.spf_result = _extract_auth_results(auth_results, "spf")
+    parsed.dkim_result = _extract_auth_results(auth_results, "dkim")
+    parsed.dmarc_result = _extract_auth_results(auth_results, "dmarc")
 
     # Also check dedicated headers
     if not parsed.spf_result:
