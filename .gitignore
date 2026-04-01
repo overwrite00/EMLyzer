@@ -42,3 +42,18 @@ desktop.ini
 
 # Log
 *.log
+
+# Varianti dotenv
+.env.*
+.env.local
+
+# Test artifacts
+.coverage
+htmlcov/
+
+# File temporanei degli script di avvio
+*.tmp
+
+# Certificati e chiavi private
+*.pem
+*.key
