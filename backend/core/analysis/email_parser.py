@@ -84,17 +84,6 @@ def _extract_auth_results(values: list[str], keyword: str) -> str:
         return m.group(1).rstrip(";").lower()
     return ""
 
-def _extract_auth_results(values: list[str], keyword: str) -> str:
-    """Extract pass/fail/none/neutral from the LAST Authentication-Results header."""
-    if not values or not isinstance(values, list):
-        return ""
-    last_header = values[-1]
-    last_header_clean = " ".join(last_header.split())
-    pattern = rf"{keyword}=(\S+)"
-    m = re.search(pattern, last_header_clean, re.IGNORECASE)
-    if m:
-        return m.group(1).rstrip(";").strip("'\"").lower()
-    return ""
 
 def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
     """Parse a raw .eml file."""
@@ -113,13 +102,6 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
     def get_header(name: str) -> str:
         """Legge un header e decodifica gli encoded words RFC 2047 (=?UTF-8?Q?...?=)."""
         val = msg.get(name, "")
-<<<<<<< Updated upstream
-        return str(val).strip() if val else ""
-    
-    def get_headers(name: str) -> str:
-        vals = msg.get_all(name, "")
-        return [str(val).strip() if val else "" for val in vals]
-=======
         if not val:
             return ""
         try:
@@ -133,7 +115,6 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
         """Legge tutti i valori di un header (può essere presente più volte)."""
         vals = msg.get_all(name) or []
         return [str(val).strip() for val in vals if val]
->>>>>>> Stashed changes
 
     parsed.mail_from = get_header("From")
     parsed.mail_subject = get_header("Subject")
@@ -155,11 +136,7 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
     # Received chain
     parsed.received_chain = [str(r).strip() for r in (msg.get_all("Received") or [])]
 
-<<<<<<< Updated upstream
-    # Auth-Results
-=======
     # Auth-Results — usa get_all per gestire email con header multipli
->>>>>>> Stashed changes
     auth_results = get_headers("Authentication-Results")
     parsed.spf_result = _extract_auth_results(auth_results, "spf")
     parsed.dkim_result = _extract_auth_results(auth_results, "dkim")
