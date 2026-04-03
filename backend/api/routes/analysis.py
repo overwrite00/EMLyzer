@@ -290,6 +290,7 @@ def _build_response_from_record(record) -> dict:
             "critical_count": ai.get("critical_count", 0),
             "attachments":    ai.get("attachments", []),
         },
+        "reputation_results": record.reputation_results,
     }
 
 

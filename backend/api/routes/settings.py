@@ -19,10 +19,11 @@ async def get_settings():
         "version": settings.VERSION,
         "max_upload_mb": settings.MAX_UPLOAD_SIZE_MB,
         "allowed_extensions": settings.ALLOWED_EXTENSIONS,
-        "reputation_plugins": {
-            "abuseipdb": bool(settings.ABUSEIPDB_API_KEY),
-            "virustotal": bool(settings.VIRUSTOTAL_API_KEY),
-            "phishtank": bool(settings.PHISHTANK_API_KEY),
+        "reputation_keys": {
+            "AbuseIPDB":    bool(settings.ABUSEIPDB_API_KEY),
+            "VirusTotal":   bool(settings.VIRUSTOTAL_API_KEY),
+            "PhishTank":    bool(settings.PHISHTANK_API_KEY),
+            "MalwareBazaar":bool(settings.MALWAREBAZAAR_API_KEY),
         },
     }
 

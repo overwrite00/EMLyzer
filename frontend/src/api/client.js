@@ -79,3 +79,9 @@ export async function getCampaigns({ threshold = 0.6, minSize = 2 } = {}) {
   const res = await api.get(`/campaigns/?threshold=${threshold}&min_size=${minSize}`)
   return res.data
 }
+
+// Get app settings (includes which API keys are configured)
+export async function getSettings() {
+  const res = await api.get('/settings/')
+  return res.data
+}

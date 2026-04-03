@@ -30,11 +30,44 @@ HEADER_INJECTION_PATTERNS = [
     r"\r\n", r"\n\n", r"%0a", r"%0d", r"\x00",
 ]
 
-# IP privati / loopback (non dovrebbero apparire in X-Originating-IP legittimi)
-PRIVATE_IP_PATTERN = re.compile(
-    r"^(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|"
-    r"192\.168\.\d+\.\d+|127\.\d+\.\d+\.\d+|::1)$"
+import ipaddress as _ipaddress
+
+# Regex per estrarre IP (v4 e v6) dai Received header
+# Formati RFC supportati:
+#   [IPv6:2001:db8::1]   — prefisso esplicito (Gmail, Postfix)
+#   [2001:db8::1]        — IPv6 senza prefisso
+#   [203.0.113.42]       — IPv4 classico
+_IP_IN_RECEIVED_RE = re.compile(
+    r"\[IPv6:([0-9a-fA-F:]+)\]"           # IPv6 con prefisso esplicito
+    r"|\[(\d{1,3}(?:\.\d{1,3}){3})\]"  # IPv4 classico
+    r"|\[([0-9a-fA-F]{0,4}(?::[0-9a-fA-F]{0,4}){2,7})\]",  # IPv6 senza prefisso
+    re.IGNORECASE,
 )
+
+def _extract_ip_from_received(received: str) -> tuple[str | None, bool]:
+    """
+    Estrae il primo IP (v4 o v6) da un Received header.
+    Ritorna (ip_str_normalizzato, is_private).
+    """
+    m = _IP_IN_RECEIVED_RE.search(received)
+    if not m:
+        return None, False
+    raw = m.group(1) or m.group(2) or m.group(3)
+    if not raw:
+        return None, False
+    try:
+        addr = _ipaddress.ip_address(raw)
+        return str(addr), addr.is_private or addr.is_loopback or addr.is_link_local
+    except ValueError:
+        return None, False
+
+def _is_private_ip(ip_str: str) -> bool:
+    """True se l'IP è privato/riservato."""
+    try:
+        addr = _ipaddress.ip_address(ip_str.strip().strip("[]"))
+        return addr.is_private or addr.is_loopback or addr.is_link_local
+    except ValueError:
+        return True
 
 
 @dataclass
@@ -179,15 +212,20 @@ def _check_header_injection(parsed: ParsedEmail, result: HeaderAnalysisResult):
 
 
 def _parse_received_chain(parsed: ParsedEmail, result: HeaderAnalysisResult):
-    """Analizza la catena Received per ricostruire il percorso SMTP."""
-    for i, received in enumerate(parsed.received_chain):
+    """
+    Analizza la catena Received per ricostruire il percorso SMTP.
+    I Received header sono in ordine inverso nel messaggio (ogni server aggiunge in cima):
+    get_all() restituisce [ultimo_hop, ..., primo_hop].
+    Invertendo, hop 1 = mittente originale, hop N = server di destinazione finale.
+    """
+    for i, received in enumerate(reversed(parsed.received_chain)):
         hop: dict = {"hop": i + 1, "raw": received[:300]}
 
-        # Estrai IP
-        ip_m = re.search(r"\[(\d{1,3}(?:\.\d{1,3}){3})\]", received)
-        if ip_m:
-            hop["ip"] = ip_m.group(1)
-            if PRIVATE_IP_PATTERN.match(hop["ip"]):
+        # Estrai IP (IPv4 e IPv6)
+        ip_str, is_private = _extract_ip_from_received(received)
+        if ip_str:
+            hop["ip"] = ip_str
+            if is_private:
                 hop["private_ip"] = True
 
         # Estrai "by" hostname
@@ -210,7 +248,7 @@ def _check_originating_ip(parsed: ParsedEmail, result: HeaderAnalysisResult):
         return
     # Rimuovi parentesi quadre se presenti
     ip = ip.strip("[]")
-    if PRIVATE_IP_PATTERN.match(ip):
+    if _is_private_ip(ip):
         result.findings.append(HeaderFinding(
             field="X-Originating-IP",
             severity="medium",

@@ -1,6 +1,6 @@
 // src/components/AnalysisDetail.jsx
-import { useState } from 'react'
-import { runReputation, getReportUrl, updateNotes } from '../api/client'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { runReputation, getReportUrl, updateNotes, getAnalysis } from '../api/client'
 import { Section, KeyValue, FindingRow, EmptyState, Button, SeverityBadge } from './ui'
 import RiskMeter from './RiskMeter'
 import { useLang } from '../i18n/LangContext'
@@ -16,6 +16,7 @@ export default function AnalysisDetail({ data, onClose }) {
   const [repLoading, setRepLoading] = useState(false)
   const [repData, setRepData]     = useState(null)
   const [repError, setRepError]   = useState('')
+  const pollRef = useRef(null)
   const [notes, setNotes]         = useState(data?.analyst_notes || '')
   const [notesSaving, setNotesSaving] = useState(false)
   const [notesSaved, setNotesSaved]   = useState(false)
@@ -25,10 +26,47 @@ export default function AnalysisDetail({ data, onClose }) {
 
   async function handleReputation() {
     setRepLoading(true); setRepError('')
-    try { setRepData(await runReputation(data.job_id)) }
-    catch (err) { setRepError(err.response?.data?.detail || err.message) }
-    finally { setRepLoading(false) }
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    try {
+      // Fase 1: chiama POST /api/reputation/{id} → risultati fast (<15s)
+      const result = await runReputation(data.job_id)
+      setRepData(result)
+
+      // Fase 2: se ci sono servizi slow (VT/AbuseIPDB/crt.sh) avvia polling
+      if (result.slow_running) {
+        pollRef.current = setInterval(async () => {
+          try {
+            // GET /api/analysis/{id} ora include reputation_results col campo reputation_phase
+            const updated = await getAnalysis(data.job_id)
+            const rep = updated?.reputation_results
+            if (!rep) return  // non ancora disponibile, riprova
+
+            if (rep.reputation_phase === 'complete') {
+              // Fase 2 completata: aggiorna tutto il repData con i risultati finali
+              setRepData({
+                job_id:           data.job_id,
+                phase:            'complete',
+                slow_running:     false,
+                reputation_score: rep.reputation_score ?? 0,
+                malicious_count:  rep.malicious_count  ?? 0,
+                service_registry: rep.service_registry ?? [],
+                results:          rep,
+              })
+              clearInterval(pollRef.current)
+              pollRef.current = null
+            }
+          } catch (_) { /* polling silenzioso */ }
+        }, 5000)  // ogni 5 secondi
+      }
+    } catch (err) {
+      setRepError(err.response?.data?.detail || err.message || 'Errore sconosciuto')
+    } finally {
+      setRepLoading(false)
+    }
   }
+
+  // Cleanup polling allo smontaggio
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
   async function handleSaveNotes() {
     setNotesSaving(true); setNotesSaved(false)
@@ -203,14 +241,33 @@ function TabHeader({ data, t }) {
 
       {data.received_hops?.length > 0 && (
         <Section title={t('header.smtp_chain')} icon="🌐">
-          {data.received_hops.map((hop, i) => (
-            <div key={i} style={{ padding: '6px 10px', marginBottom: 4, borderRadius: 4, background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-              <span style={{ color: 'var(--accent-blue)' }}>hop {hop.hop}</span>
-              {hop.ip && <> · IP: <span style={{ color: hop.private_ip ? 'var(--risk-medium)' : 'var(--text-primary)' }}>{hop.ip}</span></>}
-              {hop.by && <> · by: {hop.by}</>}
-              {hop.timestamp && <> · {hop.timestamp}</>}
-            </div>
-          ))}
+          {/* Avviso ordine hop */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 10px', marginBottom: 10, borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', fontSize: 11, color: 'var(--text-muted)' }}>
+            <span style={{ flexShrink: 0, fontSize: 13 }}>ℹ️</span>
+            <span>{t('header.smtp_chain_note')}</span>
+          </div>
+          {data.received_hops.map((hop, i) => {
+            const isFirst = i === 0
+            const isLast  = i === data.received_hops.length - 1
+            const badge = isFirst
+              ? { label: t('header.hop_sender'),      color: 'var(--accent-blue)',  bg: '#0f1f3d' }
+              : isLast
+                ? { label: t('header.hop_destination'), color: 'var(--risk-low)',     bg: 'var(--risk-low-bg)' }
+                : null
+            return (
+              <div key={i} style={{ padding: '6px 10px', marginBottom: 4, borderRadius: 4, background: 'var(--bg-card)', border: `1px solid ${isFirst ? 'var(--accent-blue)44' : isLast ? 'var(--risk-low)44' : 'var(--border)'}`, fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                <span style={{ color: 'var(--accent-blue)' }}>hop {hop.hop}</span>
+                {badge && (
+                  <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', color: badge.color, background: badge.bg, border: `1px solid ${badge.color}44` }}>
+                    {badge.label}
+                  </span>
+                )}
+                {hop.ip && <> · IP: <span style={{ color: hop.private_ip ? 'var(--risk-medium)' : 'var(--text-primary)' }}>{hop.ip}</span></>}
+                {hop.by && <> · by: {hop.by}</>}
+                {hop.timestamp && <> · {hop.timestamp}</>}
+              </div>
+            )
+          })}
         </Section>
       )}
 

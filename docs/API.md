@@ -26,7 +26,7 @@ Tutte le risposte sono in formato **JSON**. In caso di errore:
 Verifica che il server risponda.
 
 ```json
-{"status": "ok", "version": "0.3.5", "app": "EMLyzer"}
+{"status": "ok", "version": "0.4.9", "app": "EMLyzer"}
 ```
 
 ---
@@ -153,7 +153,9 @@ Salva le note dell'analista.
 ---
 
 ### `POST /api/reputation/{job_id}`
-Esegue i controlli di reputazione (AbuseIPDB, VirusTotal, OpenPhish, PhishTank, MalwareBazaar).
+Avvia i controlli di reputazione in due fasi:
+- **Fase 1** (risposta sincrona, < 15s): Spamhaus, ASN Lookup, OpenPhish, PhishTank, Redirect Chain, MalwareBazaar
+- **Fase 2** (background automatico): AbuseIPDB, VirusTotal, crt.sh — il campo `slow_running: true` indica che sono in corso; usare `GET /api/analysis/{job_id}` per il polling e controllare `reputation_results.reputation_phase === "complete"` per sapere quando sono terminati.
 
 ```json
 {
@@ -225,7 +227,7 @@ Configurazione corrente (lingua, plugin attivi, ecc.).
 ```json
 {
   "language": "it",
-  "version": "0.3.5",
+  "version": "0.4.9",
   "max_upload_mb": 25,
   "reputation_plugins": {
     "abuseipdb": true,

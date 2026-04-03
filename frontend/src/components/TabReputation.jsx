@@ -2,14 +2,16 @@
 // Scheda reputazione: mostra lo stato di TUTTI i servizi,
 // anche quelli non configurati o che non hanno trovato nulla.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui'
+import { getSettings } from '../api/client'
 
 const STATE_CONFIG = {
   malicious:       { icon: '🔴', label_it: 'MALEVOLO',       label_en: 'MALICIOUS',       color: 'var(--risk-high)',     bg: 'var(--risk-high-bg)' },
   clean:           { icon: '✅', label_it: 'Pulito',          label_en: 'Clean',           color: 'var(--risk-low)',      bg: 'var(--risk-low-bg)' },
   skipped:         { icon: '🔑', label_it: 'Chiave mancante', label_en: 'Key missing',     color: 'var(--text-muted)',    bg: 'var(--bg-card)' },
   not_applicable:  { icon: '➖', label_it: 'Non applicabile', label_en: 'Not applicable',  color: 'var(--accent-blue)',   bg: '#0f1f3d' },
+  pending:         { icon: '⏳', label_it: 'In elaborazione', label_en: 'Processing',       color: 'var(--risk-medium)',    bg: 'var(--risk-medium-bg)' },
   error:           { icon: '⚠️', label_it: 'Errore',          label_en: 'Error',           color: 'var(--risk-medium)',   bg: 'var(--risk-medium-bg)' },
 }
 
@@ -23,7 +25,13 @@ const ENTITY_ICONS = {
 export default function TabReputation({ data, loading, error, onRun, t, lang }) {
 
   const [expanded, setExpanded] = useState({})
+  const [apiKeys,   setApiKeys]  = useState({})   // { AbuseIPDB: bool, VirusTotal: bool, ... }
   const toggle = (name) => setExpanded(e => ({ ...e, [name]: !e[name] }))
+
+  // Carica lo stato delle chiavi API al mount — indipendente dall'analisi
+  useEffect(() => {
+    getSettings().then(s => { if (s?.reputation_keys) setApiKeys(s.reputation_keys) }).catch(() => {})
+  }, [])
 
   // Prima della prima esecuzione
   if (!data) {
@@ -34,7 +42,7 @@ export default function TabReputation({ data, loading, error, onRun, t, lang }) 
         </p>
 
         {/* Anteprima servizi disponibili */}
-        <ServicePreview lang={lang} />
+        <ServicePreview lang={lang} apiKeys={apiKeys} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Button onClick={onRun} loading={loading}>
@@ -105,6 +113,12 @@ export default function TabReputation({ data, loading, error, onRun, t, lang }) 
       </div>
 
       {/* Griglia servizi */}
+      {data.slow_running && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', marginBottom: 8, borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--accent-blue)44', fontSize: 12, color: 'var(--text-secondary)' }}>
+          <span style={{ fontSize: 14 }}>⏳</span>
+          <span>{t('rep.slow_running')}</span>
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {registry.map(svc => (
           <ServiceCard
@@ -310,7 +324,7 @@ function DetailRow({ r, lang }) {
 }
 
 // ── Anteprima servizi prima dell'esecuzione ───────────────────────────────────
-function ServicePreview({ lang }) {
+function ServicePreview({ lang, apiKeys }) {
   const services = [
     // ── IP ───────────────────────────────────────────────────────────────────
     { name: 'AbuseIPDB',      needs_key: true,  type: 'ip',          desc_it: 'Reputazione IP (header SMTP, X-Originating-IP, IP negli URL)', desc_en: 'IP reputation (SMTP hops, X-Originating-IP, direct IPs)' },
@@ -349,13 +363,20 @@ function ServicePreview({ lang }) {
               {lang === 'it' ? s.desc_it : s.desc_en}
             </span>
           </div>
-          {s.needs_key ? (
-            <span style={{ fontSize: 10, color: 'var(--text-muted)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)' }}>
-              🔑 {lang === 'it' ? 'chiave .env' : '.env key'}
-            </span>
-          ) : (
+          {s.needs_key ? (() => {
+            // Cerca nel service_registry se la chiave è effettivamente configurata
+            // apiKeys = { "AbuseIPDB": true/false, ... } da /api/settings/
+            const isConfigured = apiKeys[s.name] === true
+            return !isConfigured
+              ? <span style={{ fontSize: 10, color: 'var(--risk-medium)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--risk-medium)44' }}>
+                  🔑 {lang === 'it' ? 'API key non configurata' : 'API key not configured'}
+                </span>
+              : <span style={{ fontSize: 10, color: 'var(--risk-low)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--risk-low)44' }}>
+                  ✓ {lang === 'it' ? 'API key configurata' : 'API key configured'}
+                </span>
+          })() : (
             <span style={{ fontSize: 10, color: 'var(--risk-low)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--risk-low)44' }}>
-              ✓ {lang === 'it' ? 'libero' : 'free'}
+              ✓ {lang === 'it' ? 'gratuito' : 'free'}
             </span>
           )}
         </div>

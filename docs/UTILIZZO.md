@@ -86,7 +86,11 @@ Ogni email riceve un **punteggio da 0 a 100** e un'**etichetta**:
 | 🟣 **Critico** | 70–100 | Non cliccare nulla, non aprire allegati |
 
 **Come viene calcolato:**
-Il punteggio è la media pesata di quattro moduli (Header 25% + Body 25% + URL 25% + Allegati 25%). I controlli di reputazione possono aggiungere fino a +30 punti.
+Il punteggio combina quattro moduli con **pesi adattivi**: Header 35% + Body 35% + URL 20% + Allegati 10%. I moduli non applicabili (es. URL assenti) non diluiscono il punteggio — il peso viene ridistribuito sui moduli presenti.
+
+Inoltre sono attivi dei **livelli minimi garantiti** per indicatori critici ad alta confidenza: ad esempio, un mismatch tra From e Return-Path (finding HIGH) garantisce sempre almeno un punteggio Moderato, indipendentemente dal resto. Un allegato con macro VBA o un allegato CRITICAL (eseguibile camuffato) garantisce rispettivamente almeno 25 o 40 punti.
+
+I controlli di reputazione possono aggiungere fino a +30 punti.
 
 > ℹ️ Il punteggio è uno strumento di supporto, non una sentenza definitiva. Usa sempre il giudizio critico insieme ai dati tecnici.
 
@@ -204,26 +208,33 @@ Per ogni allegato viene mostrato anche il **hash SHA256** — utile per cercarlo
 
 Verifica IP, URL e hash su database pubblici di minacce.
 
-**Prima dell'esecuzione:** anteprima di tutti i 5 servizi con il loro stato di configurazione.
+**Prima dell'esecuzione:** anteprima di tutti i 9 servizi con indicazione se la API key è configurata o meno.
 
-**Dopo aver cliccato "Avvia controllo reputazione":**
+**Dopo aver cliccato "Avvia controllo reputazione"**, i risultati arrivano in due fasi:
+- **Fase 1** (pochi secondi): Spamhaus, ASN Lookup, OpenPhish, PhishTank, Redirect Chain, MalwareBazaar
+- **Fase 2** (in background, aggiornamento automatico): AbuseIPDB, VirusTotal, crt.sh
 
 | Icona | Stato | Significato |
 |---|---|---|
 | ✅ | Pulito | Analizzato, nessuna minaccia trovata |
 | 🔴 | MALEVOLO | Trovato in un database di minacce |
-| 🔑 | Chiave mancante | Servizio che richiede API key (vedi [Configurazione](CONFIGURAZIONE.md)) |
-| ➖ | Non applicabile | Attivo, ma questa email non ha entità del tipo analizzato da questo servizio |
+| ⏳ | In elaborazione | Servizio SLOW in elaborazione background (si aggiorna automaticamente) |
+| 🔑 | Chiave mancante | API key non configurata (vedi [Configurazione](CONFIGURAZIONE.md)) |
+| ➖ | Non applicabile | Attivo ma questa email non ha entità del tipo analizzato (es. nessun URL shortener per Redirect Chain) |
 | ⚠️ | Errore | Problema di connessione al servizio |
 
 **Servizi sempre attivi (nessuna chiave richiesta):**
-- **OpenPhish** — feed URL phishing aggiornato quotidianamente
-- **MalwareBazaar** — hash malware
+- **Spamhaus DROP** — blocklist IP malevoli di alto profilo
+- **ASN Lookup** — Autonomous System Number per ogni IP (ipinfo.io)
+- **OpenPhish** — feed URL phishing aggiornato
+- **Redirect Chain** — segue i redirect degli URL shortener
+- **crt.sh** — certificati TLS del dominio (età, sottodomini)
 
-**Servizi opzionali:**
-- **AbuseIPDB** — IP
-- **VirusTotal** — IP, URL, hash (70+ engine)
-- **PhishTank** — URL phishing
+**Servizi che richiedono API key:**
+- **AbuseIPDB** — reputazione IP (header SMTP, X-Originating-IP)
+- **VirusTotal** — IP, URL e hash allegati (70+ engine)
+- **PhishTank** — URL phishing verificati dalla community
+- **MalwareBazaar** — hash allegati nel database malware
 
 Clicca su un servizio per espanderlo e vedere il dettaglio di ogni entità analizzata.
 

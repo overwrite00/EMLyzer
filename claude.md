@@ -9,7 +9,7 @@ correcto un bug importante, o modificata l'architettura.
 ## Identità del progetto
 
 - **Nome**: EMLyzer (rinominato da OpenMailForensics nella v0.3.1)
-- **Versione corrente**: 0.3.5 — fonte di verità: `backend/utils/config.py` → `VERSION`
+- **Versione corrente**: 0.4.9 — fonte di verità: `backend/utils/config.py` → `VERSION`
 - **Tipo**: piattaforma open-source di email forensics & threat analysis
 - **Filosofia**: nessuna dipendenza obbligatoria da API proprietarie; API a pagamento solo come plugin opzionali configurati dal singolo utente; analisi offline-first
 - **Repository**: GitHub (distribuzione pubblica)
@@ -130,10 +130,12 @@ upload file → parse_email_file()
               salva in DB
 ```
 
-**Risk scoring**:
+**Risk scoring** (v2 — normalizzazione adattiva):
 - `low`: 0–20, `medium`: 20–45, `high`: 45–70, `critical`: 70–100
-- Pesi moduli: header 25%, body 25%, url 25%, attachment 25%
-- NLP (MultinomialNB + TF-IDF) contribuisce fino a +40pt al body score
+- Pesi base: header 35%, body 35%, url 20%, attachment 10%
+- Normalizzazione adattiva: denominatore = somma pesi moduli ATTIVI (url solo se ha URL; allegati solo se ha allegati)
+- Floor deterministici: 1 HIGH header → ≥20; HIGH+NLP≥50% → ≥35; 3+ HIGH → ≥45; URL≥75 → ≥20; allegato HIGH → ≥25; allegato CRITICAL → ≥40; 2+ body HIGH → ≥30
+- NLP (MultinomialNB + TF-IDF) contribuisce al body score_contribution
 
 ---
 
@@ -142,10 +144,13 @@ upload file → parse_email_file()
 ### email_parser
 Supporta `.eml` (mail-parser) e `.msg` (extract-msg). Estrae tutti i campi in `ParsedEmail`:
 `filename, file_hash_md5/sha1/sha256, mail_from/to/cc/subject/date, message_id, return_path, reply_to, x_mailer, x_originating_ip, x_campaign_id, list_unsubscribe, received_chain, spf/dkim/dmarc_result, body_text, body_html, attachments, parse_errors`
+**Decodifica RFC 2047**: `get_header()` usa `email.header.decode_header()` + `make_header()` — decodifica automaticamente `=?UTF-8?Q?...?=`, `=?UTF-8?B?...?=` e `=?iso-8859-1?...?=` in tutti i campi header.
 
 ### header_analyzer
 Funzioni interne: `_check_auth`, `_check_bulk_sender`, `_check_header_injection`, `_check_identity_mismatch`, `_check_missing_fields`, `_check_originating_ip`
 Finding severities: `info`, `low`, `medium`, `high`
+**IPv6**: `_extract_ip_from_received(received)` → estrae IP (v4 e v6) dai Received header; `_is_private_ip(ip)` usa `ipaddress` stdlib. Formati supportati: `[IPv6:addr]`, `[addr]`, `[x.x.x.x]`.
+**Ordine hop**: i Received header vengono invertiti (`reversed()`) in `_parse_received_chain` — hop 1 = mittente originale, hop N = server di destinazione finale (RFC 5321: ogni server aggiunge in cima).
 **Nota**: `list_unsubscribe` e `x_campaign_id` sono estratti dal parser ma NON ancora analizzati dall'header analyzer (voce in roadmap).
 
 ### body_analyzer
@@ -166,31 +171,56 @@ Tipi di cluster: `subject` (similarità Jaccard), `body_hash`, `message_id` (pat
 
 ## Sistema reputazione
 
-### Architettura
-- `reputation.py` (route) → `_extract_indicators()` → `run_reputation_checks()` (connectors)
-- Esecuzione **parallela** con `ThreadPoolExecutor(max_workers=8)`
-- Chiamata **non bloccante** per FastAPI via `await loop.run_in_executor()`
-- Timeout globale 50s → HTTP 504 se superato
-- Pre-carica feed con cache (OpenPhish, Spamhaus DROP) prima di avviare i thread
+### Architettura a due fasi
+- **Fase 1** `POST /api/reputation/{job_id}` → `run_fast_checks()` — risposta garantita < 5s, timeout route 50s
+- **Fase 2** FastAPI `BackgroundTask` → `run_slow_checks()` — nessun timeout, aggiorna DB quando finisce
+- Frontend fa polling `GET /api/analysis/{job_id}` ogni 5s finché `reputation_results.reputation_phase === "complete"`
+- **CRITICO**: usare `flag_modified(record, "reputation_results")` prima di ogni `commit()` con JSON su SQLite
+- Background task usa `asyncio.get_running_loop()` (non `get_event_loop()`, deprecato Python 3.10+)
 
-### Estrazione indicatori (da `_extract_indicators`)
-Fonti IP: `received_hops` (SMTP chain, solo pubblici), `record.x_originating_ip` (colonna diretta!), `url.host` dove `is_ip_address=True`, `url.resolved_ip`
-Fonti URL: `url_indicators.urls[].original_url`, `body_indicators.obfuscated_links[].actual_href`
-Deduplicazione via set Python — ogni IP/URL/hash appare una sola volta
+### Classificazione servizi
+**FAST** (`_FAST_SERVICES`): Spamhaus DROP, ASN Lookup, OpenPhish, PhishTank, Redirect Chain, MalwareBazaar
+**SLOW** (`_SLOW_SERVICES`): AbuseIPDB (1.1s/req), VirusTotal (15.5s/req), crt.sh (2.5s/req)
+
+### Estrazione indicatori
+- `_extract_indicators()` → tutti gli IP/URL/hash (per FAST: Spamhaus, ASN, OpenPhish, ecc.)
+- `_extract_priority_indicators()` → selettivo per SLOW (max 4 URL, solo sospetti; IP solo da header)
+  - IP: SOLO `received_hops` + `x_originating_ip` — NON i `resolved_ip` degli URL (CDN normali)
+  - URL: solo `is_shortener`, `is_new_domain`, `is_ip_address`, `is_punycode`, `risk_score >= 25`
+
+### Nomi servizi — mappa obbligatoria `_FN_TO_SOURCE`
+Mappa `fn.__name__` → nome corretto per `_build_service_registry`:
+- `check_ip_abuseipdb` → `"AbuseIPDB"`, `check_*_virustotal` → `"VirusTotal"`, `check_domain_crtsh` → `"crt.sh"`
+- SENZA questa mappa i placeholder usano nomi sbagliati (es. `"Ip Abuseipdb"`) → stato `not_applicable`
+
+### Stati `service_registry`
+- `clean` ✅ — check completato, nessun indicatore malevolo
+- `malicious` ❌ — indicatori malevoli trovati
+- `pending` ⏳ — servizio SLOW in elaborazione background
+- `skipped` 🔑 — API key non configurata
+- `not_applicable` ➖ — servizio non pertinente per questa email
+- `error` ⚠️ — errore durante il check
 
 ### Servizi attivi (9 totali)
 
-| Servizio | Tipo | Chiave | Note |
-|---|---|---|---|
-| AbuseIPDB | IP | `ABUSEIPDB_API_KEY` | Score 0-100 + ISP |
-| VirusTotal | IP+URL+hash | `VIRUSTOTAL_API_KEY` | Rate limit 4 req/min free |
-| Spamhaus DROP | IP | nessuna | Feed CIDR scaricato e cachato |
-| ASN Lookup | IP | nessuna | ipinfo.io, 50k req/mese free |
-| OpenPhish | URL | nessuna | Feed scaricato e cachato |
-| PhishTank | URL | `PHISHTANK_API_KEY` | Community verified |
-| Redirect Chain | URL | nessuna | Solo per shortener e HTTP |
-| crt.sh | URL/dominio | nessuna | Certificati TLS; retry su 502/503/504 |
-| MalwareBazaar | hash | `MALWAREBAZAAR_API_KEY` | Richiesta da marzo 2026 |
+| Servizio | Tipo | Chiave | Fase | Note |
+|---|---|---|---|---|
+| AbuseIPDB | IP | `ABUSEIPDB_API_KEY` | SLOW | Score 0-100, 1.1s rate |
+| VirusTotal | IP+URL+hash | `VIRUSTOTAL_API_KEY` | SLOW | 4 req/min free, 15.5s rate |
+| Spamhaus DROP | IP | nessuna | FAST | Feed CIDR cachato |
+| ASN Lookup | IP | nessuna | FAST | ipinfo.io, 50k/mese |
+| OpenPhish | URL | nessuna | FAST | Feed cachato |
+| PhishTank | URL | `PHISHTANK_API_KEY` | FAST | Community verified |
+| Redirect Chain | URL | nessuna | FAST | Solo shortener e HTTP |
+| crt.sh | URL/dominio | nessuna | SLOW | 2.5s rate, certificati TLS |
+| MalwareBazaar | hash | `MALWAREBAZAAR_API_KEY` | FAST | API key richiesta da marzo 2026 |
+
+### Rate limiter thread-safe
+`threading.Lock` per connettore + `_RATE_INTERVALS`. Retry backoff 2s/4s su 429/5xx.
+
+### Frontend — banner API key
+`TabReputation` carica `GET /api/settings/reputation_keys` via `useEffect` al mount.
+`ServicePreview` riceve `apiKeys = { "AbuseIPDB": bool, ... }` — indipendente dall'analisi corrente.
 
 Servizi informativi (ASN, crt.sh, Redirect Chain): mostrano `ℹ️` nella UI invece di `✅`.
 Timeout richieste: 6s per servizi sicurezza, 2s per servizi informativi (`REQUEST_TIMEOUT_INFO`).
@@ -284,6 +314,11 @@ LANGUAGE=it                # it o en
 4. **FastAPI + funzioni sincrone bloccanti**: usare sempre `await loop.run_in_executor()` per chiamate requests/HTTP sincrone negli handler async.
 5. **Versione hardcoded**: non scrivere mai `"0.3.X"` direttamente in nessun file. Usare `settings.VERSION`.
 6. **Variable scope subshell bash**: `$()` crea una subshell, le variabili assegnate dentro non propagano al padre. Usare variabili globali (`_RESOLVED_BIN`, `_RESOLVED_MINOR`) invece di `echo` + cattura.
+7. **SQLAlchemy JSON mutation**: con SQLite, riassegnare un dict JSON a una colonna non garantisce che SQLAlchemy tracci la modifica. Usare sempre `flag_modified(record, "reputation_results")` prima del `commit()`.
+8. **`_FN_TO_SOURCE` obbligatoria**: i placeholder "in elaborazione" nei servizi SLOW devono usare la mappa `_FN_TO_SOURCE` per ottenere il nome corretto (es. "AbuseIPDB" non "Ip Abuseipdb"). Senza di essa `_build_service_registry` non trova il servizio e mostra "non applicabile".
+9. **`GET /api/analysis` deve includere `reputation_results`**: `_build_response_from_record` deve restituire `"reputation_results": record.reputation_results` altrimenti il polling del frontend non può mai rilevare `reputation_phase === "complete"`.
+10. **`asyncio.get_running_loop()`**: nei background task FastAPI usare `get_running_loop()` non `get_event_loop()` (deprecato Python 3.10+, può creare un loop nuovo invece di usare quello di uvicorn).
+11. **Banner API key prima dell'analisi**: `ServicePreview` non può leggere lo stato chiavi dal `service_registry` (assente prima dell'analisi). Caricare da `GET /api/settings/reputation_keys` via `useEffect` al mount del componente.
 
 ---
 

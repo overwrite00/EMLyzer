@@ -88,9 +88,24 @@ def _whois_age(domain: str) -> tuple[Optional[datetime], Optional[int], str]:
     Tenta WHOIS per ricavare la data di creazione.
     Ritorna (creation_date, age_days, error).
     Non blocca l'analisi se fallisce.
+
+    python-whois emette logger.error() quando un server WHOIS chiude il socket
+    bruscamente (comportamento normale per molti server TLD). Lo soppressa
+    temporaneamente durante la chiamata per non inquinare i log di uvicorn.
     """
+    import logging as _logging
+    import whois  # python-whois — import lazy per performance
+    # Sopprime il logger di python-whois: i server WHOIS chiudono il socket
+    # TCP dopo la risposta (TCP half-close normale) e python-whois lo logga
+    # come error. Il filtro globale in main.py lo blocca già, ma setLevel
+    # qui aggiunge un secondo livello di difesa indipendente dall'app FastAPI.
+    _whois_logger = _logging.getLogger("whois")
+    _whois_whois_logger = _logging.getLogger("whois.whois")
+    _prev_level = _whois_logger.level
+    _prev_level2 = _whois_whois_logger.level
+    _whois_logger.setLevel(_logging.CRITICAL)
+    _whois_whois_logger.setLevel(_logging.CRITICAL)
     try:
-        import whois  # python-whois
         w = whois.whois(domain)
         creation = w.creation_date
         if isinstance(creation, list):
@@ -103,6 +118,9 @@ def _whois_age(domain: str) -> tuple[Optional[datetime], Optional[int], str]:
         return None, None, "No creation date in WHOIS"
     except Exception as e:
         return None, None, str(e)
+    finally:
+        _whois_logger.setLevel(_prev_level)
+        _whois_whois_logger.setLevel(_prev_level2)
 
 
 def _analyze_single_url(url: str, do_whois: bool = False) -> URLAnalysis:

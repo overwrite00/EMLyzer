@@ -119,7 +119,7 @@ Se hai ricevuto il file come `.tar.gz`:
 
 **Linux / macOS:**
 ```bash
-tar -xzf EMLyzer_v0.3.5.tar.gz
+tar -xzf EMLyzer_v0.4.9.tar.gz
 cd EMLyzer
 ```
 
@@ -146,7 +146,7 @@ Si aprirà una finestra nera (il Prompt dei comandi) che mostrerà i progressi:
 
 ```
 ============================================
-  EMLyzer v0.3.5
+  EMLyzer v0.4.9
 ============================================
 
 [INFO] Python trovato:
@@ -216,7 +216,7 @@ Per verificare che il backend risponda correttamente, puoi anche aprire:
 
 Dovresti vedere la risposta JSON:
 ```json
-{"status": "ok", "version": "0.3.5", "app": "EMLyzer"}
+{"status": "ok", "version": "0.4.9", "app": "EMLyzer"}
 ```
 
 ---

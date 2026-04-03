@@ -96,6 +96,9 @@ export const translations = {
   "header.findings": { it: "Finding Header", en: "Header Findings" },
   "header.no_findings": { it: "Nessun finding header.", en: "No header findings." },
   "header.smtp_chain": { it: "Percorso SMTP (Received Chain)", en: "SMTP Path (Received Chain)" },
+  "header.smtp_chain_note": { it: "Il percorso si legge dal mittente alla destinazione: hop 1 è il server di origine, l'ultimo hop è il server che ha ricevuto il messaggio.", en: "The path reads from sender to destination: hop 1 is the originating server, the last hop is the receiving server." },
+  "header.hop_sender": { it: "mittente", en: "sender" },
+  "header.hop_destination": { it: "destinazione", en: "destination" },
   "header.injection": { it: "Tentativi di Header Injection", en: "Header Injection Attempts" },
 
   // ── Body tab ─────────────────────────────────────────────────────────────────
@@ -131,6 +134,7 @@ export const translations = {
   "body.hidden_count": { it: "{n} elementi nascosti tramite CSS", en: "{n} elements hidden via CSS" },
   "body.hidden_technique": { it: "Tecnica: {technique}", en: "Technique: {technique}" },
   "body.hidden_content_label": { it: "Testo nascosto estratto:", en: "Extracted hidden text:" },
+  "body.hidden_evidence": { it: "Elementi nascosti tramite CSS o stili inline rilevati nel body HTML.", en: "Elements hidden via CSS or inline styles detected in HTML body." },
   "body.yes": { it: "Sì", en: "Yes" },
   "body.no": { it: "No", en: "No" },
 
@@ -167,6 +171,7 @@ export const translations = {
     en: "Checks IPs (SMTP headers, X-Originating-IP, direct IPs in URLs), body URLs (including obfuscated links) and attachment hashes via 9 sources — 5 free, no key required.",
   },
   "rep.run_btn": { it: "Avvia controllo reputazione", en: "Start reputation check" },
+  "rep.slow_running": { it: "VirusTotal e AbuseIPDB in elaborazione in background — i risultati si aggiorneranno a breve.", en: "VirusTotal and AbuseIPDB running in background — results will update shortly." },
   "rep.rerun_btn": { it: "↻ Ri-esegui", en: "↻ Re-run" },
   "rep.score": { it: "Score reputazione", en: "Reputation score" },
   "rep.malicious": { it: "Indicatori malevoli", en: "Malicious indicators" },

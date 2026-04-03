@@ -64,7 +64,7 @@ Email (.eml / .msg / testo incollato)
 │                                             │
 │  Reputazione        → AbuseIPDB, VirusTotal,│
 │                       OpenPhish, PhishTank, │
-│                       MalwareBazaar         │
+│                       crt.sh, MalwareBazaar │
 └─────────────────────────────────────────────┘
          │
          ▼
@@ -75,7 +75,7 @@ Email (.eml / .msg / testo incollato)
 
 ## 🔧 Versione
 
-**v0.3.5** — Python 3.13, 94 test automatici, Windows + Linux
+**v0.4.9** — Python 3.11–3.13, 94 test automatici, Windows + Linux
 
 ---
 
