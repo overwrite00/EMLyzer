@@ -102,10 +102,17 @@ async def lifespan(app: FastAPI):
     # Chiude l'executor di default di asyncio con wait=False per evitare
     # che threading._shutdown() blocchi su CTRL+C aspettando i thread
     # della fase 2 (VirusTotal/AbuseIPDB possono impiegare decine di secondi).
+    #
+    # Nota: _default_executor è un attributo privato non disponibile su tutti
+    # i loop asyncio (manca su alcune implementazioni Linux/Python 3.13+).
+    # Usiamo getattr con fallback silenzioso per compatibilità cross-platform.
     loop = asyncio.get_event_loop()
-    executor = loop._default_executor  # type: ignore[attr-defined]
+    executor = getattr(loop, "_default_executor", None)
     if executor is not None:
-        executor.shutdown(wait=False, cancel_futures=True)
+        try:
+            executor.shutdown(wait=False, cancel_futures=True)
+        except Exception:
+            pass  # shutdown non critico: il processo termina comunque
 
 
 app = FastAPI(

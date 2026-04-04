@@ -52,6 +52,13 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.5.0] — 2026-04-03
+
+### Corretto
+- Shutdown CTRL+C su Linux con Python 3.13: `loop._default_executor` non esiste su alcune implementazioni del loop asyncio (variante C di CPython 3.13, uvloop). Sostituito con `getattr(loop, "_default_executor", None)` che restituisce `None` invece di sollevare `AttributeError`, con blocco `try/except` aggiuntivo per sicurezza. Su Windows il comportamento rimane invariato
+
+---
+
 ## [0.4.9] — 2026-04-03
 
 ### Migliorato
