@@ -208,15 +208,43 @@ function TabSummary({ email, risk, t, notes, setNotes, onSaveNotes, notesSaving,
 // ── TAB HEADER ─────────────────────────────────────────────────────────────────
 function TabHeader({ data, t }) {
   if (!data) return <EmptyState message="–" />
+
+  const ad = data.auth_detail || {}
+  const AUTH_PROTOCOLS = [
+    {
+      proto: 'SPF',
+      ok: data.spf_ok,
+      result: data.spf_result,
+      desc: t('header.spf_desc'),
+      headers: 'Authentication-Results: spf=… · Received-SPF: …',
+    },
+    {
+      proto: 'DKIM',
+      ok: data.dkim_ok,
+      result: data.dkim_result,
+      desc: t('header.dkim_desc'),
+      headers: 'Authentication-Results: dkim=… · DKIM-Signature: …',
+    },
+    {
+      proto: 'DMARC',
+      ok: data.dmarc_ok,
+      result: data.dmarc_result,
+      desc: t('header.dmarc_desc'),
+      headers: 'Authentication-Results: dmarc=…',
+    },
+  ]
+
   return (
     <>
       <Section title={t('header.auth')} icon="🔐">
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <AuthPill label="SPF"   ok={data.spf_ok} />
-          <AuthPill label="DKIM"  ok={data.dkim_ok} />
-          <AuthPill label="DMARC" ok={data.dmarc_ok} />
-        </div>
-        {data.auth_summary && <div style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: 12 }}>{data.auth_summary}</div>}
+        {data.auth_summary && (
+          <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--text-secondary)' }}>
+            {data.auth_summary}
+          </div>
+        )}
+        {AUTH_PROTOCOLS.map(({ proto, ok, result, desc, headers }) => (
+          <AuthDetailRow key={proto} proto={proto} ok={ok} result={result} desc={desc} headers={headers} authDetail={ad} t={t} />
+        ))}
       </Section>
 
       {data.identity_mismatches?.length > 0 && (
@@ -280,15 +308,181 @@ function TabHeader({ data, t }) {
   )
 }
 
-function AuthPill({ label, ok }) {
+// Sub-row helper per i dettagli verbosi
+function SubRow({ label, value, mono = false, warn = false }) {
+  if (!value) return null
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '1px 0' }}>
+      <span style={{ fontSize: 10, color: 'var(--text-muted)', minWidth: 140, flexShrink: 0 }}>{label}</span>
+      <span style={{
+        fontSize: 10,
+        color: warn ? 'var(--risk-medium)' : 'var(--text-secondary)',
+        fontFamily: mono ? 'var(--font-mono)' : 'inherit',
+        wordBreak: 'break-all', lineHeight: 1.4,
+      }}>{value}</span>
+    </div>
+  )
+}
+
+function SpfSubDetail({ ad, t }) {
+  const hasData = ad.spf_client_ip || ad.spf_envelope_from || ad.spf_dns_record || ad.spf_dns_error || ad.spf_failure_reason
+  if (!hasData) return null
+  return (
+    <>
+      {ad.spf_failure_reason && (
+        <SubRow label={t('header.auth_detail_failure_reason')} value={ad.spf_failure_reason} warn />
+      )}
+      <SubRow label={t('header.auth_detail_client_ip')} value={ad.spf_client_ip} mono />
+      <SubRow label={t('header.auth_detail_envelope')} value={ad.spf_envelope_from} mono />
+      {ad.spf_dns_record
+        ? <SubRow label={t('header.auth_detail_spf_dns')} value={ad.spf_dns_record} mono />
+        : ad.spf_dns_error
+          ? <SubRow label={t('header.auth_detail_spf_dns')} value={`⚠️ ${ad.spf_dns_error}`} warn />
+          : null}
+    </>
+  )
+}
+
+function DkimSubDetail({ ad, t }) {
+  const sigs = ad.dkim_signatures || []
+  if (!sigs.length) return null
+  return sigs.map((sig, idx) => (
+    <div key={idx} style={{ marginBottom: idx < sigs.length - 1 ? 8 : 0 }}>
+      {sigs.length > 1 && (
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent-blue)', marginBottom: 3 }}>
+          {t('header.auth_detail_sig')} {idx + 1}: {sig.d || '—'}
+        </div>
+      )}
+      {sig.d && <SubRow label="d=" value={sig.d} mono />}
+      {sig.s && <SubRow label={t('header.auth_detail_selector')} value={`${sig.s}._domainkey.${sig.d}`} mono />}
+      {sig.a && <SubRow label={t('header.auth_detail_dkim_algo')} value={sig.a} mono />}
+      {sig.c && <SubRow label={t('header.auth_detail_dkim_canon')} value={sig.c} mono />}
+      {sig.h?.length > 0 && <SubRow label={t('header.auth_detail_dkim_headers')} value={sig.h.join(' · ')} />}
+      {sig.bh && <SubRow label={t('header.auth_detail_dkim_bh')} value={sig.bh} mono />}
+      <SubRow
+        label={t('header.auth_detail_dkim_key')}
+        value={
+          sig.dns_key_found
+            ? `✓ ${t('header.auth_detail_dkim_key_ok')}`
+            : (sig.dns_error
+                ? `✗ ${t('header.auth_detail_dkim_key_ko')} — ${sig.dns_error}`
+                : null)
+        }
+        warn={!sig.dns_key_found}
+      />
+      {/* Motivo fallimento: solo se la firma non passa ma la chiave DNS esiste
+          (se chiave non trovata il motivo è già evidente dalla riga DNS key) */}
+      {sig.result && sig.result !== 'pass' && sig.dns_key_found && (
+        <SubRow
+          label={t('header.auth_detail_failure_reason')}
+          value={ad.dkim_failure_reason || t('header.auth_detail_dkim_fail_sig')}
+          warn
+        />
+      )}
+    </div>
+  ))
+}
+
+function DmarcSubDetail({ ad, t }) {
+  const hasData = ad.dmarc_from_domain || ad.dmarc_policy || ad.dmarc_dns_record || ad.dmarc_dns_error || ad.dmarc_failure_reason
+  if (!hasData) return null
+  const POLICY_COLORS = {
+    reject:     { color: 'var(--risk-low)',    bg: 'var(--risk-low-bg)' },
+    quarantine: { color: 'var(--risk-medium)', bg: 'var(--risk-medium-bg)' },
+    none:       { color: 'var(--text-muted)',  bg: 'var(--bg-secondary)' },
+  }
+  const pc = POLICY_COLORS[ad.dmarc_policy] || POLICY_COLORS.none
+  const alignLabel = (v) => v === 'r' ? 'relaxed' : v === 's' ? 'strict' : v
+  return (
+    <>
+      {ad.dmarc_failure_reason && (
+        <SubRow label={t('header.auth_detail_failure_reason')} value={ad.dmarc_failure_reason} warn />
+      )}
+      {ad.dmarc_from_domain && <SubRow label={t('header.auth_detail_dmarc_from')} value={ad.dmarc_from_domain} mono />}
+      {ad.dmarc_policy && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '1px 0' }}>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', minWidth: 140, flexShrink: 0 }}>{t('header.auth_detail_dmarc_policy')}</span>
+          <span style={{ padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, color: pc.color, background: pc.bg, border: `1px solid ${pc.color}44`, fontFamily: 'var(--font-mono)' }}>
+            {ad.dmarc_policy}
+          </span>
+        </div>
+      )}
+      {ad.dmarc_subdomain_policy && <SubRow label={t('header.auth_detail_dmarc_sp')} value={ad.dmarc_subdomain_policy} mono />}
+      {ad.dmarc_adkim && <SubRow label={t('header.auth_detail_dmarc_adkim')} value={alignLabel(ad.dmarc_adkim)} />}
+      {ad.dmarc_aspf  && <SubRow label={t('header.auth_detail_dmarc_aspf')}  value={alignLabel(ad.dmarc_aspf)} />}
+      {ad.dmarc_pct && ad.dmarc_pct !== '100' && <SubRow label={t('header.auth_detail_dmarc_pct')} value={`${ad.dmarc_pct}%`} />}
+      {ad.dmarc_rua  && <SubRow label={t('header.auth_detail_dmarc_rua')} value={ad.dmarc_rua} mono />}
+      {ad.dmarc_dns_record
+        ? <SubRow label={t('header.auth_detail_dmarc_dns')} value={ad.dmarc_dns_record} mono />
+        : ad.dmarc_dns_error
+          ? <SubRow label={t('header.auth_detail_dmarc_dns')} value={`⚠️ ${ad.dmarc_dns_error}`} warn />
+          : null}
+    </>
+  )
+}
+
+function AuthDetailRow({ proto, ok, result, desc, headers, authDetail = {}, t }) {
+  const absent = !result
+  let pillColor, pillBg
+  if (absent) {
+    pillColor = 'var(--text-muted)'
+    pillBg    = 'var(--bg-card)'
+  } else if (ok) {
+    pillColor = 'var(--risk-low)'
+    pillBg    = 'var(--risk-low-bg)'
+  } else if (['softfail', 'neutral'].includes(result)) {
+    pillColor = 'var(--risk-medium)'
+    pillBg    = 'var(--risk-medium-bg)'
+  } else {
+    pillColor = 'var(--risk-high)'
+    pillBg    = 'var(--risk-high-bg)'
+  }
+  const icon  = absent ? '' : ok ? '✓ ' : '✗ '
+  const label = absent ? t('header.auth_absent_val') : result
+
+  const subDetail = proto === 'SPF'
+    ? <SpfSubDetail  ad={authDetail} t={t} />
+    : proto === 'DKIM'
+      ? <DkimSubDetail  ad={authDetail} t={t} />
+      : <DmarcSubDetail ad={authDetail} t={t} />
+
   return (
     <div style={{
-      padding: '4px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-      color: ok ? 'var(--risk-low)' : 'var(--risk-high)',
-      background: ok ? 'var(--risk-low-bg)' : 'var(--risk-high-bg)',
-      border: `1px solid ${ok ? 'var(--risk-low)' : 'var(--risk-high)'}55`,
+      padding: '10px 12px', borderRadius: 8, background: 'var(--bg-card)',
+      marginBottom: 6,
     }}>
-      {ok ? '✓' : '✗'} {label}
+      {/* riga principale */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, letterSpacing: '0.04em', marginBottom: 4 }}>
+            {proto}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4, lineHeight: 1.4 }}>
+            {desc}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            {headers}
+          </div>
+        </div>
+        <div style={{
+          padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+          color: pillColor, background: pillBg, border: `1px solid ${pillColor}55`,
+          whiteSpace: 'nowrap', alignSelf: 'center', fontFamily: 'var(--font-mono)',
+          flexShrink: 0,
+        }}>
+          {icon}{label}
+        </div>
+      </div>
+      {/* sub-dettagli */}
+      {subDetail && (
+        <div style={{
+          marginTop: 8, paddingTop: 8,
+          borderTop: '1px solid var(--border)',
+          display: 'flex', flexDirection: 'column', gap: 2,
+        }}>
+          {subDetail}
+        </div>
+      )}
     </div>
   )
 }

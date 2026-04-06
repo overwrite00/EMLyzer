@@ -47,6 +47,9 @@ _RATE_INTERVALS: dict[str, float] = {
     "phishtank":    0.5,
     "asnlookup":    0.3,
     "redirectchain":0.2,
+    "shodaninternetdb": 0.3,  # InternetDB gratuito, nessun limit ufficiale
+    "urlhaus":      0.3,    # URLhaus abuse.ch
+    "threatfox":    0.3,    # ThreatFox abuse.ch
     "openphish":    0.0,    # feed locale, nessun limit
     "spamhaus":     0.0,    # feed locale, nessun limit
 }
@@ -404,15 +407,17 @@ def check_url_phishtank(url: str) -> ReputationResult:
 
 
 # ---------------------------------------------------------------------------
-# MalwareBazaar  (no API key)
+# MalwareBazaar  (richiede Auth-Key da auth.abuse.ch)
+# Accetta ABUSECH_API_KEY (preferita) o MALWAREBAZAAR_API_KEY (legacy)
 # ---------------------------------------------------------------------------
 
 def check_hash_malwarebazaar(sha256: str) -> ReputationResult:
     r = ReputationResult(source="MalwareBazaar", entity=sha256, entity_type="hash")
+    _key = settings.ABUSECH_API_KEY or settings.MALWAREBAZAAR_API_KEY
 
-    if not settings.MALWAREBAZAAR_API_KEY:
+    if not _key:
         r.skipped = True
-        r.skip_reason = "MALWAREBAZAAR_API_KEY non configurata — registrati su bazaar.abuse.ch/account/"
+        r.skip_reason = "ABUSECH_API_KEY non configurata — registrati su auth.abuse.ch (o usa MALWAREBAZAAR_API_KEY legacy)"
         return r
 
     r.queried = True
@@ -421,7 +426,7 @@ def check_hash_malwarebazaar(sha256: str) -> ReputationResult:
             data={"query": "get_info", "hash": sha256},
             headers={
                 "User-Agent": f"EMLyzer/{settings.VERSION} (email forensics tool)",
-                "Auth-Key": settings.MALWAREBAZAAR_API_KEY,
+                "Auth-Key": _key,
             },
             timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
@@ -646,6 +651,237 @@ def check_url_redirect_chain(url: str) -> ReputationResult:
     return r
 
 
+# ---------------------------------------------------------------------------
+# Shodan InternetDB — porte aperte, CVE e tag per IP (gratuito, no API key)
+# ---------------------------------------------------------------------------
+
+_SHODAN_MALICIOUS_TAGS = frozenset({"malware", "c2", "compromised", "botnet"})
+
+def check_ip_shodan_internetdb(ip: str) -> ReputationResult:
+    """
+    Interroga Shodan InternetDB per l'IP: porte aperte, CVE, tag e hostname.
+    Servizio informativo — segnala come malevolo solo se i tag indicano attività ostile.
+    """
+    r = ReputationResult(source="Shodan InternetDB", entity=ip, entity_type="ip", queried=True)
+    try:
+        resp = _http_get_with_retry(
+            f"https://internetdb.shodan.io/{ip}",
+            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email forensics tool)"},
+            timeout=REQUEST_TIMEOUT_INFO,
+            rate_key="shodaninternetdb",
+            max_retries=1,
+        )
+        if resp.status_code == 404:
+            r.detail = "IP non trovato in Shodan InternetDB"
+            return r
+        resp.raise_for_status()
+        data = resp.json()
+
+        ports     = data.get("ports", []) or []
+        vulns     = data.get("vulns", []) or []
+        tags      = data.get("tags",  []) or []
+        hostnames = data.get("hostnames", []) or []
+
+        mal_tags = [t for t in tags if t.lower() in _SHODAN_MALICIOUS_TAGS]
+        if mal_tags:
+            r.is_malicious = True
+            r.confidence = 80.0
+        elif vulns:
+            r.confidence = 30.0  # segnale di attenzione, non conferma di malizia
+
+        parts = []
+        if ports:
+            parts.append(f"Porte: {', '.join(str(p) for p in ports[:10])}")
+        if vulns:
+            parts.append(f"CVE: {', '.join(list(vulns)[:5])}")
+        if tags:
+            parts.append(f"Tags: {', '.join(tags[:5])}")
+        if hostnames:
+            parts.append(f"Hostnames: {', '.join(hostnames[:3])}")
+        r.detail = " | ".join(parts) if parts else "Nessun dato trovato"
+
+    except requests.exceptions.HTTPError as e:
+        code = e.response.status_code if e.response is not None else 0
+        if code == 404:
+            r.detail = "IP non trovato in Shodan InternetDB"
+        else:
+            r.error = f"HTTP {code}"
+    except requests.exceptions.Timeout:
+        r.error = "Timeout Shodan InternetDB"
+    except requests.exceptions.ConnectionError:
+        r.error = "Shodan InternetDB non raggiungibile"
+    except Exception as e:
+        r.error = f"Errore: {e}"
+    return r
+
+
+# ---------------------------------------------------------------------------
+# Abuse.ch URLhaus — database URL malware (richiede Auth-Key da auth.abuse.ch)
+# ---------------------------------------------------------------------------
+
+def check_url_urlhaus(url: str) -> ReputationResult:
+    """Controlla se l'URL è nel database URLhaus di abuse.ch."""
+    r = ReputationResult(source="URLhaus", entity=url, entity_type="url")
+    _abusech_key = settings.ABUSECH_API_KEY
+    if not _abusech_key:
+        r.skipped = True
+        r.skip_reason = "ABUSECH_API_KEY non configurata — registrati gratuitamente su auth.abuse.ch"
+        return r
+    r.queried = True
+    try:
+        resp = _http_post_with_retry(
+            "https://urlhaus-api.abuse.ch/v1/url/",
+            data={"url": url},
+            headers={
+                "User-Agent": f"EMLyzer/{settings.VERSION} (email forensics tool)",
+                "Auth-Key": _abusech_key,
+            },
+            timeout=REQUEST_TIMEOUT,
+            rate_key="urlhaus",
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        status = data.get("query_status", "")
+
+        if status == "no_results":
+            r.detail = "URL non trovato in URLhaus"
+            return r
+
+        if status == "ok":
+            url_status = data.get("url_status", "")
+            threat     = data.get("threat", "")
+            tags       = data.get("tags", []) or []
+
+            r.is_malicious = url_status in ("online", "unknown") or bool(threat)
+            if url_status == "online":
+                r.confidence = 95.0
+            elif threat:
+                r.confidence = 70.0
+            elif r.is_malicious:
+                r.confidence = 50.0
+
+            parts = []
+            if url_status:
+                parts.append(f"Stato: {url_status}")
+            if threat:
+                parts.append(f"Minaccia: {threat}")
+            if tags:
+                parts.append(f"Tags: {', '.join(tags[:5])}")
+            r.detail = " | ".join(parts) if parts else "Trovato in URLhaus"
+        else:
+            r.detail = f"Status: {status}"
+
+    except requests.RequestException as e:
+        r.error = f"Errore di rete: {e}"
+    except Exception as e:
+        r.error = f"Errore: {e}"
+    return r
+
+
+# ---------------------------------------------------------------------------
+# ThreatFox (abuse.ch) — database IOC: IP, URL e hash (richiede Auth-Key da auth.abuse.ch)
+# ---------------------------------------------------------------------------
+
+def _query_threatfox(ioc: str) -> dict:
+    """Chiamata generica a ThreatFox per un singolo IOC."""
+    resp = _http_post_with_retry(
+        "https://threatfox-api.abuse.ch/api/v1/",
+        json_data={"query": "search_ioc", "search_term": ioc},
+        headers={
+            "User-Agent":   f"EMLyzer/{settings.VERSION} (email forensics tool)",
+            "Content-Type": "application/json",
+            "Auth-Key":     settings.ABUSECH_API_KEY,
+        },
+        timeout=REQUEST_TIMEOUT,
+        rate_key="threatfox",
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _parse_threatfox_result(r: ReputationResult, data: dict) -> ReputationResult:
+    """Interpreta la risposta ThreatFox e popola il ReputationResult."""
+    status = data.get("query_status", "")
+    # "no_results" / "no_result" → IOC non presente nel DB
+    # "illegal_search_term" → formato IOC non riconosciuto (es. URL non standard):
+    #   non è un errore applicativo, equivale a "non trovato"
+    if status in ("no_results", "no_result", "illegal_search_term", ""):
+        r.detail = "IOC non trovato in ThreatFox"
+        return r
+    if status == "ok":
+        iocs = data.get("data") or []
+        if not iocs:
+            r.detail = "IOC non trovato in ThreatFox"
+            return r
+        r.is_malicious = True
+        best = iocs[0]
+        r.confidence = float(best.get("confidence_level", 50))
+        malware      = best.get("malware", "")
+        threat_type  = best.get("threat_type", "")
+        ioc_type     = best.get("ioc_type", "")
+        parts = []
+        if malware:
+            parts.append(f"Malware: {malware}")
+        if threat_type:
+            parts.append(f"Tipo: {threat_type}")
+        if len(iocs) > 1:
+            parts.append(f"{len(iocs)} occorrenze")
+        r.detail = " | ".join(parts) if parts else f"Trovato in ThreatFox ({ioc_type})"
+    else:
+        r.detail = f"Status: {status}"
+    return r
+
+
+def _threatfox_skip(entity: str, entity_type: str) -> ReputationResult:
+    """Helper: risultato skip uniforme per tutti i wrapper ThreatFox."""
+    r = ReputationResult(source="ThreatFox", entity=entity, entity_type=entity_type)
+    r.skipped = True
+    r.skip_reason = "ABUSECH_API_KEY non configurata — registrati gratuitamente su auth.abuse.ch"
+    return r
+
+
+def check_ip_threatfox(ip: str) -> ReputationResult:
+    """Controlla se l'IP è presente nel database ThreatFox."""
+    if not settings.ABUSECH_API_KEY:
+        return _threatfox_skip(ip, "ip")
+    r = ReputationResult(source="ThreatFox", entity=ip, entity_type="ip", queried=True)
+    try:
+        _parse_threatfox_result(r, _query_threatfox(ip))
+    except requests.RequestException as e:
+        r.error = f"Errore di rete: {e}"
+    except Exception as e:
+        r.error = f"Errore: {e}"
+    return r
+
+
+def check_url_threatfox(url: str) -> ReputationResult:
+    """Controlla se l'URL è presente nel database ThreatFox."""
+    if not settings.ABUSECH_API_KEY:
+        return _threatfox_skip(url, "url")
+    r = ReputationResult(source="ThreatFox", entity=url, entity_type="url", queried=True)
+    try:
+        _parse_threatfox_result(r, _query_threatfox(url))
+    except requests.RequestException as e:
+        r.error = f"Errore di rete: {e}"
+    except Exception as e:
+        r.error = f"Errore: {e}"
+    return r
+
+
+def check_hash_threatfox(sha256: str) -> ReputationResult:
+    """Controlla se l'hash SHA256 è presente nel database ThreatFox."""
+    if not settings.ABUSECH_API_KEY:
+        return _threatfox_skip(sha256, "hash")
+    r = ReputationResult(source="ThreatFox", entity=sha256, entity_type="hash", queried=True)
+    try:
+        _parse_threatfox_result(r, _query_threatfox(sha256))
+    except requests.RequestException as e:
+        r.error = f"Errore di rete: {e}"
+    except Exception as e:
+        r.error = f"Errore: {e}"
+    return r
+
+
 URL_SHORTENERS = {
     "bit.ly", "t.co", "tinyurl.com", "goo.gl", "ow.ly",
     "short.link", "buff.ly", "dlvr.it", "ift.tt", "su.pr",
@@ -659,17 +895,21 @@ URL_SHORTENERS = {
 
 _SERVICE_DEFS = [
     # IP
-    ("AbuseIPDB",      "ip",          True,  "Reputazione IP (Received header, X-Originating-IP, IP negli URL)"),
-    ("VirusTotal",     "ip+url+hash", True,  "Analisi multi-engine IP, URL e hash (piano free: 4 req/min)"),
-    ("Spamhaus DROP",  "ip",          False, "Blocklist IP malevoli di alto profilo — no API key richiesta"),
-    ("ASN Lookup",     "ip",          False, "Autonomous System Number per ogni IP — no API key (ipinfo.io)"),
+    ("AbuseIPDB",         "ip",          True,  "Reputazione IP (Received header, X-Originating-IP, IP negli URL)"),
+    ("VirusTotal",        "ip+url+hash", True,  "Analisi multi-engine IP, URL e hash (piano free: 4 req/min)"),
+    ("Spamhaus DROP",     "ip",          False, "Blocklist IP malevoli di alto profilo — no API key richiesta"),
+    ("ASN Lookup",        "ip",          False, "Autonomous System Number per ogni IP — no API key (ipinfo.io)"),
+    ("Shodan InternetDB", "ip",          False, "Porte aperte, CVE e tag per ogni IP — no API key (Shodan)"),
     # URL
-    ("OpenPhish",      "url",         False, "Feed URL phishing — no API key richiesta"),
-    ("PhishTank",      "url",         True,  "Database URL phishing verificati dalla community"),
-    ("Redirect Chain", "url",         False, "Segue i redirect degli URL shortener — no API key"),
-    ("crt.sh",         "url",         False, "Certificati TLS emessi per il dominio — no API key"),
+    ("OpenPhish",         "url",         False, "Feed URL phishing — no API key richiesta"),
+    ("PhishTank",         "url",         True,  "Database URL phishing verificati dalla community"),
+    ("Redirect Chain",    "url",         False, "Segue i redirect degli URL shortener — no API key"),
+    ("crt.sh",            "url",         False, "Certificati TLS emessi per il dominio — no API key"),
+    ("URLhaus",           "url",         True,  "Database URL malware di abuse.ch (ABUSECH_API_KEY — auth.abuse.ch)"),
     # Hash
-    ("MalwareBazaar",  "hash",        True,  "Hash allegati nel database malware (API key richiesta — bazaar.abuse.ch)"),
+    ("MalwareBazaar",     "hash",        True,  "Hash allegati nel database malware (ABUSECH_API_KEY o MALWAREBAZAAR_API_KEY)"),
+    # Multi-tipo
+    ("ThreatFox",         "ip+url+hash", True,  "Database IOC abuse.ch (IP, URL, hash) — ABUSECH_API_KEY — auth.abuse.ch"),
 ]
 
 def _build_service_registry(all_results: list[ReputationResult]) -> list[dict]:
@@ -678,15 +918,18 @@ def _build_service_registry(all_results: list[ReputationResult]) -> list[dict]:
         by_source.setdefault(r.source, []).append(r)
 
     key_map = {
-        "AbuseIPDB":      bool(settings.ABUSEIPDB_API_KEY),
-        "VirusTotal":     bool(settings.VIRUSTOTAL_API_KEY),
-        "Spamhaus DROP":  True,
-        "ASN Lookup":     True,
-        "OpenPhish":      True,
-        "PhishTank":      bool(settings.PHISHTANK_API_KEY),
-        "Redirect Chain": True,
-        "crt.sh":         True,
-        "MalwareBazaar":  bool(settings.MALWAREBAZAAR_API_KEY),
+        "AbuseIPDB":         bool(settings.ABUSEIPDB_API_KEY),
+        "VirusTotal":        bool(settings.VIRUSTOTAL_API_KEY),
+        "Spamhaus DROP":     True,
+        "ASN Lookup":        True,
+        "Shodan InternetDB": True,
+        "OpenPhish":         True,
+        "PhishTank":         bool(settings.PHISHTANK_API_KEY),
+        "Redirect Chain":    True,
+        "crt.sh":            True,
+        "URLhaus":           bool(settings.ABUSECH_API_KEY),
+        "MalwareBazaar":     bool(settings.ABUSECH_API_KEY or settings.MALWAREBAZAAR_API_KEY),
+        "ThreatFox":         bool(settings.ABUSECH_API_KEY),
     }
 
     registry = []
@@ -789,12 +1032,17 @@ class ReputationSummary:
 _FAST_SERVICES = frozenset({
     # Feed locali e chiamate HTTP singole leggere — completano in < 5s
     # indipendentemente dal numero di entità
-    "check_ip_spamhaus",        # feed locale, 0s
-    "check_ip_asn",             # 1 HTTP, 0.3s rate
-    "check_url_openphish",      # feed locale, 0s
-    "check_url_redirect_chain", # 1 HTTP per URL, 0.2s rate
-    "check_url_phishtank",      # 1 HTTP, 0.5s rate
-    "check_hash_malwarebazaar", # 1 HTTP, 0.7s rate
+    "check_ip_spamhaus",           # feed locale, 0s
+    "check_ip_asn",                # 1 HTTP, 0.3s rate
+    "check_ip_shodan_internetdb",  # 1 HTTP, 0.3s rate — InternetDB gratuito
+    "check_ip_threatfox",          # 1 HTTP, 0.3s rate
+    "check_url_openphish",         # feed locale, 0s
+    "check_url_redirect_chain",    # 1 HTTP per URL, 0.2s rate
+    "check_url_phishtank",         # 1 HTTP, 0.5s rate
+    "check_url_urlhaus",           # 1 HTTP, 0.3s rate
+    "check_url_threatfox",         # 1 HTTP, 0.3s rate
+    "check_hash_malwarebazaar",    # 1 HTTP, 0.7s rate
+    "check_hash_threatfox",        # 1 HTTP, 0.3s rate
 })
 
 _SLOW_SERVICES = frozenset({
@@ -852,12 +1100,23 @@ def _build_flat_tasks(
             _c(check_ip_virustotal, ip, "ip")
         else:
             _s("VirusTotal", ip, "ip", "VIRUSTOTAL_API_KEY non configurata")
-        _c(check_ip_spamhaus, ip, "ip")
-        _c(check_ip_asn,      ip, "ip")
+        _c(check_ip_spamhaus,          ip, "ip")
+        _c(check_ip_asn,               ip, "ip")
+        _c(check_ip_shodan_internetdb, ip, "ip")
+        if settings.ABUSECH_API_KEY:
+            _c(check_ip_threatfox, ip, "ip")
+        else:
+            _s("ThreatFox", ip, "ip", "ABUSECH_API_KEY non configurata — registrati su auth.abuse.ch")
 
     # ── URL ─────────────────────────────────────────────────────────────────
     for url in urls[:20]:
         _c(check_url_openphish, url, "url")
+        if settings.ABUSECH_API_KEY:
+            _c(check_url_urlhaus,   url, "url")
+            _c(check_url_threatfox, url, "url")
+        else:
+            _s("URLhaus",   url, "url", "ABUSECH_API_KEY non configurata — registrati su auth.abuse.ch")
+            _s("ThreatFox", url, "url", "ABUSECH_API_KEY non configurata — registrati su auth.abuse.ch")
         if settings.PHISHTANK_API_KEY:
             _c(check_url_phishtank, url, "url")
         else:
@@ -887,10 +1146,14 @@ def _build_flat_tasks(
 
     # ── Hash ────────────────────────────────────────────────────────────────
     for h in hashes[:10]:
-        if settings.MALWAREBAZAAR_API_KEY:
+        if settings.ABUSECH_API_KEY:
+            _c(check_hash_threatfox, h, "hash")
+        else:
+            _s("ThreatFox", h, "hash", "ABUSECH_API_KEY non configurata — registrati su auth.abuse.ch")
+        if settings.ABUSECH_API_KEY or settings.MALWAREBAZAAR_API_KEY:
             _c(check_hash_malwarebazaar, h, "hash")
         else:
-            _s("MalwareBazaar", h, "hash", "MALWAREBAZAAR_API_KEY non configurata")
+            _s("MalwareBazaar", h, "hash", "ABUSECH_API_KEY non configurata — registrati su auth.abuse.ch (o MALWAREBAZAAR_API_KEY legacy)")
         if settings.VIRUSTOTAL_API_KEY:
             _c(check_hash_virustotal, h, "hash")
         else:

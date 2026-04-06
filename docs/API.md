@@ -154,7 +154,7 @@ Salva le note dell'analista.
 
 ### `POST /api/reputation/{job_id}`
 Avvia i controlli di reputazione in due fasi:
-- **Fase 1** (risposta sincrona, < 15s): Spamhaus, ASN Lookup, OpenPhish, PhishTank, Redirect Chain, MalwareBazaar
+- **Fase 1** (risposta sincrona, < 15s): Spamhaus, ASN Lookup, Shodan InternetDB, OpenPhish, PhishTank, Redirect Chain, URLhaus, ThreatFox, MalwareBazaar
 - **Fase 2** (background automatico): AbuseIPDB, VirusTotal, crt.sh — il campo `slow_running: true` indica che sono in corso; usare `GET /api/analysis/{job_id}` per il polling e controllare `reputation_results.reputation_phase === "complete"` per sapere quando sono terminati.
 
 ```json
