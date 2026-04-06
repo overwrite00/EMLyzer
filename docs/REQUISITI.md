@@ -112,13 +112,20 @@ Per chi vuole sapere cosa viene installato:
 
 Per usare i servizi di reputazione è necessaria una registrazione gratuita:
 
-| Servizio | Analizza | Registrazione |
-|---|---|---|
-| **AbuseIPDB** | IP sospetti | [abuseipdb.com/account/api](https://www.abuseipdb.com/account/api) |
-| **VirusTotal** | IP, URL, hash | [virustotal.com](https://www.virustotal.com) → Account → API Key |
-| **PhishTank** | URL phishing | [phishtank.com/api_register.php](https://www.phishtank.com/api_register.php) |
-| **OpenPhish** | URL phishing | *(nessuna chiave — gratuito automaticamente)* |
-| **MalwareBazaar** | Hash allegati | *(nessuna chiave — gratuito automaticamente)* |
+| Servizio | Analizza | Chiave richiesta | Registrazione |
+|---|---|---|---|
+| **AbuseIPDB** | IP sospetti | `ABUSEIPDB_API_KEY` | [abuseipdb.com/account/api](https://www.abuseipdb.com/account/api) |
+| **VirusTotal** | IP, URL, hash | `VIRUSTOTAL_API_KEY` | [virustotal.com](https://www.virustotal.com) → Account → API Key |
+| **PhishTank** | URL phishing | `PHISHTANK_API_KEY` | [phishtank.com/api_register.php](https://www.phishtank.com/api_register.php) |
+| **URLhaus** | URL malware | `ABUSECH_API_KEY` | [auth.abuse.ch](https://auth.abuse.ch/) *(gratuito)* |
+| **ThreatFox** | IP, URL, hash IOC | `ABUSECH_API_KEY` | [auth.abuse.ch](https://auth.abuse.ch/) *(gratuito, stessa chiave)* |
+| **MalwareBazaar** | Hash allegati | `ABUSECH_API_KEY` | [auth.abuse.ch](https://auth.abuse.ch/) *(gratuito, stessa chiave)* |
+| **OpenPhish** | URL phishing | *(nessuna)* | — |
+| **Spamhaus DROP** | IP | *(nessuna)* | — |
+| **ASN Lookup** | IP | *(nessuna)* | — |
+| **Shodan InternetDB** | IP | *(nessuna)* | — |
+| **Redirect Chain** | URL | *(nessuna)* | — |
+| **crt.sh** | Dominio | *(nessuna)* | — |
 
 La configurazione è descritta in [UTILIZZO.md](UTILIZZO.md#configurazione-api-opzionali).
 

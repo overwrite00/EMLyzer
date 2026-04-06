@@ -278,7 +278,7 @@ def generate_report(record, output_path: Path):
             _add_heading(doc, section_label, level=2)
             for r in results:
                 # Servizi informativi (ASN, crt.sh, Redirect Chain) → mostra solo il dettaglio
-                info_services = {"ASN Lookup", "crt.sh", "Redirect Chain"}
+                info_services = {"ASN Lookup", "crt.sh", "Redirect Chain", "Shodan InternetDB"}
                 if r.get("source") in info_services:
                     if r.get("detail") and not r.get("error"):
                         doc.add_paragraph(

@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "EMLyzer"
-    VERSION: str = "0.5.0"
+    VERSION: str = "0.7.0"
     DEBUG: bool = False
 
     # CORS - frontend dev server
@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     ABUSEIPDB_API_KEY: str = ""
     VIRUSTOTAL_API_KEY: str = ""
     PHISHTANK_API_KEY: str = ""
+    # abuse.ch unified key — copre URLhaus, ThreatFox e MalwareBazaar (auth.abuse.ch)
+    ABUSECH_API_KEY: str = ""
+    # chiave legacy MalwareBazaar: ancora accettata per retrocompatibilità
     MALWAREBAZAAR_API_KEY: str = ""
 
     # Lingua interfaccia: it (italiano) o en (english)

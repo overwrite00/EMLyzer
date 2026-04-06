@@ -261,7 +261,7 @@ function ServiceCard({ svc, expanded, onToggle, lang }) {
 // ── Riga dettaglio singola entità ─────────────────────────────────────────────
 function DetailRow({ r, lang }) {
   // Servizi informativi: non malevoli per natura, mostrano dati contestuali
-  const isInfoService = ['ASN Lookup', 'crt.sh', 'Redirect Chain'].includes(r.source)
+  const isInfoService = ['ASN Lookup', 'crt.sh', 'Redirect Chain', 'Shodan InternetDB'].includes(r.source)
   const icon = r.is_malicious ? '🔴'
              : r.error        ? '⚠️'
              : isInfoService  ? 'ℹ️'
@@ -327,17 +327,21 @@ function DetailRow({ r, lang }) {
 function ServicePreview({ lang, apiKeys }) {
   const services = [
     // ── IP ───────────────────────────────────────────────────────────────────
-    { name: 'AbuseIPDB',      needs_key: true,  type: 'ip',          desc_it: 'Reputazione IP (header SMTP, X-Originating-IP, IP negli URL)', desc_en: 'IP reputation (SMTP hops, X-Originating-IP, direct IPs)' },
-    { name: 'VirusTotal',     needs_key: true,  type: 'ip+url+hash', desc_it: 'Multi-engine: IP, URL e hash allegati',                        desc_en: 'Multi-engine: IP, URL and attachment hashes' },
-    { name: 'Spamhaus DROP',  needs_key: false, type: 'ip',          desc_it: 'Blocklist IP malevoli di alto profilo — no chiave',             desc_en: 'High-profile malicious IP blocklist — no key' },
-    { name: 'ASN Lookup',     needs_key: false, type: 'ip',          desc_it: 'Autonomous System per ogni IP (ipinfo.io) — no chiave',         desc_en: 'ASN info for each IP (ipinfo.io) — no key' },
+    { name: 'AbuseIPDB',         needs_key: true,  type: 'ip',          desc_it: 'Reputazione IP (header SMTP, X-Originating-IP, IP negli URL)', desc_en: 'IP reputation (SMTP hops, X-Originating-IP, direct IPs)' },
+    { name: 'VirusTotal',        needs_key: true,  type: 'ip+url+hash', desc_it: 'Multi-engine: IP, URL e hash allegati',                        desc_en: 'Multi-engine: IP, URL and attachment hashes' },
+    { name: 'Spamhaus DROP',     needs_key: false, type: 'ip',          desc_it: 'Blocklist IP malevoli di alto profilo — no chiave',             desc_en: 'High-profile malicious IP blocklist — no key' },
+    { name: 'ASN Lookup',        needs_key: false, type: 'ip',          desc_it: 'Autonomous System per ogni IP (ipinfo.io) — no chiave',         desc_en: 'ASN info for each IP (ipinfo.io) — no key' },
+    { name: 'Shodan InternetDB', needs_key: false, type: 'ip',          desc_it: 'Porte aperte, CVE e tag per ogni IP (Shodan) — no chiave',      desc_en: 'Open ports, CVEs and tags per IP (Shodan) — no key' },
     // ── URL ──────────────────────────────────────────────────────────────────
-    { name: 'OpenPhish',      needs_key: false, type: 'url',         desc_it: 'Feed URL phishing aggiornato — no chiave',                      desc_en: 'Live phishing URL feed — no key' },
-    { name: 'PhishTank',      needs_key: true,  type: 'url',         desc_it: 'URL phishing verificati dalla community',                       desc_en: 'Community-verified phishing URLs' },
-    { name: 'Redirect Chain', needs_key: false, type: 'url',         desc_it: 'Segue i redirect degli URL shortener — no chiave',              desc_en: 'Follows URL shortener redirects — no key' },
-    { name: 'crt.sh',         needs_key: false, type: 'url',         desc_it: 'Certificati TLS del dominio (età, sottodomini) — no chiave',    desc_en: 'Domain TLS certificates (age, subdomains) — no key' },
+    { name: 'OpenPhish',         needs_key: false, type: 'url',         desc_it: 'Feed URL phishing aggiornato — no chiave',                      desc_en: 'Live phishing URL feed — no key' },
+    { name: 'PhishTank',         needs_key: true,  type: 'url',         desc_it: 'URL phishing verificati dalla community',                       desc_en: 'Community-verified phishing URLs' },
+    { name: 'Redirect Chain',    needs_key: false, type: 'url',         desc_it: 'Segue i redirect degli URL shortener — no chiave',              desc_en: 'Follows URL shortener redirects — no key' },
+    { name: 'crt.sh',            needs_key: false, type: 'url',         desc_it: 'Certificati TLS del dominio (età, sottodomini) — no chiave',    desc_en: 'Domain TLS certificates (age, subdomains) — no key' },
+    { name: 'URLhaus',           needs_key: true,  type: 'url',         desc_it: 'Database URL malware di abuse.ch (ABUSECH_API_KEY)',            desc_en: 'Malware URL database by abuse.ch (ABUSECH_API_KEY)' },
     // ── Hash ─────────────────────────────────────────────────────────────────
-    { name: 'MalwareBazaar',  needs_key: true,  type: 'hash',        desc_it: 'Hash allegati nel database malware (API key richiesta)',         desc_en: 'Attachment hashes in malware database (API key required)' },
+    { name: 'MalwareBazaar',     needs_key: true,  type: 'hash',        desc_it: 'Hash allegati nel database malware (API key richiesta)',         desc_en: 'Attachment hashes in malware database (API key required)' },
+    // ── Multi-tipo ───────────────────────────────────────────────────────────
+    { name: 'ThreatFox',         needs_key: true,  type: 'ip+url+hash', desc_it: 'Database IOC abuse.ch (IP, URL, hash) (ABUSECH_API_KEY)',       desc_en: 'abuse.ch IOC database (IPs, URLs, hashes) (ABUSECH_API_KEY)' },
   ]
   return (
     <div style={{

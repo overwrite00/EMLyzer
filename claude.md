@@ -9,7 +9,7 @@ correcto un bug importante, o modificata l'architettura.
 ## Identità del progetto
 
 - **Nome**: EMLyzer (rinominato da OpenMailForensics nella v0.3.1)
-- **Versione corrente**: 0.5.0 — fonte di verità: `backend/utils/config.py` → `VERSION`
+- **Versione corrente**: 0.7.0 — fonte di verità: `backend/utils/config.py` → `VERSION`
 - **Tipo**: piattaforma open-source di email forensics & threat analysis
 - **Filosofia**: nessuna dipendenza obbligatoria da API proprietarie; API a pagamento solo come plugin opzionali configurati dal singolo utente; analisi offline-first
 - **Repository**: GitHub (distribuzione pubblica)
@@ -152,6 +152,7 @@ Finding severities: `info`, `low`, `medium`, `high`
 **IPv6**: `_extract_ip_from_received(received)` → estrae IP (v4 e v6) dai Received header; `_is_private_ip(ip)` usa `ipaddress` stdlib. Formati supportati: `[IPv6:addr]`, `[addr]`, `[x.x.x.x]`.
 **Ordine hop**: i Received header vengono invertiti (`reversed()`) in `_parse_received_chain` — hop 1 = mittente originale, hop N = server di destinazione finale (RFC 5321: ogni server aggiunge in cima).
 **Nota**: `list_unsubscribe` e `x_campaign_id` sono estratti dal parser ma NON ancora analizzati dall'header analyzer (voce in roadmap).
+**AuthDetail** (v0.7.0): nuovo dataclass `AuthDetail` con 16 campi per SPF/DKIM/DMARC sub-fields. Campo `auth_detail: AuthDetail` aggiunto a `HeaderAnalysisResult`, serializzato automaticamente in `header_indicators` JSON. Funzioni DNS: `_query_spf_record`, `_query_dmarc_record`, `_query_dkim_key` (timeout 2s, `dnspython`). `_build_auth_detail()` chiamata alla fine di `_check_auth()`. Campi `dkim_signatures_raw`, `received_spf_raw`, `auth_results_raw` aggiunti a `ParsedEmail`.
 
 ### body_analyzer
 Rileva: urgency_count, phishing_cta_count, credential_keyword_count, obfuscated_links (href≠testo), forms_found, js_found, invisible_elements (CSS nascosto), base64_inline_count, raw_hidden_content
@@ -209,11 +210,14 @@ Mappa `fn.__name__` → nome corretto per `_build_service_registry`:
 | VirusTotal | IP+URL+hash | `VIRUSTOTAL_API_KEY` | SLOW | 4 req/min free, 15.5s rate |
 | Spamhaus DROP | IP | nessuna | FAST | Feed CIDR cachato |
 | ASN Lookup | IP | nessuna | FAST | ipinfo.io, 50k/mese |
+| Shodan InternetDB | IP | nessuna | FAST | Porte, CVE, tag — informativo |
 | OpenPhish | URL | nessuna | FAST | Feed cachato |
 | PhishTank | URL | `PHISHTANK_API_KEY` | FAST | Community verified |
 | Redirect Chain | URL | nessuna | FAST | Solo shortener e HTTP |
 | crt.sh | URL/dominio | nessuna | SLOW | 2.5s rate, certificati TLS |
-| MalwareBazaar | hash | `MALWAREBAZAAR_API_KEY` | FAST | API key richiesta da marzo 2026 |
+| URLhaus | URL | `ABUSECH_API_KEY` | FAST | abuse.ch, auth richiesta da giu 2025 |
+| MalwareBazaar | hash | `ABUSECH_API_KEY` (o `MALWAREBAZAAR_API_KEY` legacy) | FAST | auth.abuse.ch |
+| ThreatFox | IP+URL+hash | `ABUSECH_API_KEY` | FAST | abuse.ch, auth richiesta da giu 2025 |
 
 ### Rate limiter thread-safe
 `threading.Lock` per connettore + `_RATE_INTERVALS`. Retry backoff 2s/4s su 429/5xx.
@@ -222,7 +226,7 @@ Mappa `fn.__name__` → nome corretto per `_build_service_registry`:
 `TabReputation` carica `GET /api/settings/reputation_keys` via `useEffect` al mount.
 `ServicePreview` riceve `apiKeys = { "AbuseIPDB": bool, ... }` — indipendente dall'analisi corrente.
 
-Servizi informativi (ASN, crt.sh, Redirect Chain): mostrano `ℹ️` nella UI invece di `✅`.
+Servizi informativi (ASN, crt.sh, Redirect Chain, Shodan InternetDB): mostrano `ℹ️` nella UI invece di `✅`.
 Timeout richieste: 6s per servizi sicurezza, 2s per servizi informativi (`REQUEST_TIMEOUT_INFO`).
 
 ---
@@ -235,7 +239,7 @@ Struttura 8 sezioni generate da `docx_reporter.py`:
 3. Indicatori Tecnici — Header
 4. Analisi del Contenuto (body + link offuscati + URL)
 5. Allegati
-6. Reputazione (tutti i 9 servizi, separati per categoria IP/URL/hash, entità analizzate)
+6. Reputazione (tutti i 12 servizi, separati per categoria IP/URL/hash, entità analizzate)
 7. Valutazione del Rischio (score + contributo per modulo)
 8. Note dell'Analista (sezione editabile)
 
@@ -299,7 +303,8 @@ MAX_UPLOAD_SIZE_MB=25
 ABUSEIPDB_API_KEY=         # obbligatoria per AbuseIPDB
 VIRUSTOTAL_API_KEY=        # obbligatoria per VirusTotal
 PHISHTANK_API_KEY=         # obbligatoria per PhishTank
-MALWAREBAZAAR_API_KEY=     # obbligatoria da marzo 2026
+ABUSECH_API_KEY=           # copre URLhaus + ThreatFox + MalwareBazaar (auth.abuse.ch, gratuito)
+MALWAREBAZAAR_API_KEY=     # legacy — usare ABUSECH_API_KEY per i nuovi account
 RATE_LIMIT_PER_MINUTE=30
 LANGUAGE=it                # it o en
 ```
@@ -319,6 +324,10 @@ LANGUAGE=it                # it o en
 9. **`GET /api/analysis` deve includere `reputation_results`**: `_build_response_from_record` deve restituire `"reputation_results": record.reputation_results` altrimenti il polling del frontend non può mai rilevare `reputation_phase === "complete"`.
 10. **`asyncio.get_running_loop()`**: nei background task FastAPI usare `get_running_loop()` non `get_event_loop()` (deprecato Python 3.10+, può creare un loop nuovo invece di usare quello di uvicorn).
 11. **Banner API key prima dell'analisi**: `ServicePreview` non può leggere lo stato chiavi dal `service_registry` (assente prima dell'analisi). Caricare da `GET /api/settings/reputation_keys` via `useEffect` al mount del componente.
+12. **`Received-SPF` regex con keyword vuota**: `_extract_auth_results(list, "")` con keyword `""` fa sì che il regex `r"=(\S+)"` matchi il PRIMO `=` qualsiasi nell'header (es. `client-ip=1.2.3.4` → restituisce `1.2.3.4` invece del risultato SPF). Usare sempre `re.search(r"^(\w+)", raw.strip(), re.IGNORECASE)` per estrarre il primo token del risultato Received-SPF.
+13. **`auth_detail` assente in analisi vecchie**: il campo `auth_detail` è stato aggiunto in v0.7.0. Il frontend deve gestire la sua assenza (`e.auth_detail || {}`) per le analisi pre-v0.7.0 già in DB. I sotto-dettagli semplicemente non vengono mostrati.
+14. **ThreatFox `illegal_search_term` e `no_result`**: ThreatFox restituisce `illegal_search_term` per URL con formato non riconosciuto (non è un errore) e `no_result` (singolare) come variante di `no_results`. Entrambi vanno aggiunti alla lista dei casi "non trovato" in `_parse_threatfox_result`, altrimenti cadono nell'`else` e mostrano `Status: ...` nella UI.
+15. **`start.bat` versione fallback hardcoded**: la riga `set "VERSION=x.y.z"` in `start.bat` va aggiornata a ogni nuova release, altrimenti il titolo della finestra mostra la versione precedente durante l'avvio (prima che Python legga `config.py`).
 
 ---
 
@@ -326,27 +335,40 @@ LANGUAGE=it                # it o en
 
 La roadmap completa con priorità è in `CHANGELOG.md` nella sezione `[Unreleased]`.
 
-**Prossima funzionalità da implementare** (prima in lista):
+**Prossima funzionalità da implementare** (prima in lista): **CIRCL Passive DNS**
+- Endpoint: `https://www.circl.lu/pdns/query/{ip_or_domain}` — JSON, gratuito con registrazione
+- Tipo: IP+URL, informativo
+- Aggiungere a `connectors.py` come `check_ip_circlpdns` / `check_domain_circlpdns`
 
-### 1. Shodan InternetDB (priorità massima)
-- Endpoint: `https://internetdb.shodan.io/{ip}` — JSON pubblico, no API key, no registrazione
-- Risposta: `{ip, ports, cpes, hostnames, tags, vulns}`
-- Da aggiungere a `connectors.py` come `check_ip_shodan_internetdb(ip)`
-- Tipo: IP, gratuito, informativo (icona ℹ️)
-- Aggiungere a `_SERVICE_DEFS` e a `_checks_for_ip()`
-- Aggiornare `TabReputation.jsx` (ServicePreview), `translations.js`, `docx_reporter.py`
-- Timeout: `REQUEST_TIMEOUT_INFO` (2s)
+---
 
-### 2. Abuse.ch URLhaus
-- Endpoint: `https://urlhaus-api.abuse.ch/v1/url/` POST con `{"url": "..."}`
-- No API key, stesso ecosistema di MalwareBazaar
-- Da aggiungere come `check_url_urlhaus(url)` in `connectors.py`
-- Tipo: URL, gratuito
+## Regole di versioning — Semantic Versioning (`MAJOR.MINOR.PATCH`)
 
-### 3. ThreatFox (abuse.ch)
-- Endpoint: `https://threatfox-api.abuse.ch/api/v1/` POST con `{"query":"search_ioc","search_term":"..."}`
-- No API key, copre URL/IP/hash/domini
-- Tipo: IP+URL+hash, gratuito
+Schema: `MAJOR.MINOR.PATCH` — fonte di verità `backend/utils/config.py` → `VERSION`
+
+| Componente | Quando bumpa | Esempi concreti |
+|---|---|---|
+| **PATCH** (`x.y.Z`) | Bug fix, hotfix, correzioni di comportamento errato | Fix CTRL+C, fix timeout, fix nomi servizi, fix polling |
+| **MINOR** (`x.Y.0`) | Nuove feature, nuovi servizi/analyzer, refactor architetturale significativo, miglioramenti all'algoritmo | +3 servizi reputazione, nuovo scorer, two-phase reputation |
+| **MAJOR** (`X.0.0`) | Breaking change API o schema DB, milestone di stabilità (es. 1.0) | Cambio schema risposta API, drop Python 3.11 |
+
+**Regole operative:**
+- Più fix correlati nella stessa sessione = **una sola versione PATCH** (non una versione per fix)
+- Più feature correlate nella stessa sessione = **una sola versione MINOR**
+- Non bumpa MAJOR per aggiungere feature — solo per breaking change o 1.0 milestone
+- **Non scrivere mai la versione hardcoded** fuori da `config.py`: tutto legge `settings.VERSION`
+
+**Cosa bumpa MINOR (non PATCH):**
+- Aggiunta di ≥1 nuovo servizio reputazione
+- Aggiunta di un nuovo analyzer (header, body, URL, attachment)
+- Rewrite di un algoritmo esistente (scoring, parsing)
+- Aggiunta di funzionalità UI visibili all'utente (nuova tab, nuovo pannello)
+
+**Cosa bumpa PATCH (non MINOR):**
+- Fix di un bug in un connettore o analyzer
+- Fix di comportamento errato nell'UI
+- Correzione di un edge case nel parser
+- Fix di compatibilità OS/Python
 
 ---
 

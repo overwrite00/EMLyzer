@@ -45,10 +45,15 @@ class ParsedEmail:
     list_unsubscribe: str = ""
     received_chain: list[str] = field(default_factory=list)
 
-    # Auth
+    # Auth — risultati sintetici (pass/fail/none/…)
     spf_result: str = ""
     dkim_result: str = ""
     dmarc_result: str = ""
+
+    # Auth — header grezzi per l'analisi dettagliata
+    dkim_signatures_raw: list[str] = field(default_factory=list)   # tutti gli header DKIM-Signature
+    received_spf_raw: str = ""                                       # primo Received-SPF grezzo
+    auth_results_raw: list[str] = field(default_factory=list)       # tutti gli Authentication-Results
 
     # Raw headers dict (all headers, lowercased keys)
     raw_headers: dict = field(default_factory=dict)
@@ -142,9 +147,17 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
     parsed.dkim_result = _extract_auth_results(auth_results, "dkim")
     parsed.dmarc_result = _extract_auth_results(auth_results, "dmarc")
 
-    # Also check dedicated headers
-    if not parsed.spf_result:
-        parsed.spf_result = _extract_auth_results(get_headers("Received-SPF"), "")
+    # Salva header grezzi per l'analisi dettagliata
+    parsed.auth_results_raw    = auth_results
+    parsed.dkim_signatures_raw = get_headers("DKIM-Signature")
+    received_spf_list          = get_headers("Received-SPF")
+    parsed.received_spf_raw    = received_spf_list[0] if received_spf_list else ""
+
+    # Fallback SPF da Received-SPF (fix: keyword vuota causava match su qualsiasi '=')
+    if not parsed.spf_result and parsed.received_spf_raw:
+        m = re.search(r"^(\w+)", parsed.received_spf_raw.strip(), re.IGNORECASE)
+        if m:
+            parsed.spf_result = m.group(1).lower()
 
     # All headers (lowercased keys)
     for key in msg.keys():

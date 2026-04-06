@@ -23,7 +23,9 @@ async def get_settings():
             "AbuseIPDB":    bool(settings.ABUSEIPDB_API_KEY),
             "VirusTotal":   bool(settings.VIRUSTOTAL_API_KEY),
             "PhishTank":    bool(settings.PHISHTANK_API_KEY),
-            "MalwareBazaar":bool(settings.MALWAREBAZAAR_API_KEY),
+            "URLhaus":      bool(settings.ABUSECH_API_KEY),
+            "ThreatFox":    bool(settings.ABUSECH_API_KEY),
+            "MalwareBazaar":bool(settings.ABUSECH_API_KEY or settings.MALWAREBAZAAR_API_KEY),
         },
     }
 

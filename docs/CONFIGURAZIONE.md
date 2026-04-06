@@ -49,9 +49,9 @@ Puoi cambiare anche dal pulsante IT/EN nell'interfaccia. Per renderla permanente
 ## Configurare le API key per la reputazione
 
 I servizi di reputazione sono **completamente opzionali**.
-Funzionano senza chiave: **Spamhaus DROP**, **ASN Lookup**, **OpenPhish**, **Redirect Chain**, **crt.sh**.
+Funzionano senza chiave: **Spamhaus DROP**, **ASN Lookup**, **Shodan InternetDB**, **OpenPhish**, **Redirect Chain**, **crt.sh**.
 
-> ⚠️ **MalwareBazaar** richiedeva un tempo nessuna API key, ma da marzo 2026 la registrazione è obbligatoria. Registrati su [bazaar.abuse.ch/account/](https://bazaar.abuse.ch/account/) e aggiungi `MALWAREBAZAAR_API_KEY` nel file `.env`.
+> ⚠️ **MalwareBazaar**, **URLhaus** e **ThreatFox** richiedono una API key abuse.ch. Registrati su [auth.abuse.ch](https://auth.abuse.ch/) (gratuito) e aggiungi `ABUSECH_API_KEY` nel file `.env` — una sola chiave copre tutti e tre i servizi.
 
 ---
 
@@ -115,23 +115,28 @@ LANGUAGE=it
 ABUSEIPDB_API_KEY=abc123def456ghi789jkl012
 VIRUSTOTAL_API_KEY=xyz987uvw654rst321opq098
 PHISHTANK_API_KEY=qrs111tuvw222xyz333abc444
-MALWAREBAZAAR_API_KEY=mnb555opr666stu777vwx888
+ABUSECH_API_KEY=mnb555opr666stu777vwx888
 ```
 
 ---
 
-### MalwareBazaar — Hash malware allegati
+### abuse.ch — URLhaus, ThreatFox e MalwareBazaar
 
-Verifica gli hash degli allegati nel database di campioni malware.
+Una sola chiave copre tre servizi:
+- **URLhaus** — database URL malware
+- **ThreatFox** — database IOC (IP, URL, hash malware)
+- **MalwareBazaar** — hash allegati nel database campioni malware
 
 **Come registrarsi:**
-1. Vai su [https://bazaar.abuse.ch/account/](https://bazaar.abuse.ch/account/)
+1. Vai su [https://auth.abuse.ch/](https://auth.abuse.ch/)
 2. Crea un account gratuito
 3. Nella pagina account copia la tua API key
 
 ```env
-MALWAREBAZAAR_API_KEY=incolla_qui_la_tua_chiave
+ABUSECH_API_KEY=incolla_qui_la_tua_chiave
 ```
+
+> Hai già `MALWAREBAZAAR_API_KEY` da una versione precedente? Continua a funzionare per MalwareBazaar, ma `ABUSECH_API_KEY` è preferita e copre anche URLhaus e ThreatFox.
 
 ---
 

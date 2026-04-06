@@ -13,9 +13,6 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ### Reputazione — nuovi servizi (priorità alta)
 
-- [ ] **Shodan InternetDB** — porte aperte e CVE per IP; no API key, endpoint JSON pubblico
-- [ ] **Abuse.ch URLhaus** — database URL malware attivi; no API key, stesso ecosistema di MalwareBazaar
-- [ ] **ThreatFox** (abuse.ch) — IOC unificati (URL, IP, hash, domini); no API key
 - [ ] **CIRCL Passive DNS** — storico risoluzione DNS per IP e domini; gratuito con registrazione
 - [ ] **GreyNoise Community** — distingue scanner innocui da attori malevoli, riduce falsi positivi; free tier 100 req/g
 - [ ] **URLScan.io** — analisi completa URL con screenshot; free tier 100 req/h
@@ -29,7 +26,6 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 - [ ] **List-Unsubscribe** — analisi link di unsubscribe (dominio diverso dal mittente, URL sospetti)
 - [ ] **X-Campaign-ID** — analisi del campo già estratto: correlazione campagne bulk, pattern sospetti
 - [ ] **ARC chain** (Authenticated Received Chain) — rilevante per phishing via account compromessi e forwarding
-- [ ] **DKIM-Signature parsing** — estrazione selettore, dominio firmatario, algoritmo; ora si verifica solo il risultato
 
 ### Body analysis (priorità media)
 
@@ -49,6 +45,56 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 - [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
 - [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
 - [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
+
+---
+
+## [0.7.0] — 2026-04-07
+
+### Corretto
+- **Versione frontend errata**: `start.bat` aveva la versione fallback hardcoded a `0.6.1`; aggiornata a `0.7.0`
+- **ThreatFox `illegal_search_term`**: lo status restituito da ThreatFox per URL con formato non riconosciuto veniva mostrato come `Status: illegal_search_term` invece di essere trattato come "non trovato". Aggiunto alla lista dei casi non-malevoli insieme a `no_result` (variante singolare di `no_results`)
+- **ThreatFox `no_result`**: variante singolare del campo `query_status` ora gestita come `no_results`
+
+### Aggiunto
+- **Motivo fallimento SPF/DKIM/DMARC**: quando un controllo non passa, la sezione di dettaglio mostra ora una riga "Motivo" che spiega il perché:
+  - **SPF**: testo estratto dalla parentesi in `Authentication-Results` o `Received-SPF` (es. "domain of user@bad.com does not designate 1.2.3.4 as permitted sender")
+  - **DKIM**: "Verifica firma fallita" quando la chiave DNS esiste ma la firma è invalida; se la chiave è assente il motivo è già evidente dalla riga DNS key (✗ non trovata); testo da parentesi `Authentication-Results` (es. "bad signature") se disponibile
+  - **DMARC**: sintesi degli allineamenti falliti (es. "Allineamento fallito: SPF=fail, DKIM=fail")
+  - 3 nuovi campi in `AuthDetail`: `spf_failure_reason`, `dkim_failure_reason`, `dmarc_failure_reason`
+  - 3 nuove chiavi di traduzione it/en: `header.auth_detail_failure_reason`, `header.auth_detail_dkim_fail_key`, `header.auth_detail_dkim_fail_sig`
+
+### Aggiunto (dalla sessione precedente)
+- **SPF/DKIM/DMARC verboso con verifica DNS indipendente**: la sezione Autenticazione mostra ora tutti i sotto-campi di ciascun protocollo, analoghi a quelli di MXToolbox
+  - **SPF**: client IP, Envelope-From, record TXT DNS (`v=spf1 …`) con query live su `dnspython`
+  - **DKIM**: per ogni firma `DKIM-Signature` — selettore, algoritmo, canonicalization, header firmati, body hash (bh=), esistenza chiave pubblica DNS (`selector._domainkey.domain`)
+  - **DMARC**: From domain, policy (p=) con codifica colore (reject=verde, quarantine=arancione, none=grigio), sp=, adkim=, aspf=, pct=, rua=, record TXT DNS (`v=DMARC1 …`)
+  - La verifica DNS è **sempre attiva** (non opzionale) con timeout 2s/query: 3–5 query per email, max ~3s totali
+  - Rileva contraddizioni tra `Authentication-Results` e DNS reali (utile contro header `spf=pass` contraffatti)
+  - Tutti i dati memorizzati automaticamente in `header_indicators.auth_detail` (JSON) — nessun cambio schema DB
+- **Nuovo dataclass `AuthDetail`** in `header_analyzer.py`: 16 campi strutturati per SPF/DKIM/DMARC, serializzato da `_dataclass_to_dict()`
+- **Parsing `DKIM-Signature`**: `email_parser.py` ora raccoglie tutti gli header `DKIM-Signature` presenti nell'email (campo `dkim_signatures_raw`) e il primo `Received-SPF` grezzo
+- **Fix bug `Received-SPF`**: regex precedente `r"=(\S+)"` con keyword vuota matchava il primo `=` qualsiasi; sostituito con `r"^(\w+)"` che estrae correttamente il primo token (pass/fail/softfail)
+- **23 nuove chiavi di traduzione** it/en per tutti i sotto-campi auth (`header.auth_detail_*`)
+- **UI aggiornata**: ogni riga SPF/DKIM/DMARC nel tab Header espone i sotto-campi in una griglia compatta sempre visibile (no click) con label + valore monospaciato
+
+---
+
+## [0.6.1] — 2026-04-06
+
+### Corretto
+- **URLhaus e ThreatFox richiedono API key**: abuse.ch ha reso obbligatoria l'autenticazione per tutti i propri servizi (stessa ondata di MalwareBazaar, fase completata a giugno 2025). Entrambi i connettori restituivano HTTP 401. Aggiunta chiave unificata `ABUSECH_API_KEY` che copre URLhaus, ThreatFox **e** MalwareBazaar (stesso portale `auth.abuse.ch`, gratuito). Header `Auth-Key` aggiunto alle chiamate HTTP. Senza chiave i servizi mostrano correttamente stato `skipped` (🔑) invece di errore 401
+- **Retrocompatibilità MalwareBazaar**: `MALWAREBAZAAR_API_KEY` ancora accettata come fallback; i nuovi utenti devono usare solo `ABUSECH_API_KEY`
+- `ServicePreview` e `_build_service_registry` aggiornati: URLhaus e ThreatFox ora classificati come `requires_key: true`
+
+---
+
+## [0.6.0] — 2026-04-06
+
+### Aggiunto
+- **Shodan InternetDB** — nuovo servizio reputazione IP (fase FAST): porte aperte, CVE, tag e hostname per ogni IP pubblico estratto dall'email. Gratuito, no API key, endpoint JSON pubblico `https://internetdb.shodan.io/{ip}`. Classificato come servizio informativo (ℹ️) nella UI e nel report .docx; segnala come malevolo se i tag includono `malware`, `c2`, `compromised`, `botnet`
+- **Abuse.ch URLhaus** — nuovo servizio reputazione URL (fase FAST): controlla ogni URL nel database URLhaus di abuse.ch. Gratuito, no API key. Segnala URL attivi come `malware_download` o con status `online` con confidence 95%. Stesso ecosistema di MalwareBazaar
+- **ThreatFox** (abuse.ch) — nuovo servizio reputazione multi-tipo (fase FAST): controlla IP, URL e hash SHA256 nel database IOC di ThreatFox. Gratuito, no API key. Riporta nome malware, tipo minaccia e livello di confidenza per ogni IOC trovato. Tre connettori distinti: `check_ip_threatfox`, `check_url_threatfox`, `check_hash_threatfox`
+- Totale servizi reputazione: da 9 a 12
 
 ---
 

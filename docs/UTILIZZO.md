@@ -208,10 +208,10 @@ Per ogni allegato viene mostrato anche il **hash SHA256** — utile per cercarlo
 
 Verifica IP, URL e hash su database pubblici di minacce.
 
-**Prima dell'esecuzione:** anteprima di tutti i 9 servizi con indicazione se la API key è configurata o meno.
+**Prima dell'esecuzione:** anteprima di tutti i 12 servizi con indicazione se la API key è configurata o meno.
 
 **Dopo aver cliccato "Avvia controllo reputazione"**, i risultati arrivano in due fasi:
-- **Fase 1** (pochi secondi): Spamhaus, ASN Lookup, OpenPhish, PhishTank, Redirect Chain, MalwareBazaar
+- **Fase 1** (pochi secondi): Spamhaus, ASN Lookup, Shodan InternetDB, OpenPhish, PhishTank, Redirect Chain, URLhaus, ThreatFox, MalwareBazaar
 - **Fase 2** (in background, aggiornamento automatico): AbuseIPDB, VirusTotal, crt.sh
 
 | Icona | Stato | Significato |
@@ -226,6 +226,7 @@ Verifica IP, URL e hash su database pubblici di minacce.
 **Servizi sempre attivi (nessuna chiave richiesta):**
 - **Spamhaus DROP** — blocklist IP malevoli di alto profilo
 - **ASN Lookup** — Autonomous System Number per ogni IP (ipinfo.io)
+- **Shodan InternetDB** — porte aperte, CVE e tag per ogni IP
 - **OpenPhish** — feed URL phishing aggiornato
 - **Redirect Chain** — segue i redirect degli URL shortener
 - **crt.sh** — certificati TLS del dominio (età, sottodomini)
@@ -234,7 +235,9 @@ Verifica IP, URL e hash su database pubblici di minacce.
 - **AbuseIPDB** — reputazione IP (header SMTP, X-Originating-IP)
 - **VirusTotal** — IP, URL e hash allegati (70+ engine)
 - **PhishTank** — URL phishing verificati dalla community
-- **MalwareBazaar** — hash allegati nel database malware
+- **URLhaus** — database URL malware di abuse.ch (`ABUSECH_API_KEY`)
+- **ThreatFox** — database IOC abuse.ch: IP, URL, hash malware (`ABUSECH_API_KEY`)
+- **MalwareBazaar** — hash allegati nel database malware (`ABUSECH_API_KEY`)
 
 Clicca su un servizio per espanderlo e vedere il dettaglio di ogni entità analizzata.
 
