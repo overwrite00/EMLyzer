@@ -47,5 +47,8 @@ desktop.ini
 *.swp
 *.swo
 
+# Claude Code (file locali, non per il repo)
+.claude/
+
 # Log
 *.log

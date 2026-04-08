@@ -48,6 +48,18 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.8.0] — 2026-04-08
+
+### Aggiunto
+- **Crediti sviluppatore**: footer discreto in fondo alla home page con "Sviluppato da Graziano Mariella · Distribuito con licenza MIT"
+- **Colonna numerazione `#`**: la lista analisi mostra ora il numero riga assoluto (basato sulla pagina corrente) nella prima colonna
+- **Paginazione migliorata**: aggiunto selettore "email per pagina" (10/25/50/100) accanto ai filtri; aggiunta navigazione rapida con pulsanti prima pagina `«` e ultima pagina `»` oltre ai già presenti `← Prec` e `Succ →`
+- **WHOIS abilitato di default**: `do_whois=True` in `url_analyzer.py`, `analysis.py` e nei client `runAnalysis`/`analyzeManual`; le nuove analisi includono automaticamente l'età del dominio
+- **Eliminazione analisi**: pulsante 🗑 per riga nella lista; al clic mostra conferma e rimuove il record dal DB, il file email da `uploads/` e il report `.docx` da `reports/` (se presente); se l'analisi eliminata è quella aperta in dettaglio, il pannello si chiude automaticamente
+- **Endpoint `DELETE /api/analysis/{job_id}`**: rimuove il record da SQLite, il file email caricato (`.eml`/`.msg`) e il report Word (`.docx`) se presente
+
+---
+
 ## [0.7.0] — 2026-04-07
 
 ### Corretto

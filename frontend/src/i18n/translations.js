@@ -278,6 +278,25 @@ export const translations = {
   // ── Language switcher ─────────────────────────────────────────────────────────
   "lang.it": { it: "Italiano", en: "Italian" },
   "lang.en": { it: "English", en: "English" },
+
+  // ── App credits ───────────────────────────────────────────────────────────────
+  "app.credits": { it: "Sviluppato da Graziano Mariella", en: "Developed by Graziano Mariella" },
+  "app.license": { it: "Distribuito con licenza MIT",     en: "Distributed under the MIT license" },
+
+  // ── Table column # ────────────────────────────────────────────────────────────
+  "col.num": { it: "#", en: "#" },
+
+  // ── Pagination ────────────────────────────────────────────────────────────────
+  "filter.per_page": { it: "per pagina", en: "per page" },
+  "filter.first":    { it: "«", en: "«" },
+  "filter.last":     { it: "»", en: "»" },
+
+  // ── Actions ───────────────────────────────────────────────────────────────────
+  "action.delete":         { it: "Elimina analisi", en: "Delete analysis" },
+  "action.delete_confirm": {
+    it: "Eliminare l'analisi '{subject}'? L'operazione non è reversibile.",
+    en: "Delete analysis '{subject}'? This action cannot be undone.",
+  },
 }
 
 export function createT(lang) {
