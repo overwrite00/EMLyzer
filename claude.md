@@ -9,7 +9,7 @@ correcto un bug importante, o modificata l'architettura.
 ## Identità del progetto
 
 - **Nome**: EMLyzer (rinominato da OpenMailForensics nella v0.3.1)
-- **Versione corrente**: 0.7.0 — fonte di verità: `backend/utils/config.py` → `VERSION`
+- **Versione corrente**: 0.8.0 — fonte di verità: `backend/utils/config.py` → `VERSION`
 - **Tipo**: piattaforma open-source di email forensics & threat analysis
 - **Filosofia**: nessuna dipendenza obbligatoria da API proprietarie; API a pagamento solo come plugin opzionali configurati dal singolo utente; analisi offline-first
 - **Repository**: GitHub (distribuzione pubblica)
@@ -104,6 +104,7 @@ Ogni analisi è una riga in `EmailAnalysis`. Colonne principali:
 | GET | `/api/analysis/{job_id}` | recupera risultati analisi (stessa struttura del POST) |
 | GET | `/api/analysis/` | lista paginata con filtri `q`, `risk`, `page`, `page_size` |
 | PATCH | `/api/analysis/{job_id}/notes` | salva note analista |
+| DELETE | `/api/analysis/{job_id}` | elimina DB record + file email + report .docx (se presente) |
 | POST | `/api/reputation/{job_id}` | esegue check reputazionali (separato dall'analisi) |
 | GET | `/api/report/{job_id}` | scarica report .docx |
 | GET | `/api/campaigns/` | clustering campagne con parametri `threshold`, `min_size` |
@@ -160,7 +161,7 @@ Finding categories: `text`, `html`, `base64`, `nlp`
 
 ### url_analyzer
 Per ogni URL estrae: original_url, scheme, host, path, domain, subdomain, tld, is_ip_address, is_shortener, is_punycode, resolved_ip, dns_error, whois_creation_date, domain_age_days, is_new_domain, https_used, findings, risk_score
-WHOIS è opzionale (`do_whois` param). DNS lookup sempre eseguito.
+WHOIS è abilitato di default (`do_whois=True` dalla v0.8.0). DNS lookup sempre eseguito.
 
 ### attachment_analyzer
 Calcola hash MD5/SHA1/SHA256, rileva MIME mismatch, doppia estensione, macro VBA (OLE2 e OOXML), JavaScript embedded, stream PDF sospetti. Solo analisi statica, nessuna esecuzione.

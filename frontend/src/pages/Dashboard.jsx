@@ -1,6 +1,6 @@
 // src/pages/Dashboard.jsx
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { listAnalyses, getAnalysis } from '../api/client'
+import { useState, useEffect, useCallback } from 'react'
+import { listAnalyses, getAnalysis, deleteAnalysis } from '../api/client'
 import UploadZone from '../components/UploadZone'
 import AnalysisDetail from '../components/AnalysisDetail'
 import LanguageSwitcher from '../components/LanguageSwitcher'
@@ -28,17 +28,17 @@ export default function Dashboard() {
   const [pages, setPages]         = useState(1)
   const [loading, setLoading]     = useState(true)
   const [selected, setSelected]   = useState(null)
+  const [selectedJobId, setSelectedJobId] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
   // Filtri
   const [searchQ, setSearchQ]     = useState('')
-  const [riskFilter, setRiskFilter] = useState([])  // array di label selezionate
+  const [riskFilter, setRiskFilter] = useState([])
   const [page, setPage]           = useState(1)
-  const PAGE_SIZE = 25
+  const [pageSize, setPageSize]   = useState(25)
 
   const debouncedQ = useDebounce(searchQ, 350)
 
-  // Carica la versione dal backend (evita hardcoding nel bundle)
   useEffect(() => {
     fetch('/api/health')
       .then(r => r.json())
@@ -53,29 +53,33 @@ export default function Dashboard() {
         q: debouncedQ,
         risk: riskFilter.join(','),
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
       })
       setAnalyses(data.items || [])
       setTotal(data.total || 0)
       setPages(data.pages || 1)
     } catch (_) {}
     finally { setLoading(false) }
-  }, [debouncedQ, riskFilter, page])
+  }, [debouncedQ, riskFilter, page, pageSize])
 
   useEffect(() => { fetchList() }, [fetchList])
 
-  // Reset pagina quando cambiano filtri
-  useEffect(() => { setPage(1) }, [debouncedQ, riskFilter])
+  useEffect(() => { setPage(1) }, [debouncedQ, riskFilter, pageSize])
 
   async function openDetail(jobId) {
     setDetailLoading(true)
-    try { setSelected(await getAnalysis(jobId)) }
+    try {
+      const result = await getAnalysis(jobId)
+      setSelected(result)
+      setSelectedJobId(jobId)
+    }
     catch (_) {}
     finally { setDetailLoading(false) }
   }
 
   function onNewAnalysis(result) {
     setSelected(result)
+    setSelectedJobId(result?.job_id || null)
     fetchList()
   }
 
@@ -83,6 +87,19 @@ export default function Dashboard() {
     setRiskFilter(prev =>
       prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
     )
+  }
+
+  async function handleDelete(jobId, subject) {
+    const msg = t('action.delete_confirm', { subject: subject || jobId })
+    if (!window.confirm(msg)) return
+    try {
+      await deleteAnalysis(jobId)
+      if (selectedJobId === jobId) {
+        setSelected(null)
+        setSelectedJobId(null)
+      }
+      fetchList()
+    } catch (_) {}
   }
 
   function exportCSV() {
@@ -105,6 +122,8 @@ export default function Dashboard() {
     low: 'var(--risk-low)', medium: 'var(--risk-medium)',
     high: 'var(--risk-high)', critical: 'var(--risk-critical)',
   }
+
+  const GRID_COLS = '36px 1fr 170px 70px 80px 110px 36px'
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
@@ -154,10 +173,7 @@ export default function Dashboard() {
           </div>
 
           {/* Barra ricerca + filtri */}
-          <div style={{
-            display: 'flex', gap: 10, marginBottom: 12,
-            flexWrap: 'wrap', alignItems: 'center',
-          }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             {/* Ricerca */}
             <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
               <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 13 }}>🔍</span>
@@ -208,6 +224,21 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* Selettore email per pagina */}
+            <select
+              value={pageSize}
+              onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
+              style={{
+                fontSize: 11, padding: '5px 8px', borderRadius: 4,
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                color: 'var(--text-secondary)', cursor: 'pointer',
+              }}
+            >
+              {[10, 25, 50, 100].map(n => (
+                <option key={n} value={n}>{n} {t('filter.per_page')}</option>
+              ))}
+            </select>
+
             {/* Export CSV */}
             <button onClick={exportCSV} disabled={!analyses.length} style={{
               padding: '6px 12px', borderRadius: 'var(--radius)', fontSize: 12,
@@ -243,37 +274,43 @@ export default function Dashboard() {
               }}>
                 {/* Header */}
                 <div style={{
-                  display: 'grid', gridTemplateColumns: '1fr 170px 70px 80px 110px',
+                  display: 'grid', gridTemplateColumns: GRID_COLS,
                   padding: '8px 16px', borderBottom: '1px solid var(--border)',
                   fontSize: 11, color: 'var(--text-muted)', fontWeight: 600,
                   letterSpacing: '0.05em', textTransform: 'uppercase',
                 }}>
+                  <span>{t('col.num')}</span>
                   <span>{t('col.subject')}</span>
                   <span>{t('col.date')}</span>
                   <span>{t('col.file')}</span>
                   <span>{t('col.score')}</span>
                   <span>{t('col.risk')}</span>
+                  <span></span>
                 </div>
 
-                {analyses.map((a, i) => (
+                {analyses.map((a, index) => (
                   <div key={a.job_id} onClick={() => openDetail(a.job_id)}
                     style={{
-                      display: 'grid', gridTemplateColumns: '1fr 170px 70px 80px 110px',
+                      display: 'grid', gridTemplateColumns: GRID_COLS,
                       padding: '11px 16px',
-                      borderBottom: i < analyses.length - 1 ? '1px solid var(--border)' : 'none',
+                      borderBottom: index < analyses.length - 1 ? '1px solid var(--border)' : 'none',
                       cursor: 'pointer', transition: 'background 0.12s',
                       alignItems: 'center', gap: 8,
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card)'}
                     onMouseLeave={e => e.currentTarget.style.background = ''}
                   >
+                    {/* # numero riga */}
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                      {(page - 1) * pageSize + index + 1}
+                    </div>
+
                     <div style={{ minWidth: 0 }}>
                       <div style={{
                         fontWeight: 500, fontSize: 13,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         color: 'var(--text-primary)',
                       }}>
-                        {/* Highlight search term */}
                         {searchQ
                           ? <HighlightedText text={a.subject || t('detail.no_subject')} query={searchQ} />
                           : (a.subject || t('detail.no_subject'))
@@ -302,35 +339,65 @@ export default function Dashboard() {
                       {a.risk_score != null ? a.risk_score.toFixed(1) : '—'}
                     </div>
                     <RiskBadge label={a.risk_label || 'low'} />
+
+                    {/* Pulsante elimina */}
+                    <div
+                      onClick={e => { e.stopPropagation(); handleDelete(a.job_id, a.subject) }}
+                      title={t('action.delete')}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', color: 'var(--text-muted)',
+                        fontSize: 14, opacity: 0.5,
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                      onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
+                    >
+                      🗑
+                    </div>
                   </div>
                 ))}
               </div>
 
-              {/* Paginazione */}
+              {/* Paginazione estesa */}
               {pages > 1 && (
                 <div style={{
                   display: 'flex', justifyContent: 'center', alignItems: 'center',
-                  gap: 12, marginTop: 16,
+                  gap: 8, marginTop: 16,
                 }}>
+                  <button onClick={() => setPage(1)} disabled={page <= 1} style={paginBtn(page <= 1)}>
+                    {t('filter.first')}
+                  </button>
                   <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
                     style={paginBtn(page <= 1)}>
                     {t('filter.prev')}
                   </button>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 13, padding: '0 8px' }}>
                     {t('filter.page_of', { page, pages })}
                   </span>
                   <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page >= pages}
                     style={paginBtn(page >= pages)}>
                     {t('filter.next')}
                   </button>
+                  <button onClick={() => setPage(pages)} disabled={page >= pages} style={paginBtn(page >= pages)}>
+                    {t('filter.last')}
+                  </button>
                 </div>
               )}
             </>
           )}
         </section>
+
+        {/* Footer crediti */}
+        <footer style={{
+          textAlign: 'center', padding: '24px 0 12px',
+          fontSize: 11, color: 'var(--text-muted)',
+          borderTop: '1px solid var(--border)', marginTop: 32,
+        }}>
+          {t('app.credits')} · {t('app.license')}
+        </footer>
       </main>
 
-      {selected && <AnalysisDetail data={selected} onClose={() => setSelected(null)} />}
+      {selected && <AnalysisDetail data={selected} onClose={() => { setSelected(null); setSelectedJobId(null) }} />}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
@@ -338,7 +405,7 @@ export default function Dashboard() {
 
 function paginBtn(disabled) {
   return {
-    padding: '6px 16px', borderRadius: 'var(--radius)',
+    padding: '6px 12px', borderRadius: 'var(--radius)',
     background: 'var(--bg-card)', border: '1px solid var(--border)',
     color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
     cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 12,
@@ -346,7 +413,6 @@ function paginBtn(disabled) {
   }
 }
 
-// Evidenzia il termine di ricerca nel testo
 function HighlightedText({ text, query }) {
   if (!query || !text) return text
   const idx = text.toLowerCase().indexOf(query.toLowerCase())

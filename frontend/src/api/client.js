@@ -17,7 +17,7 @@ export async function uploadEmail(file) {
 }
 
 // Run full analysis on uploaded file
-export async function runAnalysis(jobId, doWhois = false) {
+export async function runAnalysis(jobId, doWhois = true) {
   const res = await api.post(`/analysis/${jobId}?do_whois=${doWhois}`)
   return res.data
 }
@@ -63,8 +63,14 @@ export async function setLanguage(lang) {
 }
 
 // Analyze manually pasted email source
-export async function analyzeManual(source, filename = 'manual_input.eml', doWhois = false) {
+export async function analyzeManual(source, filename = 'manual_input.eml', doWhois = true) {
   const res = await api.post('/manual/', { source, filename, do_whois: doWhois })
+  return res.data
+}
+
+// Delete an analysis (DB record + email file + report .docx)
+export async function deleteAnalysis(jobId) {
+  const res = await api.delete(`/analysis/${jobId}`)
   return res.data
 }
 

@@ -123,7 +123,7 @@ def _whois_age(domain: str) -> tuple[Optional[datetime], Optional[int], str]:
         _whois_whois_logger.setLevel(_prev_level2)
 
 
-def _analyze_single_url(url: str, do_whois: bool = False) -> URLAnalysis:
+def _analyze_single_url(url: str, do_whois: bool = True) -> URLAnalysis:
     analysis = URLAnalysis(original_url=url)
 
     scheme, host, path, _ = _parse_url(url)
@@ -211,10 +211,10 @@ def _analyze_single_url(url: str, do_whois: bool = False) -> URLAnalysis:
     return analysis
 
 
-def analyze_urls(urls: list[str], do_whois: bool = False) -> URLAnalysisResult:
+def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
     """
     Analizza una lista di URL estratti dal corpo email.
-    do_whois=False di default (può essere lento; attivare opzionalmente).
+    do_whois=True di default; passare False per analisi più rapide.
     """
     result = URLAnalysisResult()
 

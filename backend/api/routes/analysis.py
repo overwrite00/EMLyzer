@@ -49,7 +49,7 @@ def _dataclass_to_dict(obj) -> dict:
 @router.post("/{job_id}")
 async def run_analysis(
     job_id: str,
-    do_whois: bool = False,
+    do_whois: bool = True,
     db: AsyncSession = Depends(get_session),
 ):
     """Esegue l'analisi completa dell'email e salva i risultati nel DB."""
@@ -407,3 +407,34 @@ async def update_notes(
     record.analyst_notes = body.notes
     await db.commit()
     return {"job_id": job_id, "analyst_notes": record.analyst_notes, "ok": True}
+
+
+@router.delete("/{job_id}")
+async def delete_analysis(
+    job_id: str,
+    db: AsyncSession = Depends(get_session),
+):
+    """Elimina l'analisi dal DB e i file fisici associati (email + report .docx)."""
+    import re
+    if not re.match(r'^[0-9a-f-]{36}$', job_id):
+        raise HTTPException(status_code=400, detail="job_id non valido")
+
+    record = await db.get(EmailAnalysis, job_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Analisi non trovata")
+
+    # Elimina file email caricato (.eml o .msg)
+    for ext in settings.ALLOWED_EXTENSIONS:
+        upload_file = settings.UPLOAD_DIR / f"{job_id}{ext}"
+        if upload_file.exists():
+            upload_file.unlink()
+            break
+
+    # Elimina report Word se presente (generato su richiesta, potrebbe non esistere)
+    report_file = settings.REPORTS_DIR / f"{job_id}.docx"
+    if report_file.exists():
+        report_file.unlink()
+
+    await db.delete(record)
+    await db.commit()
+    return {"status": "deleted", "job_id": job_id}
