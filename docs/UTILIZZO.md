@@ -66,9 +66,11 @@ Il testo deve iniziare con le intestazioni dell'email (righe tipo `From:`, `To:`
 
 ### Opzione WHOIS (analisi più approfondita)
 
-Prima di avviare l'analisi puoi attivare la casella **"🌐 Abilita WHOIS (età dominio)"**.
+La casella **"🌐 Abilita WHOIS (età dominio)"** è **attivata per default**.
 
-Il programma interrogherà i server WHOIS per verificare quando è stato registrato ogni dominio trovato nell'email. Domini registrati da meno di 30 giorni sono un forte segnale di phishing.
+Il programma interroga i server WHOIS per verificare quando è stato registrato ogni dominio trovato nell'email. Domini registrati da meno di 30 giorni sono un forte segnale di phishing.
+
+Deselezionala solo se vuoi un'analisi più rapida e non ti interessa l'età dei domini.
 
 > ⚠️ Con WHOIS attivato l'analisi richiede 20–60 secondi in più.
 
@@ -283,15 +285,25 @@ Compatibile con Microsoft Word, LibreOffice Writer, Google Docs.
 
 ## Lista analisi: ricerca e filtri
 
+### Colonna numerazione `#`
+
+La prima colonna della lista mostra il numero riga assoluto rispetto alla pagina corrente (es. pagina 2 con 25 risultati per pagina inizia da #26).
+
 ### Barra di ricerca
 
 Digita qualsiasi testo per filtrare per oggetto o mittente in tempo reale.
 Il termine trovato viene **evidenziato in giallo** nella lista.
 
+> ℹ️ L'oggetto viene decodificato correttamente anche se contiene emoji, caratteri non-ASCII o charset esotici (RFC 2047 con fallback UTF-8 → Latin-1 → Windows-1252).
+
 ### Filtri per rischio
 
 Clicca uno o più pulsanti: 🟢 Basso · 🟡 Moderato · 🔴 Alto · 🟣 Critico.
 Per rimuovere i filtri clicca ✕ o clicca di nuovo sul filtro attivo.
+
+### Selettore email per pagina
+
+Il menu a tendina accanto ai filtri permette di scegliere quante analisi mostrare: **10 / 25 / 50 / 100** per pagina.
 
 ### Esporta CSV
 
@@ -299,7 +311,15 @@ Clicca **"📥 Esporta CSV"** per scaricare la lista corrente in formato CSV (ap
 
 ### Paginazione
 
-25 analisi per pagina. Usa **"← Prec"** e **"Succ →"** per navigare.
+Usa i pulsanti di navigazione:
+- **«** — vai alla prima pagina
+- **← Prec** — pagina precedente
+- **Succ →** — pagina successiva
+- **»** — vai all'ultima pagina
+
+### Eliminare un'analisi
+
+Clicca l'icona 🗑 a destra della riga per eliminare il record. Una finestra di conferma chiede di verificare prima di procedere. L'eliminazione rimuove solo il record dal database; il file email originale e il report `.docx` rimangono sul disco.
 
 ---
 

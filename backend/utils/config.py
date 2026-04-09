@@ -14,12 +14,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "EMLyzer"
-    VERSION: str = "0.8.0"
+    VERSION: str = "0.8.2"
     DEBUG: bool = False
 
-    # CORS - frontend dev server
+    # CORS - backend in produzione + Vite dev server
     ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:5173",   # Vite default
+        "http://localhost:8000",   # backend in produzione (serve anche il frontend)
+        "http://127.0.0.1:8000",
+        "http://localhost:5173",   # Vite dev server
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",

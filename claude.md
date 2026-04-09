@@ -8,9 +8,9 @@ correcto un bug importante, o modificata l'architettura.
 
 ## Identità del progetto
 
-- **Nome**: EMLyzer (rinominato da OpenMailForensics nella v0.3.1)
-- **Versione corrente**: 0.8.0 — fonte di verità: `backend/utils/config.py` → `VERSION`
-- **Tipo**: piattaforma open-source di email forensics & threat analysis
+- **Nome**: EMLyzer
+- **Versione corrente**: 0.8.1 — fonte di verità: `backend/utils/config.py` → `VERSION`
+- **Tipo**: piattaforma open-source di email threat analysis
 - **Filosofia**: nessuna dipendenza obbligatoria da API proprietarie; API a pagamento solo come plugin opzionali configurati dal singolo utente; analisi offline-first
 - **Repository**: GitHub (distribuzione pubblica)
 - **Licenza**: MIT

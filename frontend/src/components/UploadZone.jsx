@@ -11,7 +11,7 @@ export default function UploadZone({ onAnalysisComplete }) {
   const [status, setStatus]     = useState('idle')
   const [message, setMessage]   = useState('')
   const [manualText, setManualText] = useState('')
-  const [doWhois, setDoWhois]       = useState(false)
+  const [doWhois, setDoWhois]       = useState(true)
 
   const handleFile = useCallback(async (file) => {
     if (!file) return

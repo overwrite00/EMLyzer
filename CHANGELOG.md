@@ -48,15 +48,36 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.8.2] — 2026-04-08
+
+### Fixed
+- **Email subject encoding**: decodifica RFC 2047 riscritta con fallback graceful per emoji, charset esotici e caratteri non-ASCII (UTF-8 → Latin-1 → Windows-1252); sostituisce `make_header()` che lanciava eccezioni su charset misti
+- **Raw UTF-8 headers**: aggiunto surrogate-escape recovery in `_decode_rfc2047` — gestisce header con byte UTF-8 grezzi (senza wrapper `=?...?=`) che la policy `compat32` di Python codifica come surrogates; fix per soggetti come `cartão` che venivano mostrati come `cart??o`
+- **To/CC header decoding**: anche i campi To e CC ora decodificano correttamente gli encoded-words RFC 2047
+- **Allineamento colonne tabella**: aggiunto `gap: 8` all'intestazione della tabella analisi, che mancava rispetto alle righe dati causando disallineamento visivo
+- **NaN in colonna `#`**: rimossa iniezione errata del div numero-riga nel componente `AnalysisDetail`; il div corretto rimane nel map della lista analisi
+
+---
+
+## [0.8.1] — 2026-04-08
+
+### Corretto
+- **DELETE rimuoveva file fisici**: l'endpoint `DELETE /api/analysis/{job_id}` cancellava anche il file `.eml`/`.msg` da `uploads/` e il report `.docx` da `reports/`. Comportamento corretto: si elimina solo il record DB; i file fisici restano per poter essere rianalizzati
+- **WHOIS disabilitato per default nella UI**: il checkbox WHOIS in UploadZone era impostato a `false` anziché `true`; il backend aveva già il default corretto (`do_whois=True`)
+- **Import fuori ordine in `analysis.py`**: gli import SQLAlchemy erano collocati dopo la definizione di `NotesUpdate`; spostati in cima al file
+- **Import prima del docstring in `attachment_analyzer.py`**: `from utils.i18n import t` era la prima riga del file, prima del docstring di modulo; spostato dopo
+
+---
+
 ## [0.8.0] — 2026-04-08
 
 ### Aggiunto
 - **Crediti sviluppatore**: footer discreto in fondo alla home page con "Sviluppato da Graziano Mariella · Distribuito con licenza MIT"
 - **Colonna numerazione `#`**: la lista analisi mostra ora il numero riga assoluto (basato sulla pagina corrente) nella prima colonna
 - **Paginazione migliorata**: aggiunto selettore "email per pagina" (10/25/50/100) accanto ai filtri; aggiunta navigazione rapida con pulsanti prima pagina `«` e ultima pagina `»` oltre ai già presenti `← Prec` e `Succ →`
-- **WHOIS abilitato di default**: `do_whois=True` in `url_analyzer.py`, `analysis.py` e nei client `runAnalysis`/`analyzeManual`; le nuove analisi includono automaticamente l'età del dominio
-- **Eliminazione analisi**: pulsante 🗑 per riga nella lista; al clic mostra conferma e rimuove il record dal DB, il file email da `uploads/` e il report `.docx` da `reports/` (se presente); se l'analisi eliminata è quella aperta in dettaglio, il pannello si chiude automaticamente
-- **Endpoint `DELETE /api/analysis/{job_id}`**: rimuove il record da SQLite, il file email caricato (`.eml`/`.msg`) e il report Word (`.docx`) se presente
+- **WHOIS abilitato di default**: `do_whois=True` in `url_analyzer.py`, `analysis.py` e nei client `runAnalysis`/`analyzeManual`
+- **Eliminazione analisi**: pulsante 🗑 per riga nella lista; al clic mostra conferma e rimuove il record dal DB; se l'analisi eliminata è quella aperta in dettaglio, il pannello si chiude automaticamente
+- **Endpoint `DELETE /api/analysis/{job_id}`**: rimuove il record da SQLite (i file fisici restano in `uploads/` e `reports/`)
 
 ---
 
@@ -326,7 +347,7 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 - Documentazione completa (README, installazione, utilizzo, configurazione, API)
 
 ### Modificato
-- Rinomina progetto: OpenMailForensics → **EMLyzer**
+- Rinominato il progetto in **EMLyzer**
 
 ### Corretto
 - Dati WHOIS calcolati ma mai inclusi nella risposta API

@@ -343,7 +343,7 @@ def _load_openphish():
         return
     try:
         resp = _http_get_with_retry("https://openphish.com/feed.txt",
-            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email forensics tool)"},
+            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)"},
             timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         _openphish_cache = {l.strip().lower() for l in resp.text.splitlines() if l.strip()}
@@ -385,7 +385,7 @@ def check_url_phishtank(url: str) -> ReputationResult:
                 "format": "json",
                 "app_key": settings.PHISHTANK_API_KEY or "",
             },
-            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email forensics tool)"},
+            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)"},
             timeout=REQUEST_TIMEOUT,
             rate_key="phishtank",
         )
@@ -425,7 +425,7 @@ def check_hash_malwarebazaar(sha256: str) -> ReputationResult:
         resp = _http_post_with_retry("https://mb-api.abuse.ch/api/v1/",
             data={"query": "get_info", "hash": sha256},
             headers={
-                "User-Agent": f"EMLyzer/{settings.VERSION} (email forensics tool)",
+                "User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)",
                 "Auth-Key": _key,
             },
             timeout=REQUEST_TIMEOUT)
@@ -465,7 +465,7 @@ def _load_spamhaus():
         # DROP list: singoli IP/CIDR malevoli di alto profilo
         resp = _http_get_with_retry(
             "https://www.spamhaus.org/drop/drop.txt",
-            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email forensics tool)"},
+            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)"},
             timeout=REQUEST_TIMEOUT,
             rate_key="spamhaus",
             max_retries=2,
@@ -521,7 +521,7 @@ def check_ip_asn(ip: str) -> ReputationResult:
     try:
         resp = _http_get_with_retry(
             f"https://ipinfo.io/{ip}/json",
-            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email forensics tool)"},
+            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)"},
             timeout=REQUEST_TIMEOUT_ASN,
             rate_key="asnlookup",
             max_retries=1,
@@ -565,7 +565,7 @@ def check_domain_crtsh(domain: str) -> ReputationResult:
         resp = _http_get_with_retry(
             "https://crt.sh/",
             params={"q": domain, "output": "json"},
-            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email forensics tool)"},
+            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)"},
             timeout=REQUEST_TIMEOUT_INFO,
             rate_key="crtsh",
             max_retries=2,
@@ -666,7 +666,7 @@ def check_ip_shodan_internetdb(ip: str) -> ReputationResult:
     try:
         resp = _http_get_with_retry(
             f"https://internetdb.shodan.io/{ip}",
-            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email forensics tool)"},
+            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)"},
             timeout=REQUEST_TIMEOUT_INFO,
             rate_key="shodaninternetdb",
             max_retries=1,
@@ -733,7 +733,7 @@ def check_url_urlhaus(url: str) -> ReputationResult:
             "https://urlhaus-api.abuse.ch/v1/url/",
             data={"url": url},
             headers={
-                "User-Agent": f"EMLyzer/{settings.VERSION} (email forensics tool)",
+                "User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)",
                 "Auth-Key": _abusech_key,
             },
             timeout=REQUEST_TIMEOUT,
@@ -788,7 +788,7 @@ def _query_threatfox(ioc: str) -> dict:
         "https://threatfox-api.abuse.ch/api/v1/",
         json_data={"query": "search_ioc", "search_term": ioc},
         headers={
-            "User-Agent":   f"EMLyzer/{settings.VERSION} (email forensics tool)",
+            "User-Agent":   f"EMLyzer/{settings.VERSION} (email analysis tool)",
             "Content-Type": "application/json",
             "Auth-Key":     settings.ABUSECH_API_KEY,
         },

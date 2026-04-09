@@ -10,7 +10,7 @@ Questa guida ti accompagna passo dopo passo dall'installazione di Python fino al
    - [Windows](#windows)
    - [Linux (Ubuntu / Debian)](#linux-ubuntu--debian)
    - [macOS](#macos)
-2. [Scaricare EMLyzer](#2-scaricare-openmailforensics)
+2. [Scaricare EMLyzer](#2-scaricare-emlyzer)
    - [Scarica come archivio ZIP / TAR](#scarica-come-archivio-zip--tar)
    - [Clona con Git (alternativa)](#clona-con-git-alternativa)
 3. [Primo avvio](#3-primo-avvio)
@@ -216,7 +216,7 @@ Per verificare che il backend risponda correttamente, puoi anche aprire:
 
 Dovresti vedere la risposta JSON:
 ```json
-{"status": "ok", "version": "0.4.9", "app": "EMLyzer"}
+{"status": "ok", "version": "0.8.1", "app": "EMLyzer"}
 ```
 
 ---

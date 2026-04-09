@@ -1,6 +1,6 @@
 # 🔍 EMLyzer
 
-**Piattaforma open-source di analisi forense delle email** per identificare spam, phishing e contenuti malevoli.
+**Piattaforma open-source di analisi delle email** per identificare spam, phishing e contenuti malevoli.
 
 EMLyzer permette di analizzare un'email sospetta caricando il file `.eml` o `.msg`, oppure incollando direttamente il sorgente, e ottiene in pochi secondi un **rapporto completo** con punteggio di rischio spiegabile, analisi degli header, del corpo, degli URL, degli allegati e dei servizi di reputazione.
 
@@ -77,7 +77,7 @@ Email (.eml / .msg / testo incollato)
 
 ## 🔧 Versione
 
-**v0.7.0** — Python 3.11–3.13, 94 test automatici, Windows + Linux
+**v0.8.1** — Python 3.11–3.13, 94 test automatici, Windows + Linux
 
 ---
 

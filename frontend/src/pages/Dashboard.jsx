@@ -274,7 +274,7 @@ export default function Dashboard() {
               }}>
                 {/* Header */}
                 <div style={{
-                  display: 'grid', gridTemplateColumns: GRID_COLS,
+                  display: 'grid', gridTemplateColumns: GRID_COLS, gap: 8,
                   padding: '8px 16px', borderBottom: '1px solid var(--border)',
                   fontSize: 11, color: 'var(--text-muted)', fontWeight: 600,
                   letterSpacing: '0.05em', textTransform: 'uppercase',

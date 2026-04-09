@@ -77,6 +77,49 @@ def _compute_hashes(data: bytes) -> tuple[str, str, str]:
     )
 
 
+def _decode_rfc2047(raw: str) -> str:
+    """Decodifica un valore header RFC 2047 (=?charset?Q/B?...?=).
+
+    Supporta UTF-8, Latin-1, Windows-1252, emoji (es. =?UTF-8?B?8J+YgA==?=)
+    e qualsiasi charset registrato IANA. Fallback graceful con errors='replace'.
+    """
+    if not raw:
+        return ""
+    try:
+        parts = email.header.decode_header(raw)
+        result = []
+        for fragment, charset in parts:
+            if isinstance(fragment, bytes):
+                # Costruisce lista charset da provare in ordine di affidabilità
+                charsets: list[str] = []
+                if charset:
+                    charsets.append(charset.lower().replace("_", "-"))
+                charsets += ["utf-8", "latin-1", "windows-1252"]
+                decoded: str | None = None
+                for cs in charsets:
+                    try:
+                        decoded = fragment.decode(cs)
+                        break
+                    except (UnicodeDecodeError, LookupError):
+                        continue
+                result.append(
+                    decoded if decoded is not None
+                    else fragment.decode("utf-8", errors="replace")
+                )
+            else:
+                result.append(str(fragment))
+        result_str = "".join(result).strip()
+        # Fix per raw UTF-8 headers: compat32 policy salva byte non-ASCII come
+        # surrogate escapes (\udcc3\udca3 per \xc3\xa3 = ã). Li recuperiamo qui.
+        try:
+            result_str = result_str.encode("utf-8", errors="surrogateescape").decode("utf-8")
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+        return result_str
+    except Exception:
+        return raw.strip()
+
+
 def _extract_auth_results(values: list[str], keyword: str) -> str:
     """Extract pass/fail/none/neutral from the LAST Authentication-Results header."""
     if not values or not isinstance(values, list):
@@ -105,16 +148,9 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
 
     # --- Headers ---
     def get_header(name: str) -> str:
-        """Legge un header e decodifica gli encoded words RFC 2047 (=?UTF-8?Q?...?=)."""
+        """Legge un header e decodifica gli encoded words RFC 2047."""
         val = msg.get(name, "")
-        if not val:
-            return ""
-        try:
-            # decode_header gestisce =?UTF-8?Q?...?=, =?UTF-8?B?...?= e testo plain
-            parts = email.header.decode_header(str(val))
-            return str(email.header.make_header(parts)).strip()
-        except Exception:
-            return str(val).strip()
+        return _decode_rfc2047(str(val)) if val else ""
 
     def get_headers(name: str) -> list[str]:
         """Legge tutti i valori di un header (può essere presente più volte)."""
@@ -132,11 +168,11 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
     parsed.x_campaign_id = get_header("X-Campaign-ID")
     parsed.list_unsubscribe = get_header("List-Unsubscribe")
 
-    # To / CC (can be multi-value)
+    # To / CC (can be multi-value, decode RFC 2047)
     to_raw = msg.get_all("To") or []
-    parsed.mail_to = [str(t).strip() for t in to_raw]
+    parsed.mail_to = [_decode_rfc2047(str(t)) for t in to_raw if t]
     cc_raw = msg.get_all("CC") or []
-    parsed.mail_cc = [str(c).strip() for c in cc_raw]
+    parsed.mail_cc = [_decode_rfc2047(str(c)) for c in cc_raw if c]
 
     # Received chain
     parsed.received_chain = [str(r).strip() for r in (msg.get_all("Received") or [])]

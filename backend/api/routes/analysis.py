@@ -10,12 +10,12 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 
 class NotesUpdate(BaseModel):
     notes: str = ""
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from models.database import get_session, EmailAnalysis
 from utils.config import settings
@@ -414,7 +414,7 @@ async def delete_analysis(
     job_id: str,
     db: AsyncSession = Depends(get_session),
 ):
-    """Elimina l'analisi dal DB e i file fisici associati (email + report .docx)."""
+    """Elimina l'analisi dal DB. I file fisici restano in uploads/ e reports/."""
     import re
     if not re.match(r'^[0-9a-f-]{36}$', job_id):
         raise HTTPException(status_code=400, detail="job_id non valido")
@@ -422,18 +422,6 @@ async def delete_analysis(
     record = await db.get(EmailAnalysis, job_id)
     if not record:
         raise HTTPException(status_code=404, detail="Analisi non trovata")
-
-    # Elimina file email caricato (.eml o .msg)
-    for ext in settings.ALLOWED_EXTENSIONS:
-        upload_file = settings.UPLOAD_DIR / f"{job_id}{ext}"
-        if upload_file.exists():
-            upload_file.unlink()
-            break
-
-    # Elimina report Word se presente (generato su richiesta, potrebbe non esistere)
-    report_file = settings.REPORTS_DIR / f"{job_id}.docx"
-    if report_file.exists():
-        report_file.unlink()
 
     await db.delete(record)
     await db.commit()

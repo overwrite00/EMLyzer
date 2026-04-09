@@ -26,7 +26,7 @@ Tutte le risposte sono in formato **JSON**. In caso di errore:
 Verifica che il server risponda.
 
 ```json
-{"status": "ok", "version": "0.4.9", "app": "EMLyzer"}
+{"status": "ok", "version": "0.8.1", "app": "EMLyzer"}
 ```
 
 ---
@@ -50,7 +50,7 @@ Carica un file email. Restituisce un `job_id` da usare nei passi successivi.
 ### `POST /api/analysis/{job_id}`
 Esegue l'analisi completa.
 
-**Parametro query opzionale:** `do_whois=true` per interrogare WHOIS sull'età dei domini.
+**Parametro query:** `do_whois` (default: `true`) — interroga WHOIS per ottenere l'età dei domini. Passa `do_whois=false` per saltare WHOIS e velocizzare l'analisi.
 
 ```json
 {
@@ -143,6 +143,15 @@ Risposta identica a `POST /api/analysis/{job_id}`.
 
 ---
 
+### `DELETE /api/analysis/{job_id}`
+Elimina il record dell'analisi dal database. I file fisici (`.eml`/`.msg` in `uploads/`, report `.docx` in `reports/`) **non vengono cancellati**.
+
+```json
+{"status": "deleted", "job_id": "550e8400-e29b-41d4-a716-446655440000"}
+```
+
+---
+
 ### `PATCH /api/analysis/{job_id}/notes`
 Salva le note dell'analista.
 
@@ -227,7 +236,7 @@ Configurazione corrente (lingua, plugin attivi, ecc.).
 ```json
 {
   "language": "it",
-  "version": "0.4.9",
+  "version": "0.8.1",
   "max_upload_mb": 25,
   "reputation_plugins": {
     "abuseipdb": true,

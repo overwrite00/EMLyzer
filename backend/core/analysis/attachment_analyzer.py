@@ -1,4 +1,3 @@
-from utils.i18n import t
 """
 core/analysis/attachment_analyzer.py
 
@@ -14,6 +13,7 @@ IMPORTANTE: nessun file viene eseguito. Solo analisi statica dei byte.
 """
 
 import re
+from utils.i18n import t
 from dataclasses import dataclass, field
 from typing import Optional
 

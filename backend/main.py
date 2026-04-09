@@ -117,7 +117,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="EMLyzer",
-    description="Open-source email forensics & threat analysis platform",
+    description="Open-source email threat analysis platform",
     version=settings.VERSION,
     lifespan=lifespan,
 )
@@ -143,6 +143,15 @@ app.include_router(campaigns.router,       prefix="/api/campaigns",  tags=["camp
 # Serve il frontend compilato (assets JS/CSS/immagini)
 if STATIC_DIR.exists():
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+    # Serve favicon e icone come file statici (non via SPA fallback)
+    @app.get("/favicon.svg", include_in_schema=False)
+    async def favicon():
+        return FileResponse(str(STATIC_DIR / "favicon.svg"), media_type="image/svg+xml")
+
+    @app.get("/icons.svg", include_in_schema=False)
+    async def icons():
+        return FileResponse(str(STATIC_DIR / "icons.svg"), media_type="image/svg+xml")
 
     # SPA fallback: qualsiasi URL non-API restituisce index.html
     # (necessario per il routing lato client di React)

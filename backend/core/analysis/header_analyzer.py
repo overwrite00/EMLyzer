@@ -1,7 +1,7 @@
 """
 core/analysis/header_analyzer.py
 
-Analisi forense degli header email:
+Analisi degli header email:
 - Mismatch di identità (From vs Return-Path vs Reply-To)
 - Ricostruzione percorso SMTP (Received chain)
 - Rilevamento header forging / injection
