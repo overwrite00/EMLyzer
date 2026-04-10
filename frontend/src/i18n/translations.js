@@ -294,9 +294,18 @@ export const translations = {
   // ── Actions ───────────────────────────────────────────────────────────────────
   "action.delete":         { it: "Elimina analisi", en: "Delete analysis" },
   "action.delete_confirm": {
-    it: "Eliminare l'analisi '{subject}'? L'operazione non è reversibile.",
-    en: "Delete analysis '{subject}'? This action cannot be undone.",
+    it: "Eliminare l'analisi '{subject}'? Verranno rimossi anche i file associati.",
+    en: "Delete analysis '{subject}'? Associated files will also be removed.",
   },
+  "action.select_all":     { it: "Seleziona tutto", en: "Select all" },
+  "action.deselect_all":   { it: "Deseleziona tutto", en: "Deselect all" },
+  "action.delete_selected": { it: "Elimina selezionati", en: "Delete selected" },
+  "action.selected_count": { it: "{n} selezionati", en: "{n} selected" },
+  "action.bulk_delete_confirm": {
+    it: "Eliminare {n} analisi selezionate? Verranno rimossi anche i file associati. L'operazione non è reversibile.",
+    en: "Delete {n} selected analyses? Associated files will also be removed. This action cannot be undone.",
+  },
+  "action.bulk_delete_success": { it: "{n} analisi eliminate", en: "{n} analyses deleted" },
 }
 
 export function createT(lang) {

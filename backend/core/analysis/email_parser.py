@@ -155,7 +155,7 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
     def get_headers(name: str) -> list[str]:
         """Legge tutti i valori di un header (può essere presente più volte)."""
         vals = msg.get_all(name) or []
-        return [str(val).strip() for val in vals if val]
+        return [_decode_rfc2047(str(val)) for val in vals if val]
 
     parsed.mail_from = get_header("From")
     parsed.mail_subject = get_header("Subject")
@@ -195,9 +195,14 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
         if m:
             parsed.spf_result = m.group(1).lower()
 
-    # All headers (lowercased keys)
+    # All headers (lowercased keys) — recupera surrogate escapes da compat32
     for key in msg.keys():
-        parsed.raw_headers[key.lower()] = str(msg[key])
+        raw_val = str(msg[key])
+        try:
+            raw_val = raw_val.encode("utf-8", errors="surrogateescape").decode("utf-8")
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+        parsed.raw_headers[key.lower()] = raw_val
 
     # --- Body ---
     if msg.is_multipart():

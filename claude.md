@@ -9,7 +9,7 @@ correcto un bug importante, o modificata l'architettura.
 ## Identità del progetto
 
 - **Nome**: EMLyzer
-- **Versione corrente**: 0.8.1 — fonte di verità: `backend/utils/config.py` → `VERSION`
+- **Versione corrente**: 0.9.0 — fonte di verità: `backend/utils/config.py` → `VERSION`
 - **Tipo**: piattaforma open-source di email threat analysis
 - **Filosofia**: nessuna dipendenza obbligatoria da API proprietarie; API a pagamento solo come plugin opzionali configurati dal singolo utente; analisi offline-first
 - **Repository**: GitHub (distribuzione pubblica)
@@ -104,7 +104,8 @@ Ogni analisi è una riga in `EmailAnalysis`. Colonne principali:
 | GET | `/api/analysis/{job_id}` | recupera risultati analisi (stessa struttura del POST) |
 | GET | `/api/analysis/` | lista paginata con filtri `q`, `risk`, `page`, `page_size` |
 | PATCH | `/api/analysis/{job_id}/notes` | salva note analista |
-| DELETE | `/api/analysis/{job_id}` | elimina DB record + file email + report .docx (se presente) |
+| DELETE | `/api/analysis/{job_id}` | elimina DB record + file email + report .docx |
+| POST | `/api/analysis/bulk-delete` | elimina più analisi in blocco (max 100); body `{"job_ids": [...]}` |
 | POST | `/api/reputation/{job_id}` | esegue check reputazionali (separato dall'analisi) |
 | GET | `/api/report/{job_id}` | scarica report .docx |
 | GET | `/api/campaigns/` | clustering campagne con parametri `threshold`, `min_size` |
@@ -145,7 +146,7 @@ upload file → parse_email_file()
 ### email_parser
 Supporta `.eml` (mail-parser) e `.msg` (extract-msg). Estrae tutti i campi in `ParsedEmail`:
 `filename, file_hash_md5/sha1/sha256, mail_from/to/cc/subject/date, message_id, return_path, reply_to, x_mailer, x_originating_ip, x_campaign_id, list_unsubscribe, received_chain, spf/dkim/dmarc_result, body_text, body_html, attachments, parse_errors`
-**Decodifica RFC 2047**: `get_header()` usa `email.header.decode_header()` + `make_header()` — decodifica automaticamente `=?UTF-8?Q?...?=`, `=?UTF-8?B?...?=` e `=?iso-8859-1?...?=` in tutti i campi header.
+**Decodifica RFC 2047**: `get_header()` e `get_headers()` usano entrambi `_decode_rfc2047()` — decodificano automaticamente `=?UTF-8?Q?...?=`, `=?UTF-8?B?...?=` e `=?iso-8859-1?...?=` in tutti i campi header, inclusi quelli multi-valore. Il dizionario `raw_headers` applica surrogate-escape recovery per gestire i byte UTF-8 grezzi prodotti dalla policy compat32.
 
 ### header_analyzer
 Funzioni interne: `_check_auth`, `_check_bulk_sender`, `_check_header_injection`, `_check_identity_mismatch`, `_check_missing_fields`, `_check_originating_ip`
@@ -259,7 +260,7 @@ Struttura 8 sezioni generate da `docx_reporter.py`:
 Deploy: `cd frontend && npm run build && cp -r dist/. ../backend/static/`
 
 ### Localizzazione
-160 chiavi in `translations.js` (it/en). Lingua salvata in `localStorage['emlyzer_lang']` e in `.env` via `POST /api/settings/language`.
+207 chiavi in `translations.js` (it/en). Lingua salvata in `localStorage['emlyzer_lang']` e in `.env` via `POST /api/settings/language`.
 
 ### Schede AnalysisDetail
 1. Riepilogo, 2. Header, 3. Body, 4. URL, 5. Allegati, 6. Reputazione
@@ -329,6 +330,9 @@ LANGUAGE=it                # it o en
 13. **`auth_detail` assente in analisi vecchie**: il campo `auth_detail` è stato aggiunto in v0.7.0. Il frontend deve gestire la sua assenza (`e.auth_detail || {}`) per le analisi pre-v0.7.0 già in DB. I sotto-dettagli semplicemente non vengono mostrati.
 14. **ThreatFox `illegal_search_term` e `no_result`**: ThreatFox restituisce `illegal_search_term` per URL con formato non riconosciuto (non è un errore) e `no_result` (singolare) come variante di `no_results`. Entrambi vanno aggiunti alla lista dei casi "non trovato" in `_parse_threatfox_result`, altrimenti cadono nell'`else` e mostrano `Status: ...` nella UI.
 15. **`start.bat` versione fallback hardcoded**: la riga `set "VERSION=x.y.z"` in `start.bat` va aggiornata a ogni nuova release, altrimenti il titolo della finestra mostra la versione precedente durante l'avvio (prima che Python legga `config.py`).
+16. **`get_headers()` deve decodificare RFC 2047**: la funzione `get_headers()` in `email_parser.py` deve chiamare `_decode_rfc2047()` su ogni valore, come fa `get_header()`. Senza questa decodifica, gli header multi-valore (Authentication-Results, DKIM-Signature) possono contenere token RFC 2047 grezzi.
+17. **`ensure_ascii=False` in serializzazione JSON**: `_dataclass_to_dict()` in `analysis.py` deve usare `json.dumps(..., ensure_ascii=False)` per preservare emoji e caratteri non-ASCII nella risposta API. Il default `ensure_ascii=True` escapa i caratteri Unicode in `\uXXXX`.
+18. **Collision nomi variabili nel bundle minificato**: quando si patchano manualmente file bundle Vite (senza npm), i nomi a due lettere (`Wn`, `Vn`, ecc.) possono essere riutilizzati in scope diversi dello stesso file. Usare sempre nomi con prefisso underscore (`_Wn`, `_Bn`) che non compaiono nell'originale. Verificare con `grep -c '\bNOME\b' index.js` prima di scegliere un nome. Il `useState(new Set)` passato a React viene interpretato come lazy initializer e chiama `Set()` senza `new` → TypeError; usare sempre `useState(()=>new Set())`. Analogamente, `setState(new Set)` nei callback è corretto perché React non tratta gli oggetti come initializer.
 
 ---
 

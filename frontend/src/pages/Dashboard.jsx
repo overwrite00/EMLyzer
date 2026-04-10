@@ -1,6 +1,6 @@
 // src/pages/Dashboard.jsx
 import { useState, useEffect, useCallback } from 'react'
-import { listAnalyses, getAnalysis, deleteAnalysis } from '../api/client'
+import { listAnalyses, getAnalysis, deleteAnalysis, deleteBulkAnalyses } from '../api/client'
 import UploadZone from '../components/UploadZone'
 import AnalysisDetail from '../components/AnalysisDetail'
 import LanguageSwitcher from '../components/LanguageSwitcher'
@@ -37,6 +37,8 @@ export default function Dashboard() {
   const [page, setPage]           = useState(1)
   const [pageSize, setPageSize]   = useState(25)
 
+  const [selectedIds, setSelectedIds] = useState(new Set())
+
   const debouncedQ = useDebounce(searchQ, 350)
 
   useEffect(() => {
@@ -64,7 +66,8 @@ export default function Dashboard() {
 
   useEffect(() => { fetchList() }, [fetchList])
 
-  useEffect(() => { setPage(1) }, [debouncedQ, riskFilter, pageSize])
+  useEffect(() => { setPage(1); setSelectedIds(new Set()) }, [debouncedQ, riskFilter, pageSize])
+  useEffect(() => { setSelectedIds(new Set()) }, [page])
 
   async function openDetail(jobId) {
     setDetailLoading(true)
@@ -102,6 +105,39 @@ export default function Dashboard() {
     } catch (_) {}
   }
 
+  function toggleSelect(jobId) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(jobId)) next.delete(jobId)
+      else next.add(jobId)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === analyses.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(analyses.map(a => a.job_id)))
+    }
+  }
+
+  async function handleBulkDelete() {
+    const n = selectedIds.size
+    if (!n) return
+    const msg = t('action.bulk_delete_confirm', { n })
+    if (!window.confirm(msg)) return
+    try {
+      await deleteBulkAnalyses([...selectedIds])
+      if (selectedIds.has(selectedJobId)) {
+        setSelected(null)
+        setSelectedJobId(null)
+      }
+      setSelectedIds(new Set())
+      fetchList()
+    } catch (_) {}
+  }
+
   function exportCSV() {
     if (!analyses.length) return
     const headers = ['job_id','subject','from','date','risk_score','risk_label','filename']
@@ -123,7 +159,7 @@ export default function Dashboard() {
     high: 'var(--risk-high)', critical: 'var(--risk-critical)',
   }
 
-  const GRID_COLS = '36px 1fr 170px 70px 80px 110px 36px'
+  const GRID_COLS = '28px 36px 1fr 170px 70px 80px 110px 36px'
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
@@ -279,6 +315,14 @@ export default function Dashboard() {
                   fontSize: 11, color: 'var(--text-muted)', fontWeight: 600,
                   letterSpacing: '0.05em', textTransform: 'uppercase',
                 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <input type="checkbox"
+                      checked={analyses.length > 0 && selectedIds.size === analyses.length}
+                      onChange={toggleSelectAll}
+                      title={t('action.select_all')}
+                      style={{ cursor: 'pointer', accentColor: 'var(--accent, #3b82f6)' }}
+                    />
+                  </span>
                   <span>{t('col.num')}</span>
                   <span>{t('col.subject')}</span>
                   <span>{t('col.date')}</span>
@@ -300,6 +344,15 @@ export default function Dashboard() {
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card)'}
                     onMouseLeave={e => e.currentTarget.style.background = ''}
                   >
+                    {/* Checkbox selezione */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      onClick={e => { e.stopPropagation(); toggleSelect(a.job_id) }}>
+                      <input type="checkbox"
+                        checked={selectedIds.has(a.job_id)}
+                        readOnly
+                        style={{ cursor: 'pointer', accentColor: 'var(--accent, #3b82f6)' }}
+                      />
+                    </div>
                     {/* # numero riga */}
                     <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
                       {(page - 1) * pageSize + index + 1}
@@ -396,6 +449,34 @@ export default function Dashboard() {
           {t('app.credits')} · {t('app.license')}
         </footer>
       </main>
+
+      {/* Barra azioni flottante per selezione multipla */}
+      {selectedIds.size > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px',
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)', boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
+          zIndex: 100, fontSize: 13,
+        }}>
+          <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
+            {t('action.selected_count', { n: selectedIds.size })}
+          </span>
+          <button onClick={handleBulkDelete} style={{
+            padding: '6px 16px', borderRadius: 'var(--radius)', fontSize: 12, fontWeight: 600,
+            background: '#ef4444', border: 'none', color: '#fff', cursor: 'pointer',
+          }}>
+            🗑 {t('action.delete_selected')}
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} style={{
+            padding: '6px 12px', borderRadius: 'var(--radius)', fontSize: 12,
+            background: 'transparent', border: '1px solid var(--border)',
+            color: 'var(--text-muted)', cursor: 'pointer',
+          }}>
+            {t('action.deselect_all')}
+          </button>
+        </div>
+      )}
 
       {selected && <AnalysisDetail data={selected} onClose={() => { setSelected(null); setSelectedJobId(null) }} />}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

@@ -41,9 +41,60 @@ def _find_upload_file(job_id: str) -> Path:
 def _dataclass_to_dict(obj) -> dict:
     """Serializza dataclass ricorsivamente, gestendo tipi non-JSON-serializable."""
     try:
-        return json.loads(json.dumps(asdict(obj), default=str))
+        return json.loads(json.dumps(asdict(obj), default=str, ensure_ascii=False))
     except Exception:
         return {}
+
+
+def _cleanup_files(job_id: str) -> int:
+    """Elimina file email caricato e report .docx per un job_id. Ritorna numero file rimossi."""
+    removed = 0
+    for ext in settings.ALLOWED_EXTENSIONS:
+        candidate = settings.UPLOAD_DIR / f"{job_id}{ext}"
+        if candidate.exists():
+            candidate.unlink()
+            removed += 1
+    report = settings.REPORTS_DIR / f"{job_id}.docx"
+    if report.exists():
+        report.unlink()
+        removed += 1
+    return removed
+
+
+class BulkDeleteRequest(BaseModel):
+    job_ids: list[str]
+
+
+@router.post("/bulk-delete")
+async def bulk_delete_analyses(
+    body: BulkDeleteRequest,
+    db: AsyncSession = Depends(get_session),
+):
+    """Elimina più analisi in una singola richiesta (DB + file fisici)."""
+    import re
+    if len(body.job_ids) > 100:
+        raise HTTPException(status_code=400, detail="Massimo 100 analisi per richiesta")
+
+    valid_ids = [jid for jid in body.job_ids if re.match(r'^[0-9a-f-]{36}$', jid)]
+    if not valid_ids:
+        raise HTTPException(status_code=400, detail="Nessun job_id valido fornito")
+
+    deleted_count = 0
+    files_removed = 0
+    for jid in valid_ids:
+        record = await db.get(EmailAnalysis, jid)
+        if record:
+            await db.delete(record)
+            deleted_count += 1
+            files_removed += _cleanup_files(jid)
+
+    await db.commit()
+    return {
+        "status": "deleted",
+        "requested": len(body.job_ids),
+        "deleted": deleted_count,
+        "files_removed": files_removed,
+    }
 
 
 @router.post("/{job_id}")
@@ -414,7 +465,7 @@ async def delete_analysis(
     job_id: str,
     db: AsyncSession = Depends(get_session),
 ):
-    """Elimina l'analisi dal DB. I file fisici restano in uploads/ e reports/."""
+    """Elimina l'analisi dal DB e i file fisici associati (email + report)."""
     import re
     if not re.match(r'^[0-9a-f-]{36}$', job_id):
         raise HTTPException(status_code=400, detail="job_id non valido")
@@ -425,4 +476,5 @@ async def delete_analysis(
 
     await db.delete(record)
     await db.commit()
-    return {"status": "deleted", "job_id": job_id}
+    files_removed = _cleanup_files(job_id)
+    return {"status": "deleted", "job_id": job_id, "files_removed": files_removed}

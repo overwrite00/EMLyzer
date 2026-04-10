@@ -319,7 +319,21 @@ Usa i pulsanti di navigazione:
 
 ### Eliminare un'analisi
 
-Clicca l'icona 🗑 a destra della riga per eliminare il record. Una finestra di conferma chiede di verificare prima di procedere. L'eliminazione rimuove solo il record dal database; il file email originale e il report `.docx` rimangono sul disco.
+Clicca l'icona 🗑 a destra della riga per eliminare il record. Una finestra di conferma chiede di verificare prima di procedere. L'eliminazione rimuove il record dal database **e i file fisici associati** (file email e report `.docx`).
+
+### Eliminazione massiva
+
+Per eliminare più analisi contemporaneamente:
+
+1. **Seleziona** le analisi usando le checkbox nella prima colonna della tabella
+2. La checkbox nell'intestazione seleziona/deseleziona tutte le analisi della pagina corrente
+3. Quando almeno un'analisi è selezionata, appare una **barra azioni flottante** in basso al centro con:
+   - Conteggio analisi selezionate
+   - Pulsante **"Elimina selezionati"** (rosso) — richiede conferma
+   - Pulsante **"Deseleziona tutto"**
+4. La selezione viene resettata automaticamente quando cambi pagina o filtri
+
+> ⚠️ L'eliminazione è **irreversibile**: rimuove il record dal DB, il file email da `uploads/` e il report `.docx` da `reports/`. Massimo 100 analisi per operazione.
 
 ---
 
