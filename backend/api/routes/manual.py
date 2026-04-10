@@ -12,6 +12,7 @@ import hashlib
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -72,12 +73,21 @@ async def analyze_manual(payload: ManualInput):
     from api.routes.analysis import _build_response, _dataclass_to_dict
     from models.database import EmailAnalysis, AsyncSessionLocal
 
-    parsed = parse_email_file(raw, payload.filename)
-    header_result = analyze_headers(parsed)
-    body_result = analyze_body(parsed)
-    url_result = analyze_urls(body_result.extracted_urls, do_whois=payload.do_whois)
-    attachment_result = analyze_attachments(parsed.attachments)
-    risk = compute_risk_score(header_result, body_result, url_result, attachment_result)
+    # Stessa ottimizzazione di analysis.py: pipeline bloccante in thread separato
+    # per non congelare l'event loop asyncio su Linux.
+    _do_whois = payload.do_whois
+
+    def _pipeline():
+        _parsed            = parse_email_file(raw, payload.filename)
+        _header_result     = analyze_headers(_parsed)
+        _body_result       = analyze_body(_parsed)
+        _url_result        = analyze_urls(_body_result.extracted_urls, do_whois=_do_whois)
+        _attachment_result = analyze_attachments(_parsed.attachments)
+        _risk              = compute_risk_score(_header_result, _body_result, _url_result, _attachment_result)
+        return _parsed, _header_result, _body_result, _url_result, _attachment_result, _risk
+
+    parsed, header_result, body_result, url_result, attachment_result, risk = \
+        await run_in_threadpool(_pipeline)
 
     # Persisti nel DB
     import json

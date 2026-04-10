@@ -17,8 +17,12 @@ export async function uploadEmail(file) {
 }
 
 // Run full analysis on uploaded file
+// Timeout esteso a 120s: con WHOIS e DNS su Linux l'analisi può richiedere
+// più tempo rispetto a Windows a causa di differenze nel resolver di sistema.
 export async function runAnalysis(jobId, doWhois = true) {
-  const res = await api.post(`/analysis/${jobId}?do_whois=${doWhois}`)
+  const res = await api.post(`/analysis/${jobId}?do_whois=${doWhois}`, null, {
+    timeout: 120000,
+  })
   return res.data
 }
 
@@ -64,7 +68,9 @@ export async function setLanguage(lang) {
 
 // Analyze manually pasted email source
 export async function analyzeManual(source, filename = 'manual_input.eml', doWhois = true) {
-  const res = await api.post('/manual/', { source, filename, do_whois: doWhois })
+  const res = await api.post('/manual/', { source, filename, do_whois: doWhois }, {
+    timeout: 120000,
+  })
   return res.data
 }
 
