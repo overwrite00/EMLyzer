@@ -74,6 +74,12 @@ export async function deleteAnalysis(jobId) {
   return res.data
 }
 
+// Bulk delete analyses (DB records + files)
+export async function deleteBulkAnalyses(jobIds) {
+  const res = await api.post('/analysis/bulk-delete', { job_ids: jobIds })
+  return res.data
+}
+
 // Update analyst notes
 export async function updateNotes(jobId, notes) {
   const res = await api.patch(`/analysis/${jobId}/notes`, { notes })

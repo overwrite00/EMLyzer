@@ -26,7 +26,7 @@ Tutte le risposte sono in formato **JSON**. In caso di errore:
 Verifica che il server risponda.
 
 ```json
-{"status": "ok", "version": "0.8.1", "app": "EMLyzer"}
+{"status": "ok", "version": "0.9.0", "app": "EMLyzer"}
 ```
 
 ---
@@ -144,10 +144,37 @@ Risposta identica a `POST /api/analysis/{job_id}`.
 ---
 
 ### `DELETE /api/analysis/{job_id}`
-Elimina il record dell'analisi dal database. I file fisici (`.eml`/`.msg` in `uploads/`, report `.docx` in `reports/`) **non vengono cancellati**.
+Elimina il record dell'analisi dal database **e i file fisici associati** (`.eml`/`.msg` da `uploads/`, report `.docx` da `reports/`).
 
 ```json
-{"status": "deleted", "job_id": "550e8400-e29b-41d4-a716-446655440000"}
+{"status": "deleted", "job_id": "550e8400-e29b-41d4-a716-446655440000", "files_removed": 2}
+```
+
+---
+
+### `POST /api/analysis/bulk-delete`
+Elimina più analisi in una singola richiesta. Massimo 100 analisi per richiesta.
+
+**Richiesta JSON:**
+
+```json
+{
+  "job_ids": [
+    "550e8400-e29b-41d4-a716-446655440000",
+    "660f9500-f39c-52e5-b827-557766551111"
+  ]
+}
+```
+
+**Risposta:**
+
+```json
+{
+  "status": "deleted",
+  "requested": 2,
+  "deleted": 2,
+  "files_removed": 4
+}
 ```
 
 ---
@@ -236,7 +263,7 @@ Configurazione corrente (lingua, plugin attivi, ecc.).
 ```json
 {
   "language": "it",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "max_upload_mb": 25,
   "reputation_plugins": {
     "abuseipdb": true,

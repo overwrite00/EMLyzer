@@ -48,6 +48,20 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.9.0] — 2026-04-10
+
+### Aggiunto
+- **Eliminazione massiva analisi**: selezione multipla con checkbox nella lista analisi; barra azioni flottante con conteggio, eliminazione selezionati e deselezione; limite 100 analisi per richiesta
+- **Endpoint `POST /api/analysis/bulk-delete`**: elimina più analisi in una singola richiesta (DB + file email + report .docx)
+- **Pulizia file su eliminazione singola**: l'endpoint `DELETE /api/analysis/{job_id}` ora rimuove anche il file `.eml`/`.msg` da `uploads/` e il report `.docx` da `reports/`
+
+### Corretto
+- **Encoding header multi-valore**: `get_headers()` nel parser ora decodifica correttamente gli encoded-words RFC 2047 (prima restituivano token grezzi `=?...?=`)
+- **Serializzazione JSON non-ASCII**: aggiunto `ensure_ascii=False` a `_dataclass_to_dict()` per preservare emoji e caratteri accentati nella risposta API
+- **Raw headers con surrogate escapes**: il dizionario `raw_headers` ora gestisce i byte UTF-8 grezzi della policy compat32 senza produrre caratteri corrotti
+
+---
+
 ## [0.8.2] — 2026-04-08
 
 ### Fixed
