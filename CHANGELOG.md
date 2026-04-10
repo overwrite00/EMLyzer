@@ -48,6 +48,13 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.9.1] — 2026-04-10
+
+### Corretto
+- **Encoding soggetti con byte UTF-8 grezzi**: aggiunto `_decode_header_raw_fallback()` — quando `compat32` produce U+FFFD per header con byte non-ASCII non-RFC2047 (es. `ü` come `\xc3\xbc` diretto), il parser legge i byte grezzi dell'header e decodifica come UTF-8 poi Windows-1252; si applica a tutti gli header (`Subject`, `From`, `To`, ecc.) e al dizionario `raw_headers`
+
+---
+
 ## [0.9.0] — 2026-04-10
 
 ### Aggiunto

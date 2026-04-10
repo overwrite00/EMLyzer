@@ -120,6 +120,34 @@ def _decode_rfc2047(raw: str) -> str:
         return raw.strip()
 
 
+def _decode_header_raw_fallback(raw_email: bytes, header_name: str) -> str | None:
+    """Fallback per header con byte non-ASCII non codificati RFC 2047.
+
+    Cerca il valore dell'header nei byte grezzi e prova a decodificarlo
+    direttamente come UTF-8 o Windows-1252.
+    Restituisce None se l'header non è trovato.
+    """
+    pattern = re.compile(
+        rb"(?i)^" + re.escape(header_name.encode()) + rb":\s*(.*?)(?=\r?\n[^ \t]|\r?\n\r?\n|\Z)",
+        re.DOTALL | re.MULTILINE,
+    )
+    m = pattern.search(raw_email)
+    if not m:
+        return None
+    # Unfold: rimuove line folding (CRLF + spazio/tab)
+    value_bytes = re.sub(rb"\r?\n[ \t]+", b" ", m.group(1)).strip()
+    # Se contiene RFC 2047 encoded words, usa il decoder standard
+    if b"=?" in value_bytes:
+        return _decode_rfc2047(value_bytes.decode("ascii", errors="replace"))
+    # Prova decodifica diretta UTF-8, poi Windows-1252 (copre Latin-1 esteso)
+    for cs in ("utf-8", "windows-1252", "latin-1"):
+        try:
+            return value_bytes.decode(cs)
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return value_bytes.decode("utf-8", errors="replace")
+
+
 def _extract_auth_results(values: list[str], keyword: str) -> str:
     """Extract pass/fail/none/neutral from the LAST Authentication-Results header."""
     if not values or not isinstance(values, list):
@@ -148,9 +176,19 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
 
     # --- Headers ---
     def get_header(name: str) -> str:
-        """Legge un header e decodifica gli encoded words RFC 2047."""
+        """Legge un header e decodifica gli encoded words RFC 2047.
+
+        Fallback ai byte grezzi se compat32 ha introdotto \\ufffd.
+        """
         val = msg.get(name, "")
-        return _decode_rfc2047(str(val)) if val else ""
+        if not val:
+            return ""
+        decoded = _decode_rfc2047(str(val))
+        if "\ufffd" in decoded:
+            fallback = _decode_header_raw_fallback(raw, name)
+            if fallback is not None and "\ufffd" not in fallback:
+                return fallback.strip()
+        return decoded
 
     def get_headers(name: str) -> list[str]:
         """Legge tutti i valori di un header (può essere presente più volte)."""
@@ -195,13 +233,18 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
         if m:
             parsed.spf_result = m.group(1).lower()
 
-    # All headers (lowercased keys) — recupera surrogate escapes da compat32
+    # All headers (lowercased keys) — recupera surrogate escapes da compat32,
+    # con fallback raw-bytes se compat32 ha prodotto \ufffd
     for key in msg.keys():
         raw_val = str(msg[key])
         try:
             raw_val = raw_val.encode("utf-8", errors="surrogateescape").decode("utf-8")
         except (UnicodeDecodeError, UnicodeEncodeError):
             pass
+        if "\ufffd" in raw_val:
+            fallback = _decode_header_raw_fallback(raw, key)
+            if fallback is not None and "\ufffd" not in fallback:
+                raw_val = fallback
         parsed.raw_headers[key.lower()] = raw_val
 
     # --- Body ---

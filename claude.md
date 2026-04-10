@@ -9,7 +9,7 @@ correcto un bug importante, o modificata l'architettura.
 ## Identità del progetto
 
 - **Nome**: EMLyzer
-- **Versione corrente**: 0.9.0 — fonte di verità: `backend/utils/config.py` → `VERSION`
+- **Versione corrente**: 0.9.1 — fonte di verità: `backend/utils/config.py` → `VERSION`
 - **Tipo**: piattaforma open-source di email threat analysis
 - **Filosofia**: nessuna dipendenza obbligatoria da API proprietarie; API a pagamento solo come plugin opzionali configurati dal singolo utente; analisi offline-first
 - **Repository**: GitHub (distribuzione pubblica)
@@ -146,7 +146,7 @@ upload file → parse_email_file()
 ### email_parser
 Supporta `.eml` (mail-parser) e `.msg` (extract-msg). Estrae tutti i campi in `ParsedEmail`:
 `filename, file_hash_md5/sha1/sha256, mail_from/to/cc/subject/date, message_id, return_path, reply_to, x_mailer, x_originating_ip, x_campaign_id, list_unsubscribe, received_chain, spf/dkim/dmarc_result, body_text, body_html, attachments, parse_errors`
-**Decodifica RFC 2047**: `get_header()` e `get_headers()` usano entrambi `_decode_rfc2047()` — decodificano automaticamente `=?UTF-8?Q?...?=`, `=?UTF-8?B?...?=` e `=?iso-8859-1?...?=` in tutti i campi header, inclusi quelli multi-valore. Il dizionario `raw_headers` applica surrogate-escape recovery per gestire i byte UTF-8 grezzi prodotti dalla policy compat32.
+**Decodifica RFC 2047**: `get_header()` e `get_headers()` usano entrambi `_decode_rfc2047()` — decodificano automaticamente `=?UTF-8?Q?...?=`, `=?UTF-8?B?...?=` e `=?iso-8859-1?...?=` in tutti i campi header, inclusi quelli multi-valore. Il dizionario `raw_headers` applica surrogate-escape recovery per gestire byte UTF-8 grezzi prodotti dalla policy compat32. **Fallback raw-bytes** (v0.9.1): quando compat32 produce U+FFFD (byte non-ASCII non-RFC2047, es. `ü` come `\xc3\xbc` diretto), `get_header()` e il loop `raw_headers` chiamano `_decode_header_raw_fallback(raw, name)` che estrae il valore dai byte grezzi del file e prova UTF-8 → Windows-1252.
 
 ### header_analyzer
 Funzioni interne: `_check_auth`, `_check_bulk_sender`, `_check_header_injection`, `_check_identity_mismatch`, `_check_missing_fields`, `_check_originating_ip`
