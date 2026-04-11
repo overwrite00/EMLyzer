@@ -9,7 +9,7 @@ correcto un bug importante, o modificata l'architettura.
 ## Identità del progetto
 
 - **Nome**: EMLyzer
-- **Versione corrente**: 0.9.1 — fonte di verità: `backend/utils/config.py` → `VERSION`
+- **Versione corrente**: 0.9.2 — fonte di verità: `backend/utils/config.py` → `VERSION`
 - **Tipo**: piattaforma open-source di email threat analysis
 - **Filosofia**: nessuna dipendenza obbligatoria da API proprietarie; API a pagamento solo come plugin opzionali configurati dal singolo utente; analisi offline-first
 - **Repository**: GitHub (distribuzione pubblica)
