@@ -26,7 +26,7 @@ Tutte le risposte sono in formato **JSON**. In caso di errore:
 Verifica che il server risponda.
 
 ```json
-{"status": "ok", "version": "0.9.2", "app": "EMLyzer"}
+{"status": "ok", "version": "0.9.3", "app": "EMLyzer"}
 ```
 
 ---
@@ -263,7 +263,7 @@ Configurazione corrente (lingua, plugin attivi, ecc.).
 ```json
 {
   "language": "it",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "max_upload_mb": 25,
   "reputation_plugins": {
     "abuseipdb": true,
