@@ -48,6 +48,15 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.9.2] — 2026-04-11
+
+### Sicurezza
+- **urllib3 2.5.0 → 2.6.0**: fix CVE unbounded decompression chain e streaming decompression DoS (CWE-409); la libreria è dipendenza transitiva di `requests` usato nei connettori reputazione
+- **vite ^8.0.1 → ^8.0.5**: fix CVE `server.fs.deny` bypass e `.map` traversal nel dev server (impatto solo sviluppo, non produzione)
+- **axios**: analizzato — NON vulnerabile nel contesto EMLyzer (uso browser-only, `NO_PROXY` è variabile Node.js non applicabile al browser)
+
+---
+
 ## [0.9.1] — 2026-04-10
 
 ### Corretto
