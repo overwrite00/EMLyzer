@@ -48,6 +48,14 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.9.3] — 2026-04-11
+
+### Sicurezza
+- **urllib3 2.6.0 → 2.6.3**: fix CVE decompression-bomb bypass when following HTTP redirects (streaming API); versione 2.6.0 non sufficiente per questo alert
+- **axios ^1.13.6 → ^1.15.0**: fix due CVE CRITICAL (cloud metadata header injection + NO_PROXY SSRF); entrambe non applicabili nel contesto browser-only di EMLyzer, ma constraint aggiornato per chiudere gli alert GitHub
+
+---
+
 ## [0.9.2] — 2026-04-11
 
 ### Sicurezza
