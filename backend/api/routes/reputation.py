@@ -32,6 +32,7 @@ from models.database import get_session, EmailAnalysis
 from core.reputation.connectors import (
     run_fast_checks,
     run_slow_checks,
+    finalize_fast_only,
     ReputationSummary,
 )
 from dataclasses import asdict
@@ -246,15 +247,21 @@ async def run_reputation_fast(
     # Avvia fase 2 in background con indicatori SELETTIVI (solo IP interni + URL sospetti)
     # per rispettare i rate limit di VirusTotal (4/min) e AbuseIPDB senza sprecare richieste
     slow_ips, slow_urls, slow_hashes = _extract_priority_indicators(record)
-    if slow_ips or slow_urls or slow_hashes:
+    has_slow = bool(slow_ips or slow_urls or slow_hashes)
+    slow_indicators = {"ips": slow_ips, "urls": slow_urls, "hashes": slow_hashes}
+
+    if has_slow:
+        rep_dict["slow_indicators"] = slow_indicators
         background_tasks.add_task(
             _run_slow_background, job_id, slow_ips, slow_urls, slow_hashes, rep_dict
         )
-
-    has_slow = bool(slow_ips or slow_urls or slow_hashes)
-
-    # Se non ci sono entità per la fase 2, segna subito come completo
-    if not has_slow:
+    else:
+        # Nessun indicatore SLOW: rimuovi i placeholder "in elaborazione" prima di
+        # salvare come "complete". Senza questo i servizi AbuseIPDB/VirusTotal/crt.sh
+        # rimarrebbero bloccati in stato "pending" indefinitamente nel frontend.
+        summary = finalize_fast_only(summary)
+        rep_dict = _summary_to_dict(summary)
+        rep_dict["slow_indicators"] = slow_indicators
         rep_dict["reputation_phase"] = "complete"
         record.reputation_results = rep_dict
         flag_modified(record, "reputation_results")
@@ -262,7 +269,7 @@ async def run_reputation_fast(
 
     return {
         "job_id":            job_id,
-        "phase":             "fast",
+        "phase":             "fast" if has_slow else "complete",
         "slow_running":      has_slow,
         "reputation_score":  summary.reputation_score,
         "malicious_count":   summary.malicious_count,
@@ -273,11 +280,7 @@ async def run_reputation_fast(
             "urls":   len(urls),
             "hashes": len(hashes),
         },
-        "slow_entities": {
-            "ips":    len(slow_ips),
-            "urls":   len(slow_urls),
-            "hashes": len(slow_hashes),
-        } if has_slow else None,
+        "slow_indicators":   slow_indicators,
     }
 
 
@@ -333,6 +336,10 @@ async def _run_slow_background(
             if record:
                 final_dict = _summary_to_dict(updated)
                 final_dict["reputation_phase"] = "complete"
+                # Preserva slow_indicators salvati dalla fase 1
+                prev = record.reputation_results or {}
+                if "slow_indicators" in prev:
+                    final_dict["slow_indicators"] = prev["slow_indicators"]
                 record.reputation_results = final_dict
                 flag_modified(record, "reputation_results")
                 await session.commit()

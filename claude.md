@@ -9,7 +9,7 @@ correcto un bug importante, o modificata l'architettura.
 ## Identità del progetto
 
 - **Nome**: EMLyzer
-- **Versione corrente**: 0.9.3 — fonte di verità: `backend/utils/config.py` → `VERSION`
+- **Versione corrente**: 0.9.4 — fonte di verità: `backend/utils/config.py` → `VERSION`
 - **Tipo**: piattaforma open-source di email threat analysis
 - **Filosofia**: nessuna dipendenza obbligatoria da API proprietarie; API a pagamento solo come plugin opzionali configurati dal singolo utente; analisi offline-first
 - **Repository**: GitHub (distribuzione pubblica)
@@ -180,6 +180,9 @@ Tipi di cluster: `subject` (similarità Jaccard), `body_hash`, `message_id` (pat
 - Frontend fa polling `GET /api/analysis/{job_id}` ogni 5s finché `reputation_results.reputation_phase === "complete"`
 - **CRITICO**: usare `flag_modified(record, "reputation_results")` prima di ogni `commit()` con JSON su SQLite
 - Background task usa `asyncio.get_running_loop()` (non `get_event_loop()`, deprecato Python 3.10+)
+- **`finalize_fast_only(summary)`** (v0.9.4): chiamata dalla route quando `has_slow=False`; rimuove i placeholder "in elaborazione" e ricalcola `service_registry`; senza di essa AbuseIPDB/VirusTotal/crt.sh restano bloccati in "pending" per email senza indicatori SLOW
+- **Disk cache feed** (v0.9.4): Spamhaus DROP (TTL 24h) e OpenPhish (TTL 12h) vengono salvati in `backend/data/cache/` come JSON; al riavvio si leggono da disco senza ri-scaricare; se il download fallisce si usa la cache scaduta come fallback
+- **`slow_indicators`** (v0.9.4): campo in `reputation_results` con IP/URL/hash passati ai servizi SLOW; usato dal frontend per diagnostica nel tab Reputazione
 
 ### Classificazione servizi
 **FAST** (`_FAST_SERVICES`): Spamhaus DROP, ASN Lookup, OpenPhish, PhishTank, Redirect Chain, MalwareBazaar
