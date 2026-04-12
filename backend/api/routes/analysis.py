@@ -17,7 +17,8 @@ from sqlalchemy import select
 class NotesUpdate(BaseModel):
     notes: str = ""
 
-from models.database import get_session, EmailAnalysis
+from sqlalchemy import text
+from models.database import get_session, EmailAnalysis, engine
 from utils.config import settings
 from core.analysis.email_parser import parse_email_file
 from core.analysis.header_analyzer import analyze_headers
@@ -27,6 +28,26 @@ from core.analysis.attachment_analyzer import analyze_attachments
 from core.analysis.scorer import compute_risk_score
 
 router = APIRouter()
+
+import logging as _logging
+_logger = _logging.getLogger(__name__)
+
+
+async def _vacuum_db() -> None:
+    """Esegue VACUUM sul DB SQLite per recuperare spazio su disco.
+
+    Usato dopo operazioni di eliminazione massiva. Richiede una connessione
+    fuori da qualsiasi transazione (isolation_level=AUTOCOMMIT).
+    Non bloccante: le eccezioni vengono loggate ma ignorate.
+    """
+    try:
+        async with engine.execution_options(
+            isolation_level="AUTOCOMMIT"
+        ).connect() as conn:
+            await conn.execute(text("VACUUM"))
+            _logger.info("VACUUM completato — spazio DB recuperato")
+    except Exception as e:
+        _logger.warning("VACUUM fallito (non critico): %s", e)
 
 
 def _find_upload_file(job_id: str) -> Path:
@@ -89,6 +110,9 @@ async def bulk_delete_analyses(
             files_removed += _cleanup_files(jid)
 
     await db.commit()
+    # VACUUM dopo eliminazioni massive per recuperare spazio su disco
+    if deleted_count > 0:
+        await _vacuum_db()
     return {
         "status": "deleted",
         "requested": len(body.job_ids),
@@ -477,4 +501,5 @@ async def delete_analysis(
     await db.delete(record)
     await db.commit()
     files_removed = _cleanup_files(job_id)
+    await _vacuum_db()
     return {"status": "deleted", "job_id": job_id, "files_removed": files_removed}
