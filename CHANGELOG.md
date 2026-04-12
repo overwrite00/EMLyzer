@@ -48,6 +48,17 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.9.4] — 2026-04-12
+
+### Corretto
+- **Servizi reputazione bloccati "in elaborazione"**: quando `_extract_priority_indicators()` non trova indicatori SLOW (nessun IP da `received_hops`, nessun URL sospetto), i placeholder creati da `run_fast_checks()` per AbuseIPDB/VirusTotal/crt.sh venivano salvati nel DB con `reputation_phase=complete` senza essere rimossi. Aggiunta `finalize_fast_only()` che pulisce i placeholder e ricalcola il `service_registry` prima del salvataggio → i servizi mostrano correttamente "➖ Non applicabile" anziché restare bloccati in "⏳ In elaborazione"
+
+### Aggiunto
+- **Cache su disco per Spamhaus DROP e OpenPhish**: i feed locali vengono salvati in `backend/data/cache/` con TTL 24h (Spamhaus) e 12h (OpenPhish); all'avvio successivo vengono letti da disco senza ri-scaricare; se il download fallisce ma esiste una cache scaduta viene usata come fallback
+- **Diagnostica indicatori analizzati**: il campo `slow_indicators` viene ora incluso in `reputation_results`; il tab Reputazione mostra gli IP/URL/hash passati ai servizi avanzati, oppure un avviso "Nessun indicatore ad alta priorità" quando i servizi avanzati non vengono attivati
+
+---
+
 ## [0.9.3] — 2026-04-11
 
 ### Sicurezza

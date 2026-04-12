@@ -10,6 +10,7 @@ Connettori reputazione:
 Ogni connettore traccia il proprio stato (queried/skipped/error) per la UI.
 """
 
+import json
 import time
 import base64
 import ipaddress
@@ -17,6 +18,8 @@ import urllib.parse
 import threading
 import logging
 from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
+from datetime import datetime, timezone
+from pathlib import Path
 import requests
 from dataclasses import dataclass, field
 from utils.config import settings
@@ -26,6 +29,50 @@ logger = logging.getLogger(__name__)
 REQUEST_TIMEOUT      = 8    # servizi di sicurezza (AbuseIPDB, VirusTotal, ecc.)
 REQUEST_TIMEOUT_ASN  = 4    # ASN lookup
 REQUEST_TIMEOUT_INFO = 5    # servizi informativi (crt.sh, redirect chain)
+
+# ---------------------------------------------------------------------------
+# Disk cache per feed locali (Spamhaus DROP, OpenPhish)
+# ---------------------------------------------------------------------------
+# I feed vengono scaricati al primo avvio e salvati in backend/data/cache/.
+# Alla sessione successiva vengono letti dal disco se non scaduti (TTL).
+# Se il download fallisce ma il cache scaduto esiste, viene usato come fallback.
+
+_CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "cache"
+
+
+def _cache_load(name: str, ttl_hours: int | None = None) -> list | None:
+    """Carica dati dal cache su disco.
+    Se ttl_hours è None ignora l'età (fallback stale).
+    Restituisce la lista di dati o None se cache assente/corrotta/scaduta."""
+    try:
+        path = _CACHE_DIR / f"{name}.json"
+        if not path.exists():
+            return None
+        with path.open(encoding="utf-8") as f:
+            cached = json.load(f)
+        if ttl_hours is not None:
+            saved_at = datetime.fromisoformat(cached["saved_at"])
+            age_h = (datetime.now(timezone.utc) - saved_at).total_seconds() / 3600
+            if age_h > ttl_hours:
+                return None
+        return cached["data"]
+    except Exception:
+        return None
+
+
+def _cache_save(name: str, data: list) -> None:
+    """Salva dati su disco come JSON con timestamp UTC. Scrittura atomica."""
+    try:
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        path = _CACHE_DIR / f"{name}.json"
+        payload = {"saved_at": datetime.now(timezone.utc).isoformat(), "data": data}
+        tmp = path.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        tmp.replace(path)
+    except Exception:
+        pass  # cache su disco è best-effort
+
 
 # ---------------------------------------------------------------------------
 # Rate limiter thread-safe con semaforo per servizio
@@ -341,15 +388,28 @@ def _load_openphish():
     global _openphish_cache, _openphish_loaded, _openphish_error
     if _openphish_loaded:
         return
+    # Prova cache su disco (TTL 12h) prima di scaricare dalla rete
+    cached = _cache_load("openphish_feed", ttl_hours=12)
+    if cached is not None:
+        _openphish_cache = set(cached)
+        _openphish_loaded = True
+        return
     try:
         resp = _http_get_with_retry("https://openphish.com/feed.txt",
             headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)"},
             timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
-        _openphish_cache = {l.strip().lower() for l in resp.text.splitlines() if l.strip()}
+        urls = [l.strip().lower() for l in resp.text.splitlines() if l.strip()]
+        _openphish_cache = set(urls)
         _openphish_loaded = True
+        _cache_save("openphish_feed", urls)
     except Exception as e:
         _openphish_error = str(e)
+        # Fallback: cache scaduta piuttosto che feed vuoto
+        stale = _cache_load("openphish_feed")  # nessun controllo TTL
+        if stale is not None:
+            _openphish_cache = set(stale)
+            _openphish_error += " (usando cache scaduta)"
         _openphish_loaded = True
 
 def check_url_openphish(url: str) -> ReputationResult:
@@ -461,6 +521,15 @@ def _load_spamhaus():
     global _spamhaus_cache, _spamhaus_loaded, _spamhaus_error
     if _spamhaus_loaded:
         return
+    # Prova cache su disco (TTL 24h) prima di scaricare dalla rete
+    cached = _cache_load("spamhaus_drop", ttl_hours=24)
+    if cached is not None:
+        try:
+            _spamhaus_cache = [ipaddress.ip_network(c, strict=False) for c in cached]
+            _spamhaus_loaded = True
+            return
+        except Exception:
+            pass  # cache corrotta, riscarica
     try:
         # DROP list: singoli IP/CIDR malevoli di alto profilo
         resp = _http_get_with_retry(
@@ -472,6 +541,7 @@ def _load_spamhaus():
         )
         resp.raise_for_status()
         networks = []
+        cidr_strings = []
         for line in resp.text.splitlines():
             line = line.strip()
             if not line or line.startswith(";"):
@@ -479,12 +549,22 @@ def _load_spamhaus():
             cidr = line.split(";")[0].strip()
             try:
                 networks.append(ipaddress.ip_network(cidr, strict=False))
+                cidr_strings.append(cidr)
             except ValueError:
                 pass
         _spamhaus_cache = networks
         _spamhaus_loaded = True
+        _cache_save("spamhaus_drop", cidr_strings)
     except Exception as e:
         _spamhaus_error = str(e)
+        # Fallback: cache scaduta piuttosto che lista vuota
+        stale = _cache_load("spamhaus_drop")  # nessun controllo TTL
+        if stale is not None:
+            try:
+                _spamhaus_cache = [ipaddress.ip_network(c, strict=False) for c in stale]
+                _spamhaus_error += " (usando cache scaduta)"
+            except Exception:
+                pass
         _spamhaus_loaded = True
 
 def check_ip_spamhaus(ip: str) -> ReputationResult:
@@ -1329,6 +1409,24 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str]) -> "Repu
     if malicious:
         avg_conf = sum(r.confidence for r in malicious) / len(malicious)
         summary.reputation_score = min(avg_conf * 1.2, 100.0)
+    return summary
+
+
+def finalize_fast_only(summary: "ReputationSummary") -> "ReputationSummary":
+    """Rimuove i placeholder 'in elaborazione' quando non ci sono indicatori SLOW.
+
+    Chiamata dalla route quando has_slow=False, evita che AbuseIPDB/VirusTotal/crt.sh
+    rimangano bloccati in stato 'pending' indefinitamente.
+    Ricalcola service_registry dopo la pulizia: i servizi SLOW appaiono
+    come 'not_applicable' anziché 'pending'.
+    """
+    for lst in (summary.ip_results, summary.url_results, summary.hash_results):
+        to_remove = [r for r in lst if r.skipped
+                     and "in elaborazione" in (r.skip_reason or "")]
+        for r in to_remove:
+            lst.remove(r)
+    all_results = summary.ip_results + summary.url_results + summary.hash_results
+    summary.service_registry = _build_service_registry(all_results)
     return summary
 
 
