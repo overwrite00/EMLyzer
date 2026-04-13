@@ -34,6 +34,7 @@ aiosqlite==0.22.1
 
 # Security / sanitization
 bleach==6.3.0
+tinycss2>=1.3.0
 
 # Dev & test
 pytest==9.0.2

@@ -103,3 +103,9 @@ export async function getSettings() {
   const res = await api.get('/settings/')
   return res.data
 }
+
+// Get email body content (text + sanitized HTML for preview)
+export async function getEmailBody(jobId) {
+  const res = await api.get(`/analysis/${jobId}/body`)
+  return res.data
+}

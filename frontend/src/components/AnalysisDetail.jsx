@@ -128,7 +128,7 @@ export default function AnalysisDetail({ data, onClose }) {
         <div style={{ padding: '24px' }}>
           {tab === 0 && <TabSummary email={email} risk={risk} t={t} notes={notes} setNotes={setNotes} onSaveNotes={handleSaveNotes} notesSaving={notesSaving} notesSaved={notesSaved} />}
           {tab === 1 && <TabHeader data={header_analysis} t={t} />}
-          {tab === 2 && <TabBody data={body_analysis} t={t} />}
+          {tab === 2 && <TabBody data={body_analysis} t={t} jobId={data.job_id} />}
           {tab === 3 && <TabURL data={url_analysis} t={t} />}
           {tab === 4 && <TabAttachments data={attachment_analysis} t={t} />}
           {tab === 5 && <TabReputation data={repData} loading={repLoading} error={repError} onRun={handleReputation} t={t} lang={lang} />}
@@ -487,8 +487,73 @@ function AuthDetailRow({ proto, ok, result, desc, headers, authDetail = {}, t })
   )
 }
 
+// ── Body Preview Section ────────────────────────────────────────────────────
+// Fetches full email body (text + sanitized HTML) from GET /api/analysis/{id}/body
+function BodyPreviewSection({ jobId }) {
+  const [bodyData, setBodyData] = useState(null)
+  const [loading, setLoading]   = useState(false)
+  const [showHtml, setShowHtml] = useState(false)
+
+  useEffect(() => {
+    if (!jobId) return
+    setLoading(true)
+    fetch(`/api/analysis/${jobId}/body`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { setBodyData(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [jobId])
+
+  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '8px 0' }}>⏳ Caricamento contenuto...</div>
+  if (!bodyData || (!bodyData.body_text && !bodyData.has_html)) return null
+
+  return (
+    <>
+      {bodyData.body_text && (
+        <Section title="Contenuto email" icon="📝">
+          <div style={{ padding: '6px 10px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--risk-medium)', fontSize: 11, color: 'var(--risk-medium)', marginBottom: 8 }}>
+            ⚠ Contenuto originale. Non cliccare su link.
+          </div>
+          <div style={{
+            padding: '10px 12px', borderRadius: 6,
+            background: '#0a0a14', border: '2px solid var(--severity-medium)',
+            fontFamily: 'var(--font-mono)', fontSize: 11,
+            color: 'var(--severity-medium)', whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all', maxHeight: 300, overflowY: 'auto',
+          }}>
+            {bodyData.body_text}
+          </div>
+        </Section>
+      )}
+
+      {bodyData.has_html && (
+        <Section title="Anteprima HTML" icon="🖼">
+          <div style={{ padding: '6px 10px', borderRadius: 4, background: 'rgba(255,100,0,0.08)', border: '1px solid var(--risk-high)', fontSize: 11, color: 'var(--risk-high)', marginBottom: 8 }}>
+            ⚠ Anteprima sicura: HTML sanitizzato, link e risorse esterne disabilitati.
+          </div>
+          <button onClick={() => setShowHtml(v => !v)} style={{
+            background: 'none', border: '1px solid var(--border)',
+            borderRadius: 4, color: 'var(--text-secondary)', fontSize: 11,
+            padding: '4px 10px', cursor: 'pointer', marginBottom: 8,
+          }}>
+            {showHtml ? '▼' : '▶'} {showHtml ? 'Nascondi anteprima' : 'Mostra anteprima'}
+          </button>
+          {showHtml && (
+            <iframe
+              srcDoc={bodyData.body_html_sanitized || ''}
+              sandbox=""
+              referrerPolicy="no-referrer"
+              style={{ width: '100%', height: 450, border: '1px solid var(--border)', borderRadius: 6, background: '#fff', display: 'block' }}
+            />
+          )}
+        </Section>
+      )}
+    </>
+  )
+}
+
+
 // ── TAB BODY ───────────────────────────────────────────────────────────────────
-function TabBody({ data, t }) {
+function TabBody({ data, t, jobId }) {
   if (!data) return <EmptyState message="–" />
 
   const stats = [
@@ -512,6 +577,9 @@ function TabBody({ data, t }) {
 
       {/* ── Sezione NLP ── */}
       <NLPSection nlp={data.nlp} t={t} />
+
+      {/* ── Contenuto email e anteprima HTML ── */}
+      <BodyPreviewSection jobId={jobId} />
 
       {/* ── Sezione HTML Nascosto espansa ── */}
       {data.invisible_elements > 0 && <HiddenHTMLSection data={data} t={t} />}
