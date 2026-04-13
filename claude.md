@@ -9,7 +9,7 @@ correcto un bug importante, o modificata l'architettura.
 ## Identità del progetto
 
 - **Nome**: EMLyzer
-- **Versione corrente**: 0.9.4 — fonte di verità: `backend/utils/config.py` → `VERSION`
+- **Versione corrente**: 0.10.0 — fonte di verità: `backend/utils/config.py` → `VERSION`
 - **Tipo**: piattaforma open-source di email threat analysis
 - **Filosofia**: nessuna dipendenza obbligatoria da API proprietarie; API a pagamento solo come plugin opzionali configurati dal singolo utente; analisi offline-first
 - **Repository**: GitHub (distribuzione pubblica)
@@ -336,6 +336,7 @@ LANGUAGE=it                # it o en
 16. **`get_headers()` deve decodificare RFC 2047**: la funzione `get_headers()` in `email_parser.py` deve chiamare `_decode_rfc2047()` su ogni valore, come fa `get_header()`. Senza questa decodifica, gli header multi-valore (Authentication-Results, DKIM-Signature) possono contenere token RFC 2047 grezzi.
 17. **`ensure_ascii=False` in serializzazione JSON**: `_dataclass_to_dict()` in `analysis.py` deve usare `json.dumps(..., ensure_ascii=False)` per preservare emoji e caratteri non-ASCII nella risposta API. Il default `ensure_ascii=True` escapa i caratteri Unicode in `\uXXXX`.
 18. **Collision nomi variabili nel bundle minificato**: quando si patchano manualmente file bundle Vite (senza npm), i nomi a due lettere (`Wn`, `Vn`, ecc.) possono essere riutilizzati in scope diversi dello stesso file. Usare sempre nomi con prefisso underscore (`_Wn`, `_Bn`) che non compaiono nell'originale. Verificare con `grep -c '\bNOME\b' index.js` prima di scegliere un nome. Il `useState(new Set)` passato a React viene interpretato come lazy initializer e chiama `Set()` senza `new` → TypeError; usare sempre `useState(()=>new Set())`. Analogamente, `setState(new Set)` nei callback è corretto perché React non tratta gli oggetti come initializer.
+19. **`bleach.css_sanitizer` richiede `tinycss2`**: bleach 6.x lancia `NoCssSanitizerWarning` quando `style` è in `ALLOWED_ATTRS` ma `css_sanitizer` non è passato a `bleach.clean()`. Soluzione: aggiungere `tinycss2>=1.3.0` a `requirements.txt` e passare un'istanza di `CSSSanitizer(allowed_css_properties=[...])` a `bleach.clean()`. Creare `_CSS_SANITIZER` a livello di modulo (non dentro la funzione) per evitare ricreazioni ad ogni chiamata.
 
 ---
 

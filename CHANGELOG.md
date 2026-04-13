@@ -48,6 +48,17 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.10.0] — 2026-04-13
+
+### Aggiunto
+- **Visualizzazione contenuto email nel tab Body**: nuova sezione "Contenuto email" che mostra il testo plain-text dell'email nello stesso stile della sezione "HTML nascosto" (sfondo scuro, font mono, scroll a 300px); caricato dinamicamente via `GET /api/analysis/{id}/body`
+- **Anteprima HTML sicura nel tab Body**: nuova sezione "Anteprima HTML" con toggle espandi/comprimi che renderizza il corpo HTML dell'email in un `<iframe sandbox="" referrerPolicy="no-referrer">` con contenuto sanitizzato; i link sono disabilitati (`href="#"`, `pointer-events:none`), le immagini sostituite con GIF 1×1 trasparente, il CSS inline filtrato con allowlist di proprietà sicure
+- **Endpoint `GET /api/analysis/{job_id}/body`**: nuovo endpoint che ri-parsa il file email caricato e restituisce `body_text` (max 50.000 caratteri) e `body_html_sanitized` (HTML sanitizzato pronto per iframe srcdoc)
+- **`_sanitize_email_html()`**: helper di sanitizzazione con bleach (allowlist tag), `CSSSanitizer` con allowlist proprietà CSS, sostituzione img src con placeholder GIF, disabilitazione href, wrapper HTML con CSP `default-src 'none'`
+- **Dipendenza `tinycss2`**: aggiunta a `requirements.txt` per supportare `bleach.css_sanitizer.CSSSanitizer` e filtrare il CSS inline in modo sicuro (fix `NoCssSanitizerWarning`)
+
+---
+
 ## [0.9.4] — 2026-04-12
 
 ### Corretto

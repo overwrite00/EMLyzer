@@ -469,6 +469,139 @@ def _build_response(job_id, parsed, header_result, body_result, url_result, atta
     }
 
 
+import bleach as _bleach
+from bleach.css_sanitizer import CSSSanitizer as _CSSSanitizer
+
+# Proprietà CSS sicure per le anteprime email — ricreato una sola volta a livello modulo
+_HTML_CSS_SANITIZER = _CSSSanitizer(
+    allowed_css_properties=[
+        'background-color', 'border', 'border-collapse', 'border-color',
+        'border-radius', 'border-spacing', 'border-style', 'border-width',
+        'color', 'display', 'font-family', 'font-size', 'font-style',
+        'font-weight', 'height', 'line-height', 'margin', 'margin-bottom',
+        'margin-left', 'margin-right', 'margin-top', 'max-width', 'min-width',
+        'padding', 'padding-bottom', 'padding-left', 'padding-right',
+        'padding-top', 'text-align', 'text-decoration', 'vertical-align',
+        'width', 'white-space', 'word-break', 'word-wrap',
+    ]
+)
+
+_BLEACH_ALLOWED_TAGS = [
+    'a', 'abbr', 'acronym', 'b', 'blockquote', 'br', 'caption',
+    'cite', 'code', 'dd', 'del', 'dfn', 'div', 'dl', 'dt', 'em',
+    'figcaption', 'figure', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'header', 'hr', 'i', 'img', 'ins', 'kbd', 'li', 'main', 'mark',
+    'ol', 'p', 'pre', 'q', 's', 'samp', 'section', 'small', 'span',
+    'strong', 'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'th',
+    'thead', 'time', 'tr', 'u', 'ul',
+]
+
+_BLEACH_ALLOWED_ATTRS = {
+    '*':    ['class', 'id', 'style', 'title'],
+    'a':    ['href', 'title'],
+    'img':  ['alt', 'width', 'height'],
+    'td':   ['colspan', 'rowspan', 'align', 'valign'],
+    'th':   ['colspan', 'rowspan', 'align', 'valign', 'scope'],
+    'col':  ['span', 'width'],
+}
+
+
+def _sanitize_email_html(html_body: str) -> str:
+    """Sanitizza HTML email per anteprima sicura nell'analista.
+
+    - Allowlist di tag sicuri (no script, no form, no iframe, no object)
+    - CSS inline filtrato con CSSSanitizer (allowlist proprietà sicure)
+    - Sostituisce img src con placeholder GIF 1px (blocca risorse esterne)
+    - Disabilita tutti i link (href → #, pointer-events:none via CSS)
+    - Avvolge in documento HTML con CSP strict inline
+    """
+    import re as _re
+
+    cleaned = _bleach.clean(
+        html_body,
+        tags=_BLEACH_ALLOWED_TAGS,
+        attributes=_BLEACH_ALLOWED_ATTRS,
+        strip=True,
+        strip_comments=True,
+        css_sanitizer=_HTML_CSS_SANITIZER,
+    )
+
+    _BLANK_GIF = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+    # Replace existing img src with blank GIF placeholder
+    cleaned = _re.sub(
+        r'(<img\b[^>]*?)\s+src=["\'][^"\']*["\']',
+        rf'\1 src="{_BLANK_GIF}"',
+        cleaned, flags=_re.IGNORECASE,
+    )
+    # Add placeholder to img tags without src
+    cleaned = _re.sub(
+        r'(<img\b(?![^>]*\bsrc=)[^>]*)(/?>)',
+        rf'\1 src="{_BLANK_GIF}"\2',
+        cleaned, flags=_re.IGNORECASE,
+    )
+    # Disable all links: replace href value with #
+    cleaned = _re.sub(
+        r'(<a\b[^>]*?)\s+href=["\'][^"\']*["\']',
+        r'\1 href="#"',
+        cleaned, flags=_re.IGNORECASE,
+    )
+    # Add href="#" to <a> tags that have no href
+    cleaned = _re.sub(
+        r'(<a\b(?![^>]*\bhref=)[^>]*)(/?>)',
+        r'\1 href="#"\2',
+        cleaned, flags=_re.IGNORECASE,
+    )
+
+    return (
+        '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+        '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; '
+        'style-src \'unsafe-inline\'; img-src data:; script-src \'none\'; '
+        'connect-src \'none\'; frame-src \'none\';">'
+        '<style>body{font-family:sans-serif;font-size:13px;padding:12px;margin:0;'
+        'color:#222;background:#fff;word-break:break-word}'
+        'a{color:#888;text-decoration:underline;pointer-events:none;cursor:default}'
+        'img{max-width:100%;height:auto}*{box-sizing:border-box}</style>'
+        f'</head><body>{cleaned}</body></html>'
+    )
+
+
+@router.get("/{job_id}/body")
+async def get_email_body(
+    job_id: str,
+    db: AsyncSession = Depends(get_session),
+):
+    """Restituisce il contenuto testuale e HTML dell'email.
+
+    L'HTML è sanitizzato con bleach (allowlist tag), img src sostituiti con
+    placeholder, link disabilitati e avvolto in documento con CSP strict.
+    Sicuro per l'anteprima in iframe sandbox.
+    """
+    import re, asyncio
+    if not re.match(r'^[0-9a-f-]{36}$', job_id):
+        raise HTTPException(status_code=400, detail="job_id non valido")
+
+    record = await db.get(EmailAnalysis, job_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Analisi non trovata")
+
+    file_path = _find_upload_file(job_id)
+    raw = file_path.read_bytes()
+
+    loop = asyncio.get_running_loop()
+    parsed = await loop.run_in_executor(None, parse_email_file, raw, file_path.name)
+
+    body_text = (parsed.body_text or "").strip()[:50_000]
+    sanitized_html = _sanitize_email_html(parsed.body_html) if parsed.body_html else None
+
+    return {
+        "job_id":             job_id,
+        "has_text":           bool(body_text),
+        "has_html":           bool(parsed.body_html),
+        "body_text":          body_text,
+        "body_html_sanitized": sanitized_html,
+    }
+
+
 @router.patch("/{job_id}/notes")
 async def update_notes(
     job_id: str,
