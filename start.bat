@@ -8,7 +8,7 @@ set "VENV_DIR=%~dp0.venv"
 set "VENV_PYTHON=%~dp0.venv\Scripts\python.exe"
 set "FOUND_PYTHON="
 set "FOUND_VER="
-set "VERSION=0.10.0"
+set "VERSION=0.10.1"
 
 :: ── Leggi versione da config.py usando Python (piu' affidabile di for/f) ──────
 :: Viene fatto dopo aver trovato Python, quindi piu' avanti nello script.
