@@ -48,6 +48,14 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.10.1] — 2026-04-13
+
+### Corretto
+- **Timeout analisi su email con molti URL**: email con 40+ URL (es. newsletter HTML con immagini CDN da paypalobjects.com) causavano timeout di 60s nel frontend perché la query WHOIS veniva eseguita per ogni URL invece che per dominio unico. Con 42 URL dallo stesso dominio `paypalobjects.com` venivano eseguite 42 query WHOIS identiche (8s ognuna). Aggiunta cache WHOIS pre-calcolata per dominio unico in `analyze_urls()`: il tempo passa da 60s+ a ~12-15s (7 query invece di 42 per l'email di test)
+- **Timeout frontend per `runAnalysis` e `analyzeManual`**: aumentato da 60s a 300s nel bundle e in `client.js` per garantire che email complesse completino l'analisi senza errore "timeout of 60000ms exceeded"
+
+---
+
 ## [0.10.0] — 2026-04-13
 
 ### Aggiunto

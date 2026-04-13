@@ -159,7 +159,18 @@ def _whois_age(domain: str) -> tuple[Optional[datetime], Optional[int], str]:
             return None, None, f"WHOIS timeout ({WHOIS_TIMEOUT}s)"
 
 
-def _analyze_single_url(url: str, do_whois: bool = True) -> URLAnalysis:
+def _analyze_single_url(
+    url: str,
+    do_whois: bool = True,
+    whois_cache: "dict[str, tuple] | None" = None,
+) -> URLAnalysis:
+    """
+    Analizza un singolo URL.
+
+    whois_cache: dizionario {domain: (creation_date, age_days, error)} pre-calcolato
+    in analyze_urls() per evitare query WHOIS ridondanti sullo stesso dominio.
+    Se None (retrocompatibilità), esegue la query direttamente.
+    """
     analysis = URLAnalysis(original_url=url)
 
     scheme, host, path, _ = _parse_url(url)
@@ -215,9 +226,12 @@ def _analyze_single_url(url: str, do_whois: bool = True) -> URLAnalysis:
                 "evidence": dns_err,
             })
 
-        # WHOIS età dominio (opzionale, con timeout garantito)
+        # WHOIS età dominio — usa cache se disponibile, altrimenti query diretta
         if do_whois and analysis.domain:
-            creation, age_days, _ = _whois_age(analysis.domain)
+            if whois_cache is not None:
+                creation, age_days, _ = whois_cache.get(analysis.domain, (None, None, ""))
+            else:
+                creation, age_days, _ = _whois_age(analysis.domain)
             analysis.whois_creation_date = creation
             analysis.domain_age_days     = age_days
             if age_days is not None and age_days < 30:
@@ -275,11 +289,53 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
     if not capped_urls:
         return result
 
-    # Elaborazione parallela degli URL
+    # ── Pre-calcola WHOIS per dominio unico ──────────────────────────────────
+    # Problema senza cache: un'email con 42 URL da paypalobjects.com eseguirebbe
+    # 42 query WHOIS identiche (8s ognuna), saturando il budget di tempo anche
+    # con 8 worker paralleli (ceil(42/8) = 6 round × 8s = 48s solo per WHOIS).
+    # Con la cache: 1 query per dominio unico → max ~8 domini × 8s / 8 worker = 8s.
+    whois_cache: dict[str, tuple] = {}
+    if do_whois:
+        unique_domains: set[str] = set()
+        for url in capped_urls:
+            _, host, _, _ = _parse_url(url)
+            clean_host = host.split(":")[0] if host else ""
+            if not IP_HOST_RE.match(clean_host):
+                ext = tldextract.extract(url)
+                domain = f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain
+                if domain:
+                    unique_domains.add(domain)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=URL_WORKERS) as executor:
+            domain_futures = {
+                executor.submit(_whois_age, domain): domain
+                for domain in unique_domains
+            }
+            whois_batch_timeout = min(WHOIS_TIMEOUT * 2, 20.0)
+            try:
+                for future in concurrent.futures.as_completed(
+                    domain_futures, timeout=whois_batch_timeout
+                ):
+                    domain = domain_futures[future]
+                    try:
+                        whois_cache[domain] = future.result()
+                    except Exception:
+                        whois_cache[domain] = (None, None, "")
+            except concurrent.futures.TimeoutError:
+                for future, domain in domain_futures.items():
+                    if future.done():
+                        try:
+                            whois_cache[domain] = future.result()
+                        except Exception:
+                            pass
+                    elif domain not in whois_cache:
+                        whois_cache[domain] = (None, None, "whois timeout")
+
+    # Elaborazione parallela degli URL (WHOIS già in cache)
     analyses: list[URLAnalysis] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=URL_WORKERS) as executor:
         future_map = {
-            executor.submit(_analyze_single_url, url, do_whois): url
+            executor.submit(_analyze_single_url, url, do_whois, whois_cache): url
             for url in capped_urls
         }
         try:
