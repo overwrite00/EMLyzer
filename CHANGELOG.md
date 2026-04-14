@@ -48,6 +48,14 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.10.2] — 2026-04-14
+
+### Sicurezza
+- **pytest aggiornato a 9.0.3** (da 9.0.2): fix privilege escalation su UNIX via directory `/tmp/pytest-of-{user}` con permessi scrivibili da altri utenti locali (Dependabot alert #10, GHSA-jfh8-c2jp-jmjq)
+- **follow-redirects aggiornato a 1.16.0** (da 1.15.11): fix leak di header di autenticazione personalizzati verso host cross-domain durante redirect HTTP; dipendenza transitiva di axios nel frontend (Dependabot alert #11, CVE-2025-46566)
+
+---
+
 ## [0.10.1] — 2026-04-13
 
 ### Corretto

@@ -16,6 +16,9 @@
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.2"
   },
+  "overrides": {
+    "follow-redirects": "1.16.0"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@types/react": "^19.2.14",
