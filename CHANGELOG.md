@@ -48,6 +48,17 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.10.3] — 2026-04-18
+
+### Aggiunto
+- **Localizzazione script di avvio**: `start.sh`, `start.bat`, `run_tests.sh` e `run_tests.bat` rilevano automaticamente la lingua del sistema operativo (Windows UI culture / `$LANG`) e mostrano tutti i messaggi in italiano o in inglese. Nessuna modifica al file `.env` necessaria.
+- **Completamento i18n API backend**: tutti gli endpoint FastAPI (`upload`, `analysis`, `report`, `reputation`, `settings`) usano ora `t()` da `utils/i18n.py` invece di stringhe hardcoded in italiano. Le risposte di errore rispettano il parametro `LANGUAGE` del file `.env`.
+
+### Aggiornato
+- **python-multipart 0.0.26** (da 0.0.22): compatibile con FastAPI 0.135.2 e Starlette 1.0.0 (`>=0.0.18`).
+
+---
+
 ## [0.10.2] — 2026-04-14
 
 ### Sicurezza

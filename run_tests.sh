@@ -10,6 +10,59 @@ BACKEND_DIR="$SCRIPT_DIR/backend"
 VENV_DIR="$SCRIPT_DIR/.venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
 
+# ── Lingua output (it/en) — rilevata dalla locale del SO ─────────────────────
+# Usa $LANG o $LANGUAGE; default italiano.
+# Per forzare: LANG=en_US.UTF-8 ./run_tests.sh
+SCRIPT_LANG="it"
+_os_locale="${LANG:-${LANGUAGE:-}}"
+case "$_os_locale" in en*) SCRIPT_LANG="en" ;; esac
+
+if [ "$SCRIPT_LANG" = "en" ]; then
+    _E="[ERROR]"   ; _W="[WARNING]" ; _I="[INFO]"
+    _M_VENV_MISSING="Virtual environment not found."
+    _M_VENV_SEARCHING="Looking for compatible Python to create the venv..."
+    _M_VENV_CREATING="Creating virtual environment..."
+    _M_VENV_FAILED="Virtual environment creation failed."
+    _M_VENV_HINT_DEB="         Ubuntu/Debian: sudo apt install python3-venv python3-pip"
+    _M_VENV_HINT_FED="         Fedora/RHEL:   sudo dnf install python3-pip"
+    _M_PY_NOT_FOUND="Python 3.11+ not found."
+    _M_PY_HINT_DEB="         Ubuntu/Debian: sudo apt install python3 python3-venv python3-pip"
+    _M_PY_HINT_FED="         Fedora/RHEL:   sudo dnf install python3 python3-pip"
+    _M_DEPS_INSTALLING="Installing dependencies..."
+    _M_DEPS_FAILED="Dependencies installation failed:"
+    _M_PYTEST_MISSING="pytest not found in the virtual environment."
+    _M_PYTEST_HINT_PRE="         Run:"
+    _M_PY_IN_VENV="Python in venv:"
+    _M_RUNNING="Running tests..."
+    _M_ALL_PASSED=" ✓  All tests passed."
+    _M_SOME_FAILED=" ✗  Some tests failed. Check the output above."
+    _M_INTERRUPTED=" ✗  Execution interrupted (CTRL+C or configuration error)."
+    _M_NO_TESTS=" ⚠  No tests found."
+    _M_PYTEST_ERR=" ✗  pytest error"
+else
+    _E="[ERRORE]"  ; _W="[AVVISO]" ; _I="[INFO]"
+    _M_VENV_MISSING="Virtual environment non trovato."
+    _M_VENV_SEARCHING="Cerco Python compatibile per creare il venv..."
+    _M_VENV_CREATING="Creazione virtual environment..."
+    _M_VENV_FAILED="Creazione venv fallita."
+    _M_VENV_HINT_DEB="         Ubuntu/Debian: sudo apt install python3-venv python3-pip"
+    _M_VENV_HINT_FED="         Fedora/RHEL:   sudo dnf install python3-pip"
+    _M_PY_NOT_FOUND="Python 3.11+ non trovato."
+    _M_PY_HINT_DEB="         Ubuntu/Debian: sudo apt install python3 python3-venv python3-pip"
+    _M_PY_HINT_FED="         Fedora/RHEL:   sudo dnf install python3 python3-pip"
+    _M_DEPS_INSTALLING="Installazione dipendenze..."
+    _M_DEPS_FAILED="Installazione dipendenze fallita:"
+    _M_PYTEST_MISSING="pytest non trovato nel virtual environment."
+    _M_PYTEST_HINT_PRE="         Esegui:"
+    _M_PY_IN_VENV="Python nel venv:"
+    _M_RUNNING="Esecuzione test..."
+    _M_ALL_PASSED=" ✓  Tutti i test superati."
+    _M_SOME_FAILED=" ✗  Alcuni test sono falliti. Controlla l'output sopra."
+    _M_INTERRUPTED=" ✗  Esecuzione interrotta (CTRL+C o errore di configurazione)."
+    _M_NO_TESTS=" ⚠  Nessun test trovato."
+    _M_PYTEST_ERR=" ✗  Errore pytest"
+fi
+
 echo ""
 echo " ============================================"
 echo "  EMLyzer - Test Suite"
@@ -18,8 +71,8 @@ echo ""
 
 # ── Se il venv non esiste, crealo ────────────────────────────────────────────
 if [ ! -f "$VENV_PYTHON" ]; then
-    echo "[INFO] Virtual environment non trovato."
-    echo "[INFO] Cerco Python compatibile per creare il venv..."
+    echo "$_I $_M_VENV_MISSING"
+    echo "$_I $_M_VENV_SEARCHING"
     echo ""
 
     FOUND_PYTHON=""
@@ -32,31 +85,35 @@ if [ ! -f "$VENV_PYTHON" ]; then
             [ -z "$minor" ] && continue
             if [ "${ver%%.*}" = "3" ] && [ "$minor" -ge 11 ] 2>/dev/null; then
                 FOUND_PYTHON="$candidate"
-                echo "[INFO] Trovato: $candidate (Python $ver)"
+                if [ "$SCRIPT_LANG" = "en" ]; then
+                    echo "$_I Found: $candidate (Python $ver)"
+                else
+                    echo "$_I Trovato: $candidate (Python $ver)"
+                fi
                 break
             fi
         fi
     done
 
     if [ -z "$FOUND_PYTHON" ]; then
-        echo "[ERRORE] Python 3.11+ non trovato."
-        echo "         Ubuntu/Debian: sudo apt install python3 python3-venv python3-pip"
-        echo "         Fedora/RHEL:   sudo dnf install python3 python3-pip"
+        echo "$_E $_M_PY_NOT_FOUND"
+        echo "$_M_PY_HINT_DEB"
+        echo "$_M_PY_HINT_FED"
         exit 1
     fi
 
-    echo "[INFO] Creazione virtual environment..."
+    echo "$_I $_M_VENV_CREATING"
     if ! "$FOUND_PYTHON" -m venv "$VENV_DIR" 2>/tmp/emlyzer_venv_err; then
         cat /tmp/emlyzer_venv_err
-        echo "[ERRORE] Creazione venv fallita."
-        echo "         Ubuntu/Debian: sudo apt install python3-venv python3-pip"
-        echo "         Fedora/RHEL:   sudo dnf install python3-pip"
+        echo "$_E $_M_VENV_FAILED"
+        echo "$_M_VENV_HINT_DEB"
+        echo "$_M_VENV_HINT_FED"
         exit 1
     fi
 
-    echo "[INFO] Installazione dipendenze..."
+    echo "$_I $_M_DEPS_INSTALLING"
     if ! "$VENV_PYTHON" -m pip install -r "$BACKEND_DIR/requirements.txt" -q 2>/tmp/emlyzer_pip_err; then
-        echo "[ERRORE] Installazione dipendenze fallita:"
+        echo "$_E $_M_DEPS_FAILED"
         cat /tmp/emlyzer_pip_err
         exit 1
     fi
@@ -65,15 +122,15 @@ fi
 
 # ── Verifica che pytest sia disponibile ──────────────────────────────────────
 if ! "$VENV_PYTHON" -m pytest --version &>/dev/null; then
-    echo "[ERRORE] pytest non trovato nel virtual environment."
-    echo "         Esegui: $VENV_PYTHON -m pip install pytest pytest-asyncio httpx"
+    echo "$_E $_M_PYTEST_MISSING"
+    echo "$_M_PYTEST_HINT_PRE $VENV_PYTHON -m pip install pytest pytest-asyncio httpx"
     exit 1
 fi
 
-echo "[INFO] Python nel venv: $("$VENV_PYTHON" --version 2>&1)"
-echo "[INFO] pytest: $("$VENV_PYTHON" -m pytest --version 2>&1)"
+echo "$_I $_M_PY_IN_VENV $("$VENV_PYTHON" --version 2>&1)"
+echo "$_I pytest: $("$VENV_PYTHON" -m pytest --version 2>&1)"
 echo ""
-echo "[INFO] Esecuzione test..."
+echo "$_I $_M_RUNNING"
 echo ""
 
 cd "$BACKEND_DIR"
@@ -85,15 +142,19 @@ EXIT_CODE=$?
 
 echo ""
 if [ "$EXIT_CODE" = "0" ]; then
-    echo " ✓  Tutti i test superati."
+    echo "$_M_ALL_PASSED"
 elif [ "$EXIT_CODE" = "1" ]; then
-    echo " ✗  Alcuni test sono falliti. Controlla l'output sopra."
+    echo "$_M_SOME_FAILED"
 elif [ "$EXIT_CODE" = "2" ]; then
-    echo " ✗  Esecuzione interrotta (CTRL+C o errore di configurazione)."
+    echo "$_M_INTERRUPTED"
 elif [ "$EXIT_CODE" = "5" ]; then
-    echo " ⚠  Nessun test trovato."
+    echo "$_M_NO_TESTS"
 else
-    echo " ✗  Errore pytest (exit code: $EXIT_CODE)."
+    if [ "$SCRIPT_LANG" = "en" ]; then
+        echo "$_M_PYTEST_ERR (exit code: $EXIT_CODE)."
+    else
+        echo "$_M_PYTEST_ERR (exit code: $EXIT_CODE)."
+    fi
 fi
 echo ""
 

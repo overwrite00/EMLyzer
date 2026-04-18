@@ -7,6 +7,7 @@ Endpoint per leggere/impostare la lingua e le impostazioni dell'app.
 from fastapi import APIRouter
 from pydantic import BaseModel
 from utils.config import settings
+from utils.i18n import t
 
 router = APIRouter()
 
@@ -42,6 +43,6 @@ async def set_language(body: LangUpdate):
     """
     if body.language not in ("it", "en"):
         from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail="Lingua non supportata. Usa 'it' o 'en'.")
+        raise HTTPException(status_code=400, detail=t("settings.language_unsupported"))
     settings.LANGUAGE = body.language
     return {"language": settings.LANGUAGE, "ok": True}
