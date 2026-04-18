@@ -270,6 +270,32 @@ TRANSLATIONS = {
         "en": "NLP: phishing probability {prob}% (confidence: {confidence})",
     },
 
+    # ── Analysis / bulk-delete / notes ──────────────────────────────────────────
+    "analysis.bulk_max": {
+        "it": "Massimo 100 analisi per richiesta",
+        "en": "Maximum 100 analyses per request",
+    },
+    "analysis.no_valid_ids": {
+        "it": "Nessun job_id valido fornito",
+        "en": "No valid job_id provided",
+    },
+    "analysis.notes_too_long": {
+        "it": "Note troppo lunghe (max 10.000 caratteri)",
+        "en": "Notes too long (max 10,000 characters)",
+    },
+
+    # ── Reputation route ─────────────────────────────────────────────────────────
+    "reputation.timeout": {
+        "it": "I servizi di reputazione non hanno risposto nel tempo previsto. Riprova.",
+        "en": "Reputation services did not respond in time. Try again.",
+    },
+
+    # ── Settings route ───────────────────────────────────────────────────────────
+    "settings.language_unsupported": {
+        "it": "Lingua non supportata. Usa 'it' o 'en'.",
+        "en": "Unsupported language. Use 'it' or 'en'.",
+    },
+
     # ── Manual input ──────────────────────────────────────────────────────────
     "manual.parse_error": {
         "it": "Impossibile analizzare il testo fornito come email RFC 822",

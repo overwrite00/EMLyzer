@@ -21,6 +21,7 @@ class NotesUpdate(BaseModel):
 from sqlalchemy import text
 from models.database import get_session, EmailAnalysis, engine
 from utils.config import settings
+from utils.i18n import t
 from core.analysis.email_parser import parse_email_file
 from core.analysis.header_analyzer import analyze_headers
 from core.analysis.body_analyzer import analyze_body
@@ -57,7 +58,7 @@ def _find_upload_file(job_id: str) -> Path:
         candidate = settings.UPLOAD_DIR / f"{job_id}{ext}"
         if candidate.exists():
             return candidate
-    raise HTTPException(status_code=404, detail=f"File non trovato per job_id: {job_id}")
+    raise HTTPException(status_code=404, detail=t("analysis.file_not_found", job_id=job_id))
 
 
 def _dataclass_to_dict(obj) -> dict:
@@ -95,11 +96,11 @@ async def bulk_delete_analyses(
     """Elimina più analisi in una singola richiesta (DB + file fisici)."""
     import re
     if len(body.job_ids) > 100:
-        raise HTTPException(status_code=400, detail="Massimo 100 analisi per richiesta")
+        raise HTTPException(status_code=400, detail=t("analysis.bulk_max"))
 
     valid_ids = [jid for jid in body.job_ids if re.match(r'^[0-9a-f-]{36}$', jid)]
     if not valid_ids:
-        raise HTTPException(status_code=400, detail="Nessun job_id valido fornito")
+        raise HTTPException(status_code=400, detail=t("analysis.no_valid_ids"))
 
     deleted_count = 0
     files_removed = 0
@@ -133,7 +134,7 @@ async def run_analysis(
     # Validazione job_id (solo caratteri UUID sicuri)
     import re
     if not re.match(r'^[0-9a-f-]{36}$', job_id):
-        raise HTTPException(status_code=400, detail="job_id non valido")
+        raise HTTPException(status_code=400, detail=t("analysis.invalid_job_id"))
 
     # Recupera il file
     file_path = _find_upload_file(job_id)
@@ -219,11 +220,11 @@ async def get_analysis(
     """Recupera i risultati di un'analisi già eseguita."""
     import re
     if not re.match(r'^[0-9a-f-]{36}$', job_id):
-        raise HTTPException(status_code=400, detail="job_id non valido")
+        raise HTTPException(status_code=400, detail=t("analysis.invalid_job_id"))
 
     record = await db.get(EmailAnalysis, job_id)
     if not record:
-        raise HTTPException(status_code=404, detail="Analisi non trovata")
+        raise HTTPException(status_code=404, detail=t("analysis.not_found"))
 
     return _build_response_from_record(record)
 
@@ -578,11 +579,11 @@ async def get_email_body(
     """
     import re, asyncio
     if not re.match(r'^[0-9a-f-]{36}$', job_id):
-        raise HTTPException(status_code=400, detail="job_id non valido")
+        raise HTTPException(status_code=400, detail=t("analysis.invalid_job_id"))
 
     record = await db.get(EmailAnalysis, job_id)
     if not record:
-        raise HTTPException(status_code=404, detail="Analisi non trovata")
+        raise HTTPException(status_code=404, detail=t("analysis.not_found"))
 
     file_path = _find_upload_file(job_id)
     raw = file_path.read_bytes()
@@ -611,14 +612,14 @@ async def update_notes(
     """Aggiorna le note manuali dell analista."""
     import re
     if not re.match(r'^[0-9a-f-]{36}$', job_id):
-        raise HTTPException(status_code=400, detail="job_id non valido")
+        raise HTTPException(status_code=400, detail=t("analysis.invalid_job_id"))
 
     record = await db.get(EmailAnalysis, job_id)
     if not record:
-        raise HTTPException(status_code=404, detail="Analisi non trovata")
+        raise HTTPException(status_code=404, detail=t("analysis.not_found"))
 
     if len(body.notes) > 10000:
-        raise HTTPException(status_code=400, detail="Note troppo lunghe (max 10.000 caratteri)")
+        raise HTTPException(status_code=400, detail=t("analysis.notes_too_long"))
 
     record.analyst_notes = body.notes
     await db.commit()
@@ -633,11 +634,11 @@ async def delete_analysis(
     """Elimina l'analisi dal DB e i file fisici associati (email + report)."""
     import re
     if not re.match(r'^[0-9a-f-]{36}$', job_id):
-        raise HTTPException(status_code=400, detail="job_id non valido")
+        raise HTTPException(status_code=400, detail=t("analysis.invalid_job_id"))
 
     record = await db.get(EmailAnalysis, job_id)
     if not record:
-        raise HTTPException(status_code=404, detail="Analisi non trovata")
+        raise HTTPException(status_code=404, detail=t("analysis.not_found"))
 
     await db.delete(record)
     await db.commit()
