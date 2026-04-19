@@ -261,7 +261,7 @@ function ServiceCard({ svc, expanded, onToggle, lang }) {
 // ── Riga dettaglio singola entità ─────────────────────────────────────────────
 function DetailRow({ r, lang }) {
   // Servizi informativi: non malevoli per natura, mostrano dati contestuali
-  const isInfoService = ['ASN Lookup', 'crt.sh', 'Redirect Chain', 'Shodan InternetDB'].includes(r.source)
+  const isInfoService = ['ASN Lookup', 'crt.sh', 'Redirect Chain', 'Shodan InternetDB', 'CIRCL Passive DNS'].includes(r.source)
   const icon = r.is_malicious ? '🔴'
              : r.error        ? '⚠️'
              : isInfoService  ? 'ℹ️'
@@ -331,7 +331,8 @@ function ServicePreview({ lang, apiKeys }) {
     { name: 'VirusTotal',        needs_key: true,  type: 'ip+url+hash', desc_it: 'Multi-engine: IP, URL e hash allegati',                        desc_en: 'Multi-engine: IP, URL and attachment hashes' },
     { name: 'Spamhaus DROP',     needs_key: false, type: 'ip',          desc_it: 'Blocklist IP malevoli di alto profilo — no chiave',             desc_en: 'High-profile malicious IP blocklist — no key' },
     { name: 'ASN Lookup',        needs_key: false, type: 'ip',          desc_it: 'Autonomous System per ogni IP (ipinfo.io) — no chiave',         desc_en: 'ASN info for each IP (ipinfo.io) — no key' },
-    { name: 'Shodan InternetDB', needs_key: false, type: 'ip',          desc_it: 'Porte aperte, CVE e tag per ogni IP (Shodan) — no chiave',      desc_en: 'Open ports, CVEs and tags per IP (Shodan) — no key' },
+    { name: 'Shodan InternetDB', needs_key: false, type: 'ip',          desc_it: 'Porte aperte, CVE e tag per ogni IP (Shodan) — no chiave',                   desc_en: 'Open ports, CVEs and tags per IP (Shodan) — no key' },
+    { name: 'CIRCL Passive DNS', needs_key: true,  type: 'ip+url',      desc_it: 'Passive DNS storico IP/domini — CIRCL_API_KEY (gratuita, circl.lu/pdns)',    desc_en: 'Historical passive DNS for IPs/domains — CIRCL_API_KEY (free, circl.lu/pdns)' },
     // ── URL ──────────────────────────────────────────────────────────────────
     { name: 'OpenPhish',         needs_key: false, type: 'url',         desc_it: 'Feed URL phishing aggiornato — no chiave',                      desc_en: 'Live phishing URL feed — no key' },
     { name: 'PhishTank',         needs_key: true,  type: 'url',         desc_it: 'URL phishing verificati dalla community',                       desc_en: 'Community-verified phishing URLs' },
