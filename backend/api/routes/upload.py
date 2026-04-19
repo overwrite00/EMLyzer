@@ -16,6 +16,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from utils.config import settings
+from utils.i18n import t
 
 router = APIRouter()
 
@@ -26,23 +27,23 @@ MAX_SIZE = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 async def upload_email(file: UploadFile = File(...)):
     # 1. Validazione nome file e estensione
     if not file.filename:
-        raise HTTPException(status_code=400, detail="Nome file mancante")
+        raise HTTPException(status_code=400, detail=t("upload.no_filename"))
 
     ext = Path(file.filename).suffix.lower()
     if ext not in settings.ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Formato non supportato: '{ext}'. Formati accettati: {settings.ALLOWED_EXTENSIONS}",
+            detail=t("upload.unsupported_format", ext=ext, allowed=settings.ALLOWED_EXTENSIONS),
         )
 
     # 2. Lettura e validazione dimensione
     raw = await file.read()
     if len(raw) == 0:
-        raise HTTPException(status_code=400, detail="File vuoto")
+        raise HTTPException(status_code=400, detail=t("upload.empty_file"))
     if len(raw) > MAX_SIZE:
         raise HTTPException(
             status_code=413,
-            detail=f"File troppo grande: max {settings.MAX_UPLOAD_SIZE_MB} MB",
+            detail=t("upload.too_large", max_mb=settings.MAX_UPLOAD_SIZE_MB),
         )
 
     # 3. Calcola hash SHA256 del file caricato
@@ -56,7 +57,7 @@ async def upload_email(file: UploadFile = File(...)):
     try:
         dest_path.write_bytes(raw)
     except OSError as e:
-        raise HTTPException(status_code=500, detail=f"Errore salvataggio file: {e}")
+        raise HTTPException(status_code=500, detail=t("upload.save_error", error=e))
 
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
@@ -65,6 +66,6 @@ async def upload_email(file: UploadFile = File(...)):
             "original_filename": file.filename,
             "size_bytes": len(raw),
             "sha256": sha256,
-            "message": "File caricato con successo. Avvia l'analisi con POST /api/analysis/{job_id}",
+            "message": t("upload.success", job_id=job_id),
         },
     )

@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sqlalchemy.orm.attributes import flag_modified
 from models.database import get_session, EmailAnalysis
+from utils.i18n import t
 from core.reputation.connectors import (
     run_fast_checks,
     run_slow_checks,
@@ -218,12 +219,12 @@ async def run_reputation_fast(
     per vedere quando i risultati vengono aggiornati.
     """
     if not re.match(r'^[0-9a-f-]{36}$', job_id):
-        raise HTTPException(status_code=400, detail="job_id non valido")
+        raise HTTPException(status_code=400, detail=t("analysis.invalid_job_id"))
 
     record = await db.get(EmailAnalysis, job_id)
     if not record:
         raise HTTPException(status_code=404,
-            detail="Analisi non trovata. Esegui prima POST /api/analysis/{job_id}")
+            detail=t("analysis.run_first", job_id=job_id))
 
     ips, urls, hashes = _extract_indicators(record)
 
@@ -236,7 +237,7 @@ async def run_reputation_fast(
         )
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504,
-            detail="I servizi di reputazione non hanno risposto nel tempo previsto. Riprova.")
+            detail=t("reputation.timeout"))
 
     rep_dict = _summary_to_dict(summary)
     rep_dict["reputation_phase"] = "fast"   # indica che la fase 2 è ancora in corso
