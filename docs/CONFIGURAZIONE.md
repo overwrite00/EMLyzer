@@ -50,6 +50,8 @@ Puoi cambiare anche dal pulsante IT/EN nell'interfaccia. Per renderla permanente
 
 I servizi di reputazione sono **completamente opzionali**.
 Funzionano senza chiave: **Spamhaus DROP**, **ASN Lookup**, **Shodan InternetDB**, **OpenPhish**, **Redirect Chain**, **crt.sh**.
+Richiedono registrazione gratuita: **CIRCL Passive DNS**, **PhishTank**, **URLhaus/ThreatFox/MalwareBazaar** (abuse.ch).
+Richiedono account con piano free: **AbuseIPDB**, **VirusTotal**.
 
 > ⚠️ **MalwareBazaar**, **URLhaus** e **ThreatFox** richiedono una API key abuse.ch. Registrati su [auth.abuse.ch](https://auth.abuse.ch/) (gratuito) e aggiungi `ABUSECH_API_KEY` nel file `.env` — una sola chiave copre tutti e tre i servizi.
 
@@ -105,6 +107,27 @@ PHISHTANK_API_KEY=incolla_qui_la_tua_chiave
 
 ---
 
+### CIRCL Passive DNS
+
+Storico delle risoluzioni DNS per IP e domini: mostra quali nomi di dominio hanno puntato a un IP e quali IP un dominio ha storicamente risolto. Servizio **informativo** (non emette giudizi malevolo/pulito), utile per la threat intelligence e per tracciare l'infrastruttura di un attaccante.
+
+**Come registrarsi:**
+1. Vai su [https://www.circl.lu/pdns/](https://www.circl.lu/pdns/)
+2. Clicca **"Request access"** e compila il modulo (è gratuito)
+3. Riceverai username e password via email
+4. Inserisci le credenziali nel formato `username:password`
+
+```env
+CIRCL_API_KEY=tuo_username:tua_password
+```
+
+> **Esempio:** se lo username è `mario.rossi@example.com` e la password è `abc123`, scrivi:
+> `CIRCL_API_KEY=mario.rossi@example.com:abc123`
+
+**Limite:** nessun limite ufficiale dichiarato; EMLyzer applica un rate limit conservativo di 2 req/s.
+
+---
+
 ## Esempio di .env completo
 
 ```env
@@ -116,6 +139,7 @@ ABUSEIPDB_API_KEY=abc123def456ghi789jkl012
 VIRUSTOTAL_API_KEY=xyz987uvw654rst321opq098
 PHISHTANK_API_KEY=qrs111tuvw222xyz333abc444
 ABUSECH_API_KEY=mnb555opr666stu777vwx888
+CIRCL_API_KEY=tuo_username:tua_password
 ```
 
 ---
