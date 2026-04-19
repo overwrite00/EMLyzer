@@ -14,6 +14,7 @@ EMLyzer permette di analizzare un'email sospetta caricando il file `.eml` o `.ms
 |---|---|
 | [docs/REQUISITI.md](docs/REQUISITI.md) | Requisiti di sistema, software necessario |
 | [docs/INSTALLAZIONE.md](docs/INSTALLAZIONE.md) | Guida installazione passo-passo (Windows e Linux) |
+| [docs/CONFIGURAZIONE.md](docs/CONFIGURAZIONE.md) | Configurazione `.env`, API key servizi di reputazione |
 | [docs/UTILIZZO.md](docs/UTILIZZO.md) | Come usare l'applicazione, tutte le funzioni |
 | [docs/API.md](docs/API.md) | Riferimento API REST (per sviluppatori) |
 
