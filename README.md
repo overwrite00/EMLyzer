@@ -66,7 +66,8 @@ Email (.eml / .msg / testo incollato)
 │                       OpenPhish, PhishTank, │
 │                       Shodan, URLhaus,      │
 │                       ThreatFox, crt.sh,   │
-│                       MalwareBazaar        │
+│                       MalwareBazaar,       │
+│                       CIRCL Passive DNS    │
 └─────────────────────────────────────────────┘
          │
          ▼
