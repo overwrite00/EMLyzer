@@ -49,6 +49,8 @@ desktop.ini
 
 # Claude Code (file locali, non per il repo)
 .claude/
+claude.md
+CLAUDE.md
 
 # Log
 *.log
