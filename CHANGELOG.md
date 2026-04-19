@@ -13,7 +13,7 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ### Reputazione — nuovi servizi (priorità alta)
 
-- [ ] **CIRCL Passive DNS** — storico risoluzione DNS per IP e domini; gratuito con registrazione
+- [x] **CIRCL Passive DNS** — storico risoluzione DNS per IP e domini; gratuito con registrazione *(v0.11.0)*
 - [ ] **GreyNoise Community** — distingue scanner innocui da attori malevoli, riduce falsi positivi; free tier 100 req/g
 - [ ] **URLScan.io** — analisi completa URL con screenshot; free tier 100 req/h
 - [ ] **Pulsedive** — threat intel aggregata su IP/URL/domini; free tier 30 req/min
@@ -45,6 +45,13 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 - [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
 - [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
 - [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
+
+---
+
+## [0.11.0] — 2026-04-19
+
+### Aggiunto
+- **CIRCL Passive DNS**: nuovo servizio reputazione informativo per IP e domini. Interroga `pdns.circl.lu` per lo storico di risoluzione DNS: per un IP mostra i domini che vi hanno puntato storicamente; per un dominio mostra gli IP a cui ha risolto e i record A/AAAA/MX/NS/CNAME. Gratuito con registrazione (CIRCL_API_KEY in formato `username:password`). Fase FAST, classificato come informativo (icona ℹ️ nel frontend, come ASN Lookup e Shodan InternetDB).
 
 ---
 

@@ -99,6 +99,7 @@ _RATE_INTERVALS: dict[str, float] = {
     "threatfox":    0.3,    # ThreatFox abuse.ch
     "openphish":    0.0,    # feed locale, nessun limit
     "spamhaus":     0.0,    # feed locale, nessun limit
+    "circl":        0.5,    # CIRCL Passive DNS — nessun limite ufficiale, conservativo
 }
 
 def _rate_limit(connector: str):
@@ -126,6 +127,7 @@ def _http_get_with_retry(
     *,
     params: dict | None = None,
     headers: dict | None = None,
+    auth: tuple | None = None,
     timeout: float = REQUEST_TIMEOUT,
     max_retries: int = 2,
     rate_key: str = "",
@@ -133,6 +135,7 @@ def _http_get_with_retry(
     """
     Esegue una GET con retry su errori temporanei (429, 502, 503, 504).
     Backoff esponenziale: 2s, 4s. Su 429 usa Retry-After se presente.
+    auth: tupla (user, password) per HTTP Basic Auth (opzionale).
     """
     last_exc: Exception | None = None
     for attempt in range(max_retries + 1):
@@ -143,7 +146,7 @@ def _http_get_with_retry(
         try:
             if rate_key:
                 _rate_limit(rate_key)
-            resp = requests.get(url, params=params, headers=headers, timeout=timeout)
+            resp = requests.get(url, params=params, headers=headers, auth=auth, timeout=timeout)
             if resp.status_code == 429:
                 retry_after = float(resp.headers.get("Retry-After", 5))
                 logger.debug("429 da %s — attesa %.1fs", url, retry_after)
@@ -688,6 +691,156 @@ def check_domain_crtsh(domain: str) -> ReputationResult:
 
 
 # ---------------------------------------------------------------------------
+# CIRCL Passive DNS — storico risoluzione DNS per IP e domini (gratuito)
+# ---------------------------------------------------------------------------
+
+def check_ip_circl_pdns(ip: str) -> ReputationResult:
+    """
+    CIRCL Passive DNS — storico DNS per IP.
+    Ritorna i domini che hanno storicamente risolto a questo IP.
+    Informativo: non imposta is_malicious.
+    Richiede CIRCL_API_KEY in formato "username:password" (registrazione gratuita su circl.lu/pdns).
+    """
+    api_key = settings.CIRCL_API_KEY.strip()
+    if not api_key:
+        return ReputationResult(
+            source="CIRCL Passive DNS", entity=ip, entity_type="ip",
+            skipped=True, skip_reason="CIRCL_API_KEY non configurata",
+        )
+    user, _, pwd = api_key.partition(":")
+    try:
+        resp = _http_get_with_retry(
+            f"https://www.circl.lu/pdns/query/{ip}",
+            headers={"Accept": "application/json",
+                     "User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)"},
+            auth=(user, pwd),
+            timeout=REQUEST_TIMEOUT_INFO,
+            rate_key="circl",
+            max_retries=1,
+        )
+        if resp.status_code == 404:
+            return ReputationResult(
+                source="CIRCL Passive DNS", entity=ip, entity_type="ip",
+                queried=True, detail="Nessun record trovato.",
+            )
+        resp.raise_for_status()
+        records = [json.loads(ln) for ln in resp.text.splitlines() if ln.strip()]
+        if not records:
+            return ReputationResult(
+                source="CIRCL Passive DNS", entity=ip, entity_type="ip",
+                queried=True, detail="Nessun record trovato.",
+            )
+        # Estrai domini unici (rrname) → questi hostname hanno puntato a questo IP
+        domains = list(dict.fromkeys(
+            r.get("rrname", "").rstrip(".") for r in records if r.get("rrname")
+        ))
+        time_last = max((r.get("time_last", "") for r in records), default="")
+        time_last_str = time_last[:10] if time_last else "?"
+        sample = ", ".join(domains[:5])
+        extra = f" (+{len(domains) - 5} altri)" if len(domains) > 5 else ""
+        detail = (
+            f"{len(records)} record — domini: {sample}{extra}"
+            f" | ultimo visto: {time_last_str}"
+        )
+        return ReputationResult(
+            source="CIRCL Passive DNS", entity=ip, entity_type="ip",
+            queried=True, detail=detail,
+        )
+    except requests.exceptions.HTTPError as e:
+        code = e.response.status_code if e.response is not None else 0
+        if code == 401:
+            return ReputationResult(
+                source="CIRCL Passive DNS", entity=ip, entity_type="ip",
+                error="Credenziali CIRCL non valide (CIRCL_API_KEY=user:password)",
+            )
+        return ReputationResult(
+            source="CIRCL Passive DNS", entity=ip, entity_type="ip",
+            error=f"CIRCL HTTP {code}",
+        )
+    except Exception as exc:
+        return ReputationResult(
+            source="CIRCL Passive DNS", entity=ip, entity_type="ip",
+            error=f"CIRCL: {type(exc).__name__}",
+        )
+
+
+def check_domain_circl_pdns(domain: str) -> ReputationResult:
+    """
+    CIRCL Passive DNS — storico DNS per dominio.
+    Ritorna gli IP a cui il dominio ha storicamente risolto e altri record DNS.
+    Informativo: non imposta is_malicious.
+    Richiede CIRCL_API_KEY in formato "username:password" (registrazione gratuita su circl.lu/pdns).
+    """
+    api_key = settings.CIRCL_API_KEY.strip()
+    if not api_key:
+        return ReputationResult(
+            source="CIRCL Passive DNS", entity=domain, entity_type="url",
+            skipped=True, skip_reason="CIRCL_API_KEY non configurata",
+        )
+    user, _, pwd = api_key.partition(":")
+    try:
+        resp = _http_get_with_retry(
+            f"https://www.circl.lu/pdns/query/{domain}",
+            headers={"Accept": "application/json",
+                     "User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)"},
+            auth=(user, pwd),
+            timeout=REQUEST_TIMEOUT_INFO,
+            rate_key="circl",
+            max_retries=1,
+        )
+        if resp.status_code == 404:
+            return ReputationResult(
+                source="CIRCL Passive DNS", entity=domain, entity_type="url",
+                queried=True, detail="Nessun record trovato.",
+            )
+        resp.raise_for_status()
+        records = [json.loads(ln) for ln in resp.text.splitlines() if ln.strip()]
+        if not records:
+            return ReputationResult(
+                source="CIRCL Passive DNS", entity=domain, entity_type="url",
+                queried=True, detail="Nessun record trovato.",
+            )
+        # Raggruppa per rrtype — mostra A/AAAA/MX/NS/CNAME
+        by_type: dict[str, list[str]] = {}
+        for r in records:
+            rt  = r.get("rrtype", "?")
+            rd  = r.get("rdata", "").rstrip(".")
+            if rd:
+                by_type.setdefault(rt, []).append(rd)
+        parts = []
+        for rt in ("A", "AAAA", "MX", "NS", "CNAME"):
+            vals = list(dict.fromkeys(by_type.get(rt, [])))   # dedup con ordine
+            if vals:
+                sample = ", ".join(vals[:3])
+                extra  = f" (+{len(vals) - 3})" if len(vals) > 3 else ""
+                parts.append(f"{rt}: {sample}{extra}")
+        time_last = max((r.get("time_last", "") for r in records), default="")
+        time_last_str = time_last[:10] if time_last else "?"
+        body = " | ".join(parts) if parts else f"{len(records)} record"
+        detail = f"{body} | ultimo visto: {time_last_str}"
+        return ReputationResult(
+            source="CIRCL Passive DNS", entity=domain, entity_type="url",
+            queried=True, detail=detail,
+        )
+    except requests.exceptions.HTTPError as e:
+        code = e.response.status_code if e.response is not None else 0
+        if code == 401:
+            return ReputationResult(
+                source="CIRCL Passive DNS", entity=domain, entity_type="url",
+                error="Credenziali CIRCL non valide (CIRCL_API_KEY=user:password)",
+            )
+        return ReputationResult(
+            source="CIRCL Passive DNS", entity=domain, entity_type="url",
+            error=f"CIRCL HTTP {code}",
+        )
+    except Exception as exc:
+        return ReputationResult(
+            source="CIRCL Passive DNS", entity=domain, entity_type="url",
+            error=f"CIRCL: {type(exc).__name__}",
+        )
+
+
+# ---------------------------------------------------------------------------
 # Redirect chain — segue i redirect degli URL shortener
 # ---------------------------------------------------------------------------
 
@@ -980,6 +1133,7 @@ _SERVICE_DEFS = [
     ("Spamhaus DROP",     "ip",          False, "Blocklist IP malevoli di alto profilo — no API key richiesta"),
     ("ASN Lookup",        "ip",          False, "Autonomous System Number per ogni IP — no API key (ipinfo.io)"),
     ("Shodan InternetDB", "ip",          False, "Porte aperte, CVE e tag per ogni IP — no API key (Shodan)"),
+    ("CIRCL Passive DNS", "ip+url",      True,  "Storico risoluzione DNS per IP e domini — gratuito con registrazione (circl.lu/pdns)"),
     # URL
     ("OpenPhish",         "url",         False, "Feed URL phishing — no API key richiesta"),
     ("PhishTank",         "url",         True,  "Database URL phishing verificati dalla community"),
@@ -1010,6 +1164,7 @@ def _build_service_registry(all_results: list[ReputationResult]) -> list[dict]:
         "URLhaus":           bool(settings.ABUSECH_API_KEY),
         "MalwareBazaar":     bool(settings.ABUSECH_API_KEY or settings.MALWAREBAZAAR_API_KEY),
         "ThreatFox":         bool(settings.ABUSECH_API_KEY),
+        "CIRCL Passive DNS": bool(settings.CIRCL_API_KEY),
     }
 
     registry = []
@@ -1115,12 +1270,14 @@ _FAST_SERVICES = frozenset({
     "check_ip_spamhaus",           # feed locale, 0s
     "check_ip_asn",                # 1 HTTP, 0.3s rate
     "check_ip_shodan_internetdb",  # 1 HTTP, 0.3s rate — InternetDB gratuito
+    "check_ip_circl_pdns",         # 1 HTTP, 0.5s rate — CIRCL Passive DNS
     "check_ip_threatfox",          # 1 HTTP, 0.3s rate
     "check_url_openphish",         # feed locale, 0s
     "check_url_redirect_chain",    # 1 HTTP per URL, 0.2s rate
     "check_url_phishtank",         # 1 HTTP, 0.5s rate
     "check_url_urlhaus",           # 1 HTTP, 0.3s rate
     "check_url_threatfox",         # 1 HTTP, 0.3s rate
+    "check_domain_circl_pdns",     # 1 HTTP, 0.5s rate — CIRCL Passive DNS
     "check_hash_malwarebazaar",    # 1 HTTP, 0.7s rate
     "check_hash_threatfox",        # 1 HTTP, 0.3s rate
 })
@@ -1183,6 +1340,10 @@ def _build_flat_tasks(
         _c(check_ip_spamhaus,          ip, "ip")
         _c(check_ip_asn,               ip, "ip")
         _c(check_ip_shodan_internetdb, ip, "ip")
+        if settings.CIRCL_API_KEY:
+            _c(check_ip_circl_pdns,    ip, "ip")
+        else:
+            _s("CIRCL Passive DNS", ip, "ip", "CIRCL_API_KEY non configurata — registrati su circl.lu/pdns")
         if settings.ABUSECH_API_KEY:
             _c(check_ip_threatfox, ip, "ip")
         else:
@@ -1213,7 +1374,7 @@ def _build_flat_tasks(
                 _c(check_url_redirect_chain, url, "url")
         except Exception:
             pass
-        # crt.sh — solo domini (non IP diretti)
+        # crt.sh e CIRCL Passive DNS — solo domini (non IP diretti)
         try:
             host = urllib.parse.urlparse(url).netloc.split(":")[0]
             ipaddress.ip_address(host)   # se è un IP → ValueError → salta
@@ -1221,6 +1382,8 @@ def _build_flat_tasks(
             domain = host.lstrip("www.")
             if domain:
                 _c(check_domain_crtsh, domain, "url")
+                if settings.CIRCL_API_KEY:
+                    _c(check_domain_circl_pdns, domain, "url")
         except Exception:
             pass
 

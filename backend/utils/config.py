@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "EMLyzer"
-    VERSION: str = "0.10.3"
+    VERSION: str = "0.11.0"
     DEBUG: bool = False
 
     # CORS - backend in produzione + Vite dev server
@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     ABUSECH_API_KEY: str = ""
     # chiave legacy MalwareBazaar: ancora accettata per retrocompatibilità
     MALWAREBAZAAR_API_KEY: str = ""
+    # CIRCL Passive DNS: formato "username:password" — registrazione gratuita su circl.lu/pdns
+    CIRCL_API_KEY: str = ""
 
     # Lingua interfaccia: it (italiano) o en (english)
     LANGUAGE: str = "it"

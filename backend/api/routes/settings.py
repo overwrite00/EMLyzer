@@ -21,12 +21,13 @@ async def get_settings():
         "max_upload_mb": settings.MAX_UPLOAD_SIZE_MB,
         "allowed_extensions": settings.ALLOWED_EXTENSIONS,
         "reputation_keys": {
-            "AbuseIPDB":    bool(settings.ABUSEIPDB_API_KEY),
-            "VirusTotal":   bool(settings.VIRUSTOTAL_API_KEY),
-            "PhishTank":    bool(settings.PHISHTANK_API_KEY),
-            "URLhaus":      bool(settings.ABUSECH_API_KEY),
-            "ThreatFox":    bool(settings.ABUSECH_API_KEY),
-            "MalwareBazaar":bool(settings.ABUSECH_API_KEY or settings.MALWAREBAZAAR_API_KEY),
+            "AbuseIPDB":         bool(settings.ABUSEIPDB_API_KEY),
+            "VirusTotal":        bool(settings.VIRUSTOTAL_API_KEY),
+            "PhishTank":         bool(settings.PHISHTANK_API_KEY),
+            "URLhaus":           bool(settings.ABUSECH_API_KEY),
+            "ThreatFox":         bool(settings.ABUSECH_API_KEY),
+            "MalwareBazaar":     bool(settings.ABUSECH_API_KEY or settings.MALWAREBAZAAR_API_KEY),
+            "CIRCL Passive DNS": bool(settings.CIRCL_API_KEY),
         },
     }
 
