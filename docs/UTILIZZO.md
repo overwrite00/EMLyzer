@@ -210,10 +210,10 @@ Per ogni allegato viene mostrato anche il **hash SHA256** — utile per cercarlo
 
 Verifica IP, URL e hash su database pubblici di minacce.
 
-**Prima dell'esecuzione:** anteprima di tutti i 12 servizi con indicazione se la API key è configurata o meno.
+**Prima dell'esecuzione:** anteprima di tutti i 19 servizi con indicazione se la API key è configurata o meno.
 
 **Dopo aver cliccato "Avvia controllo reputazione"**, i risultati arrivano in due fasi:
-- **Fase 1** (pochi secondi): Spamhaus, ASN Lookup, Shodan InternetDB, OpenPhish, PhishTank, Redirect Chain, URLhaus, ThreatFox, MalwareBazaar
+- **Fase 1** (pochi secondi): Spamhaus, ASN Lookup, Shodan InternetDB, CIRCL Passive DNS, GreyNoise Community, Criminal IP, OpenPhish, PhishTank, Redirect Chain, URLhaus, URLScan.io, ThreatFox, MalwareBazaar, Hybrid Analysis, Pulsedive, SecurityTrails
 - **Fase 2** (in background, aggiornamento automatico): AbuseIPDB, VirusTotal, crt.sh
 
 | Icona | Stato | Significato |
@@ -228,18 +228,25 @@ Verifica IP, URL e hash su database pubblici di minacce.
 **Servizi sempre attivi (nessuna chiave richiesta):**
 - **Spamhaus DROP** — blocklist IP malevoli di alto profilo
 - **ASN Lookup** — Autonomous System Number per ogni IP (ipinfo.io)
-- **Shodan InternetDB** — porte aperte, CVE e tag per ogni IP
+- **Shodan InternetDB** — porte aperte, CVE e tag per ogni IP *(ℹ️ informativo)*
 - **OpenPhish** — feed URL phishing aggiornato
+- **URLScan.io** — scansioni esistenti per URL/domini *(search pubblico, chiave opzionale)*
 - **Redirect Chain** — segue i redirect degli URL shortener
 - **crt.sh** — certificati TLS del dominio (età, sottodomini)
 
 **Servizi che richiedono API key:**
-- **AbuseIPDB** — reputazione IP (header SMTP, X-Originating-IP)
-- **VirusTotal** — IP, URL e hash allegati (70+ engine)
-- **PhishTank** — URL phishing verificati dalla community
+- **AbuseIPDB** — reputazione IP (header SMTP, X-Originating-IP) (`ABUSEIPDB_API_KEY`)
+- **VirusTotal** — IP, URL e hash allegati (70+ engine) (`VIRUSTOTAL_API_KEY`)
+- **PhishTank** — URL phishing verificati dalla community (`PHISHTANK_API_KEY`)
 - **URLhaus** — database URL malware di abuse.ch (`ABUSECH_API_KEY`)
 - **ThreatFox** — database IOC abuse.ch: IP, URL, hash malware (`ABUSECH_API_KEY`)
 - **MalwareBazaar** — hash allegati nel database malware (`ABUSECH_API_KEY`)
+- **CIRCL Passive DNS** — storico DNS per IP e domini (`CIRCL_API_KEY`) *(ℹ️ informativo)*
+- **GreyNoise Community** — classifica IP come scanner/malevolo/benigno (`GREYNOISE_API_KEY`)
+- **Criminal IP** — score rischio IP 0-4 con geolocalizzazione (`CRIMINALIP_API_KEY`)
+- **Pulsedive** — threat intel aggregata IP e URL (`PULSEDIVE_API_KEY`)
+- **SecurityTrails** — DNS attuale e storico per domini (`SECURITYTRAILS_API_KEY`) *(ℹ️ informativo)*
+- **Hybrid Analysis** — analisi hash allegati nel database sandbox Falcon (`HYBRID_ANALYSIS_API_KEY`)
 
 Clicca su un servizio per espanderlo e vedere il dettaglio di ogni entità analizzata.
 
