@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "EMLyzer"
-    VERSION: str = "0.13.0"
+    VERSION: str = "0.14.0"
     DEBUG: bool = False
 
     # CORS - backend in produzione + Vite dev server
@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     SECURITYTRAILS_API_KEY: str = ""
     # Hybrid Analysis: https://www.hybrid-analysis.com/signup (gratuito con registrazione)
     HYBRID_ANALYSIS_API_KEY: str = ""
+
+    # LanguageTool — rilevamento errori grammaticali nel corpo email (opzionale)
+    # Lasciare vuoto per disabilitare. URL server locale: http://localhost:8081
+    # URL pubblico (con limiti): https://api.languagetool.org/v2/check
+    LANGUAGETOOL_API_URL: str = ""
 
     # Lingua interfaccia: it (italiano) o en (english)
     LANGUAGE: str = "it"

@@ -45,6 +45,53 @@ CREDENTIAL_KEYWORDS = [
     r"\bcodice fiscale\b",
 ]
 
+# Mappa omoglifi Unicode → carattere latino equivalente
+# Cirillico e greco visivamente identici a caratteri latini
+_HOMOGLYPH_MAP: dict[str, str] = {
+    # Cirillico
+    '\u0430': 'a',  # а
+    '\u0435': 'e',  # е
+    '\u043e': 'o',  # о
+    '\u0440': 'p',  # р
+    '\u0441': 'c',  # с
+    '\u0445': 'x',  # х
+    '\u0443': 'y',  # у
+    '\u0456': 'i',  # і
+    '\u0455': 's',  # ѕ
+    '\u0501': 'd',  # ԁ
+    '\u0412': 'B',  # В
+    '\u041c': 'M',  # М
+    '\u041d': 'H',  # Н
+    '\u041e': 'O',  # О
+    '\u0420': 'P',  # Р
+    '\u0421': 'C',  # С
+    '\u0422': 'T',  # Т
+    '\u0425': 'X',  # Х
+    '\u0410': 'A',  # А
+    '\u0415': 'E',  # Е
+    '\u0406': 'I',  # І
+    # Greco
+    '\u0391': 'A',  # Α
+    '\u0392': 'B',  # Β
+    '\u0395': 'E',  # Ε
+    '\u0396': 'Z',  # Ζ
+    '\u0397': 'H',  # Η
+    '\u0399': 'I',  # Ι
+    '\u039a': 'K',  # Κ
+    '\u039c': 'M',  # Μ
+    '\u039d': 'N',  # Ν
+    '\u039f': 'O',  # Ο
+    '\u03a1': 'P',  # Ρ
+    '\u03a4': 'T',  # Τ
+    '\u03a5': 'Y',  # Υ
+    '\u03a7': 'X',  # Χ
+    '\u03b1': 'a',  # α
+    '\u03bf': 'o',  # ο
+    '\u03c1': 'p',  # ρ
+    '\u03bd': 'v',  # ν
+    '\u03c9': 'w',  # ω
+}
+
 # URL shortener noti
 URL_SHORTENER_DOMAINS = {
     "bit.ly", "tinyurl.com", "t.co", "ow.ly", "is.gd", "buff.ly",
@@ -303,6 +350,65 @@ def _extract_domain_from_url(url: str) -> str:
     return ""
 
 
+def _check_homoglyphs(body_text: str, result: BodyAnalysisResult):
+    """
+    Rileva caratteri Unicode omoglifi (cirillico/greco) visivamente identici
+    a caratteri latini — tecnica usata per spoofing visivo nei link e nel testo.
+    """
+    if not body_text:
+        return
+    found = [ch for ch in body_text if ch in _HOMOGLYPH_MAP]
+    if not found:
+        return
+    n = len(found)
+    # Caratteri unici trovati (max 10 nel sample)
+    sample = "".join(dict.fromkeys(found))[:10]
+    severity = "high" if n >= 3 else "low"
+    result.findings.append(BodyFinding(
+        category="text",
+        severity=severity,
+        description=t("body.homoglyphs", count=n),
+        evidence=f"Caratteri sospetti: {sample}",
+        count=n,
+    ))
+
+
+def _check_languagetool(body_text: str, result: BodyAnalysisResult):
+    """
+    Verifica errori grammaticali via LanguageTool (opzionale).
+    Abilitato solo se LANGUAGETOOL_API_URL è configurato in .env.
+    ≥5 errori → finding MEDIUM (possibile testo tradotto automaticamente).
+    """
+    from utils.config import settings
+    url = settings.LANGUAGETOOL_API_URL.strip()
+    if not url or not body_text.strip():
+        return
+    # Normalizza URL: assicura che termini con /check
+    if not url.endswith("/check"):
+        url = url.rstrip("/") + "/check"
+    try:
+        import requests as _req
+        resp = _req.post(
+            url,
+            data={"text": body_text[:5000], "language": "auto"},
+            timeout=5,
+        )
+        if resp.status_code != 200:
+            return
+        matches = resp.json().get("matches", [])
+        n = len(matches)
+        if n >= 5:
+            result.findings.append(BodyFinding(
+                category="text",
+                severity="medium",
+                description=t("body.grammar_errors", count=n),
+                evidence=f"{n} potenziali errori rilevati da LanguageTool",
+                count=n,
+            ))
+    except Exception:
+        pass  # Servizio non disponibile — analisi continua senza errori
+
+
 def _compute_score(result: BodyAnalysisResult) -> float:
     weights = {"info": 0, "low": 5, "medium": 15, "high": 25}
     score = sum(weights.get(f.severity, 0) for f in result.findings)
@@ -315,6 +421,8 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
 
     _analyze_text(parsed.body_text, result)
     _analyze_html(parsed.body_html, result)
+    _check_homoglyphs(parsed.body_text, result)
+    _check_languagetool(parsed.body_text, result)
 
     # Deduplica URL
     result.extracted_urls = list(dict.fromkeys(result.extracted_urls))

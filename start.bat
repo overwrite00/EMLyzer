@@ -8,7 +8,7 @@ set "VENV_DIR=%~dp0.venv"
 set "VENV_PYTHON=%~dp0.venv\Scripts\python.exe"
 set "FOUND_PYTHON="
 set "FOUND_VER="
-set "VERSION=0.13.0"
+set "VERSION=0.14.0"
 
 :: ── Lingua output (it/en) — rilevata dalla locale di sistema ──────────────────
 :: Default: italiano. Se la lingua UI di Windows e' inglese, usa l'inglese.

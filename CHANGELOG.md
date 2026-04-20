@@ -29,10 +29,10 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ### Body analysis (priorità media)
 
-- [ ] **Rilevamento errori grammaticali** — integrazione LanguageTool (locale o API) per testi tradotti/generati automaticamente
-- [ ] **Logistic regression NLP** — miglioramento classificatore attuale (Naive Bayes); migliore calibrazione probabilità
-- [ ] **Dataset Enron/Nazario** — riaddestramento modello NLP con dataset pubblici per migliorare la generalizzazione
-- [ ] **Omoglifi e Unicode spoofing** — rilevamento caratteri Unicode visivamente identici a caratteri latini nel testo (es. `а` cirillica)
+- [x] **Rilevamento errori grammaticali** — integrazione LanguageTool (locale o API) per testi tradotti/generati automaticamente *(v0.14.0)*
+- [x] **Logistic regression NLP** — miglioramento classificatore attuale (Naive Bayes); migliore calibrazione probabilità *(v0.14.0)*
+- [x] **Dataset Enron/Nazario** — riaddestramento modello NLP con dataset pubblici per migliorare la generalizzazione *(v0.14.0)*
+- [x] **Omoglifi e Unicode spoofing** — rilevamento caratteri Unicode visivamente identici a caratteri latini nel testo (es. `а` cirillica) *(v0.14.0)*
 
 ### Report (priorità media)
 
@@ -45,6 +45,18 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 - [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
 - [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
 - [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
+
+---
+
+## [0.14.0] — 2026-04-20
+
+### Aggiunto
+- **Rilevamento omoglifi Unicode**: nuova funzione `_check_homoglyphs` in `body_analyzer.py` con mappa inline di 39 caratteri Cirillici e Greci visivamente identici ai latini. Finding HIGH se ≥3 occorrenze, LOW se 1-2. Evidence mostra i caratteri sospetti trovati. Nessuna dipendenza esterna.
+- **Switch NLP: Naive Bayes → Logistic Regression**: il classificatore NLP passa da `MultinomialNB` a `LogisticRegression + MaxAbsScaler`. Migliore calibrazione delle probabilità, gestione ottimizzata di feature correlate. `MaxAbsScaler` necessario per input sparse TF-IDF. Estrazione top features aggiornata: usa `clf.coef_[0]` (coefficienti positivi = predice phishing) invece di `feature_log_prob_[1]`.
+- **Dataset NLP espanso**: da ~65 a ~165 campioni. Nuove categorie phishing (label=1): banking italiano (UniCredit, Intesa, PosteItaliane, INPS), Microsoft/Office365, sextortion, prize/419 fraud, rimborso fiscale, malware lure. Nuove categorie legittime (label=0): email HR (ferie, buste paga), notifiche GitHub, ricevute e-commerce, email italiane quotidiane, supporto tecnico. Bilanciamento ~50/50.
+- **LanguageTool grammar checker** (opzionale): nuova funzione `_check_languagetool` in `body_analyzer.py`. Se `LANGUAGETOOL_API_URL` è configurato in `.env`, analizza il corpo email (max 5000 caratteri). ≥5 errori grammaticali → finding MEDIUM "Possibili errori grammaticali". Silenzioso se il servizio non è disponibile o l'URL è vuoto.
+- Nuova chiave di configurazione `LANGUAGETOOL_API_URL` in `config.py` e `.env.example`.
+- 9 nuovi test in `TestBodyAnalyzerV14`.
 
 ---
 

@@ -657,6 +657,128 @@ class TestNLPClassifier:
 
 
 # ─────────────────────────────────────────────
+# Test: v0.14.0 — Omoglifi + NLP LR + LanguageTool
+# ─────────────────────────────────────────────
+
+class TestBodyAnalyzerV14:
+    """Test per le feature introdotte in v0.14.0."""
+
+    # ── Omoglifi Unicode ──
+
+    def test_homoglyphs_detected_high(self):
+        """≥3 caratteri cirillici nel testo → finding HIGH."""
+        # 'а' (U+0430, cirillico), 'е' (U+0435), 'о' (U+043E), 'р' (U+0440)
+        cyrillic_text = "Urgеnt: vеrify уour аccount nоw"  # е,у,а,о = cirillico
+        from core.analysis.body_analyzer import _check_homoglyphs
+        from core.analysis.body_analyzer import BodyAnalysisResult
+        result = BodyAnalysisResult()
+        _check_homoglyphs(cyrillic_text, result)
+        hom_findings = [f for f in result.findings if f.category == "text"
+                        and "Unicode" in f.description or "spoofing" in f.description.lower()]
+        # Trova il finding omoglifi
+        hom = [f for f in result.findings if f.category == "text"]
+        assert len(hom) >= 1
+        assert hom[0].severity == "high"
+
+    def test_homoglyphs_few_low(self):
+        """1-2 caratteri cirillici → finding LOW."""
+        # Solo 'а' (U+0430) e 'е' (U+0435)
+        text = "Deаr client"  # а = cirillico
+        from core.analysis.body_analyzer import _check_homoglyphs, BodyAnalysisResult
+        result = BodyAnalysisResult()
+        _check_homoglyphs(text, result)
+        hom = [f for f in result.findings if f.category == "text"]
+        assert len(hom) == 1
+        assert hom[0].severity == "low"
+
+    def test_homoglyphs_clean_no_finding(self):
+        """Testo ASCII puro → nessun finding omoglifi."""
+        from core.analysis.body_analyzer import _check_homoglyphs, BodyAnalysisResult
+        result = BodyAnalysisResult()
+        _check_homoglyphs("Hello dear customer please verify your account", result)
+        assert len(result.findings) == 0
+
+    def test_homoglyphs_empty_text_no_error(self):
+        """Testo vuoto → nessun errore, nessun finding."""
+        from core.analysis.body_analyzer import _check_homoglyphs, BodyAnalysisResult
+        result = BodyAnalysisResult()
+        _check_homoglyphs("", result)
+        assert len(result.findings) == 0
+
+    # ── NLP LogisticRegression (invarianza rispetto a MultinomialNB) ──
+
+    def test_nlp_lr_phishing_detected(self):
+        """LR deve classificare testi phishing noti come phishing/suspicious."""
+        from core.analysis.nlp_classifier import classify_text
+        samples = [
+            "urgent your account suspended verify credentials immediately click here",
+            "dear customer your paypal account has been limited please update information",
+            "congratulations you have won a prize claim your reward enter your details",
+        ]
+        for text in samples:
+            r = classify_text(text)
+            assert r.available, f"LR non disponibile per: {text}"
+            assert r.label in ("phishing", "suspicious"), \
+                f"Atteso phishing/suspicious, ottenuto {r.label!r} per: {text}"
+
+    def test_nlp_lr_legitimate_not_flagged(self):
+        """LR non deve classificare email legittime come phishing."""
+        from core.analysis.nlp_classifier import classify_text
+        samples = [
+            "meeting scheduled for tomorrow at 3pm please confirm your attendance",
+            "attached is the quarterly report for your review please provide feedback",
+            "pull request merged into main branch all tests passing deployment complete",
+        ]
+        for text in samples:
+            r = classify_text(text)
+            assert r.available
+            assert r.phishing_probability < 0.75, \
+                f"Probabilità troppo alta ({r.phishing_probability}) per: {text}"
+
+    # ── LanguageTool (opzionale) ──
+
+    def test_languagetool_skipped_no_url(self):
+        """Con LANGUAGETOOL_API_URL vuoto: nessun finding, nessun errore."""
+        from core.analysis.body_analyzer import _check_languagetool, BodyAnalysisResult
+        from utils.config import settings
+        original = settings.LANGUAGETOOL_API_URL
+        try:
+            settings.LANGUAGETOOL_API_URL = ""
+            result = BodyAnalysisResult()
+            _check_languagetool("This text has many errors gramatical yes", result)
+            assert len(result.findings) == 0
+        finally:
+            settings.LANGUAGETOOL_API_URL = original
+
+    def test_languagetool_skipped_empty_body(self):
+        """Con testo vuoto: nessun finding, nessun errore anche se URL configurato."""
+        from core.analysis.body_analyzer import _check_languagetool, BodyAnalysisResult
+        from utils.config import settings
+        original = settings.LANGUAGETOOL_API_URL
+        try:
+            settings.LANGUAGETOOL_API_URL = "http://localhost:19999"  # porta non in ascolto
+            result = BodyAnalysisResult()
+            _check_languagetool("", result)
+            assert len(result.findings) == 0
+        finally:
+            settings.LANGUAGETOOL_API_URL = original
+
+    def test_languagetool_connection_error_silent(self):
+        """Errore di connessione → silenzioso, nessun finding, nessuna eccezione."""
+        from core.analysis.body_analyzer import _check_languagetool, BodyAnalysisResult
+        from utils.config import settings
+        original = settings.LANGUAGETOOL_API_URL
+        try:
+            settings.LANGUAGETOOL_API_URL = "http://127.0.0.1:19999"  # porta sicuramente chiusa
+            result = BodyAnalysisResult()
+            _check_languagetool("This is some text with possible errors in it.", result)
+            # Nessuna eccezione e nessun finding (connection refused)
+            assert len(result.findings) == 0
+        finally:
+            settings.LANGUAGETOOL_API_URL = original
+
+
+# ─────────────────────────────────────────────
 # Test: PATCH notes e WHOIS toggle (HTTP)
 # ─────────────────────────────────────────────
 

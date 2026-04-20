@@ -238,6 +238,14 @@ TRANSLATIONS = {
         "it": "Immagine inline Base64 ({mime})",
         "en": "Inline Base64 image ({mime})",
     },
+    "body.homoglyphs": {
+        "it": "Caratteri Unicode sospetti rilevati — possibile spoofing visivo ({count} occorrenze)",
+        "en": "Suspicious Unicode characters detected — possible visual spoofing ({count} occurrences)",
+    },
+    "body.grammar_errors": {
+        "it": "Possibili errori grammaticali nel testo ({count}) — potrebbe indicare testo tradotto automaticamente",
+        "en": "Possible grammar errors in text ({count}) — may indicate auto-translated content",
+    },
 
     # ── URL analysis ──────────────────────────────────────────────────────────
     "url.ip_direct": {
