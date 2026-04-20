@@ -68,7 +68,11 @@ Email (.eml / .msg / testo incollato)
 │                       Shodan, URLhaus,      │
 │                       ThreatFox, crt.sh,   │
 │                       MalwareBazaar,       │
-│                       CIRCL Passive DNS    │
+│                       CIRCL Passive DNS,   │
+│                       GreyNoise, URLScan,  │
+│                       Pulsedive, CriminalIP│
+│                       SecurityTrails,      │
+│                       Hybrid Analysis      │
 └─────────────────────────────────────────────┘
          │
          ▼
@@ -79,7 +83,7 @@ Email (.eml / .msg / testo incollato)
 
 ## 🔧 Versione
 
-**v0.11.0** — Python 3.11–3.13, 94 test automatici, Windows + Linux
+**v0.12.0** — Python 3.11–3.13, 94 test automatici, Windows + Linux
 
 ---
 

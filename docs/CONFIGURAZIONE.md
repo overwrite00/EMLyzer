@@ -128,6 +128,112 @@ CIRCL_API_KEY=tuo_username:tua_password
 
 ---
 
+### GreyNoise Community
+
+Classifica un IP come `malicious`, `benign` o `unknown`. Distingue i normali scanner di internet (crawlers, ricercatori di sicurezza) dagli attori malevoli, riducendo significativamente i falsi positivi nell'analisi degli header SMTP.
+
+**Come registrarsi:**
+1. Vai su [https://www.greynoise.io/](https://www.greynoise.io/)
+2. Clicca **"Sign Up"** e crea un account gratuito
+3. Nella dashboard vai su **"Account"** → **"API Keys"** → copia la chiave
+
+```env
+GREYNOISE_API_KEY=incolla_qui_la_tua_chiave
+```
+
+**Limite gratuito:** 100 richieste al giorno.
+
+---
+
+### URLScan.io
+
+Ricerca scansioni esistenti per URL e domini nel database di urlscan.io. Mostra il verdetto (`malicious`/`benign`) dell'ultima scansione disponibile con score e tag.
+
+> **Nota:** la ricerca funziona anche **senza API key** (accesso pubblico con rate limit ridotto). La chiave aumenta il limite e sblocca la funzione di invio nuove scansioni.
+
+**Come registrarsi (opzionale):**
+1. Vai su [https://urlscan.io/user/signup](https://urlscan.io/user/signup)
+2. Crea un account gratuito
+3. Vai su **"Settings"** → **"API Keys"** → copia la chiave
+
+```env
+URLSCAN_API_KEY=incolla_qui_la_tua_chiave
+```
+
+**Limite gratuito:** 100 ricerche/ora con chiave; accesso pubblico senza chiave più limitato.
+
+---
+
+### Pulsedive
+
+Threat intelligence aggregata per IP e URL: assegna un livello di rischio (`none`/`low`/`medium`/`high`/`critical`) con i fattori di rischio specifici rilevati.
+
+**Come registrarsi:**
+1. Vai su [https://pulsedive.com/](https://pulsedive.com/)
+2. Crea un account gratuito
+3. Vai su **"Dashboard"** → **"API"** → copia la chiave
+
+```env
+PULSEDIVE_API_KEY=incolla_qui_la_tua_chiave
+```
+
+**Limite gratuito:** 30 richieste al minuto.
+
+---
+
+### Criminal IP
+
+Score di rischio IP su scala 0-4 (Safe / Low / Medium / High / Critical) con geolocalizzazione. Particolarmente efficace per rilevare IP di C&C e infrastrutture botnet.
+
+**Come registrarsi:**
+1. Vai su [https://www.criminalip.io/](https://www.criminalip.io/)
+2. Clicca **"Sign Up"** e crea un account gratuito
+3. Vai su **"My Information"** → **"API Key"** → copia la chiave
+
+```env
+CRIMINALIP_API_KEY=incolla_qui_la_tua_chiave
+```
+
+**Limite gratuito:** disponibile con free tier (limiti aggiornati sul sito).
+
+---
+
+### SecurityTrails
+
+DNS attuale per domini: record A, MX, NS. Servizio **informativo** (come ASN Lookup e Shodan), utile per tracciare l'infrastruttura del mittente.
+
+> ⚠️ **Attenzione:** il piano gratuito include solo **50 richieste al mese**. EMLyzer applica un rate limit molto conservativo (1 richiesta ogni 3 secondi) per non consumare il quota rapidamente.
+
+**Come registrarsi:**
+1. Vai su [https://securitytrails.com/app/account](https://securitytrails.com/app/account)
+2. Crea un account gratuito
+3. Vai su **"Account"** → **"API Key"** → copia la chiave
+
+```env
+SECURITYTRAILS_API_KEY=incolla_qui_la_tua_chiave
+```
+
+**Limite gratuito:** 50 richieste al mese.
+
+---
+
+### Hybrid Analysis (CrowdStrike Falcon)
+
+Ricerca hash degli allegati nel database della sandbox Falcon. Restituisce il verdict (`no specific threat`/`suspicious`/`malicious`), il tipo di file e i tag comportamentali rilevati durante l'analisi.
+
+**Come registrarsi:**
+1. Vai su [https://www.hybrid-analysis.com/signup](https://www.hybrid-analysis.com/signup)
+2. Compila il modulo (è gratuito con registrazione)
+3. Una volta approvato, vai su **"Profile"** → **"API key"** → copia la chiave
+
+```env
+HYBRID_ANALYSIS_API_KEY=incolla_qui_la_tua_chiave
+```
+
+**Limite:** gratuito con registrazione (limiti aggiornati sul sito).
+
+---
+
 ## Esempio di .env completo
 
 ```env
@@ -140,6 +246,11 @@ VIRUSTOTAL_API_KEY=xyz987uvw654rst321opq098
 PHISHTANK_API_KEY=qrs111tuvw222xyz333abc444
 ABUSECH_API_KEY=mnb555opr666stu777vwx888
 CIRCL_API_KEY=tuo_username:tua_password
+GREYNOISE_API_KEY=abc111def222ghi333jkl444
+PULSEDIVE_API_KEY=mno555pqr666stu777vwx888
+CRIMINALIP_API_KEY=yz1112abc3334def5556ghi7
+SECURITYTRAILS_API_KEY=jkl888mno999pqr000stu111
+HYBRID_ANALYSIS_API_KEY=vwx222yz3334abc5556def77
 ```
 
 ---
