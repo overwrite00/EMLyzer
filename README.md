@@ -1,5 +1,7 @@
 # 🔍 EMLyzer
 
+![EMLyzer](images/emlyzer_cover.png)
+
 **Piattaforma open-source di analisi delle email** per identificare spam, phishing e contenuti malevoli.
 
 EMLyzer permette di analizzare un'email sospetta caricando il file `.eml` o `.msg`, oppure incollando direttamente il sorgente, e ottiene in pochi secondi un **rapporto completo** con punteggio di rischio spiegabile, analisi degli header, del corpo, degli URL, degli allegati e dei servizi di reputazione.
@@ -23,7 +25,7 @@ EMLyzer permette di analizzare un'email sospetta caricando il file `.eml` o `.ms
 ## ⚡ Avvio rapido
 
 ### Windows
-1. Installa **Python 3.13** da [python.org](https://www.python.org/downloads/) *(spunta "Add Python to PATH")*
+1. Installa **Python 3.13** da [python.org](https://www.python.org/downloads/)
 2. Scarica e decomprimi il progetto
 3. Fai doppio clic su **`start.bat`**
 4. Apri il browser su **http://localhost:8000**
