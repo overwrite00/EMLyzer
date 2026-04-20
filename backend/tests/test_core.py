@@ -657,6 +657,128 @@ class TestNLPClassifier:
 
 
 # ─────────────────────────────────────────────
+# Test: v0.14.0 — Omoglifi + NLP LR + LanguageTool
+# ─────────────────────────────────────────────
+
+class TestBodyAnalyzerV14:
+    """Test per le feature introdotte in v0.14.0."""
+
+    # ── Omoglifi Unicode ──
+
+    def test_homoglyphs_detected_high(self):
+        """≥3 caratteri cirillici nel testo → finding HIGH."""
+        # 'а' (U+0430, cirillico), 'е' (U+0435), 'о' (U+043E), 'р' (U+0440)
+        cyrillic_text = "Urgеnt: vеrify уour аccount nоw"  # е,у,а,о = cirillico
+        from core.analysis.body_analyzer import _check_homoglyphs
+        from core.analysis.body_analyzer import BodyAnalysisResult
+        result = BodyAnalysisResult()
+        _check_homoglyphs(cyrillic_text, result)
+        hom_findings = [f for f in result.findings if f.category == "text"
+                        and "Unicode" in f.description or "spoofing" in f.description.lower()]
+        # Trova il finding omoglifi
+        hom = [f for f in result.findings if f.category == "text"]
+        assert len(hom) >= 1
+        assert hom[0].severity == "high"
+
+    def test_homoglyphs_few_low(self):
+        """1-2 caratteri cirillici → finding LOW."""
+        # Solo 'а' (U+0430) e 'е' (U+0435)
+        text = "Deаr client"  # а = cirillico
+        from core.analysis.body_analyzer import _check_homoglyphs, BodyAnalysisResult
+        result = BodyAnalysisResult()
+        _check_homoglyphs(text, result)
+        hom = [f for f in result.findings if f.category == "text"]
+        assert len(hom) == 1
+        assert hom[0].severity == "low"
+
+    def test_homoglyphs_clean_no_finding(self):
+        """Testo ASCII puro → nessun finding omoglifi."""
+        from core.analysis.body_analyzer import _check_homoglyphs, BodyAnalysisResult
+        result = BodyAnalysisResult()
+        _check_homoglyphs("Hello dear customer please verify your account", result)
+        assert len(result.findings) == 0
+
+    def test_homoglyphs_empty_text_no_error(self):
+        """Testo vuoto → nessun errore, nessun finding."""
+        from core.analysis.body_analyzer import _check_homoglyphs, BodyAnalysisResult
+        result = BodyAnalysisResult()
+        _check_homoglyphs("", result)
+        assert len(result.findings) == 0
+
+    # ── NLP LogisticRegression (invarianza rispetto a MultinomialNB) ──
+
+    def test_nlp_lr_phishing_detected(self):
+        """LR deve classificare testi phishing noti come phishing/suspicious."""
+        from core.analysis.nlp_classifier import classify_text
+        samples = [
+            "urgent your account suspended verify credentials immediately click here",
+            "dear customer your paypal account has been limited please update information",
+            "congratulations you have won a prize claim your reward enter your details",
+        ]
+        for text in samples:
+            r = classify_text(text)
+            assert r.available, f"LR non disponibile per: {text}"
+            assert r.label in ("phishing", "suspicious"), \
+                f"Atteso phishing/suspicious, ottenuto {r.label!r} per: {text}"
+
+    def test_nlp_lr_legitimate_not_flagged(self):
+        """LR non deve classificare email legittime come phishing."""
+        from core.analysis.nlp_classifier import classify_text
+        samples = [
+            "meeting scheduled for tomorrow at 3pm please confirm your attendance",
+            "attached is the quarterly report for your review please provide feedback",
+            "pull request merged into main branch all tests passing deployment complete",
+        ]
+        for text in samples:
+            r = classify_text(text)
+            assert r.available
+            assert r.phishing_probability < 0.75, \
+                f"Probabilità troppo alta ({r.phishing_probability}) per: {text}"
+
+    # ── LanguageTool (opzionale) ──
+
+    def test_languagetool_skipped_no_url(self):
+        """Con LANGUAGETOOL_API_URL vuoto: nessun finding, nessun errore."""
+        from core.analysis.body_analyzer import _check_languagetool, BodyAnalysisResult
+        from utils.config import settings
+        original = settings.LANGUAGETOOL_API_URL
+        try:
+            settings.LANGUAGETOOL_API_URL = ""
+            result = BodyAnalysisResult()
+            _check_languagetool("This text has many errors gramatical yes", result)
+            assert len(result.findings) == 0
+        finally:
+            settings.LANGUAGETOOL_API_URL = original
+
+    def test_languagetool_skipped_empty_body(self):
+        """Con testo vuoto: nessun finding, nessun errore anche se URL configurato."""
+        from core.analysis.body_analyzer import _check_languagetool, BodyAnalysisResult
+        from utils.config import settings
+        original = settings.LANGUAGETOOL_API_URL
+        try:
+            settings.LANGUAGETOOL_API_URL = "http://localhost:19999"  # porta non in ascolto
+            result = BodyAnalysisResult()
+            _check_languagetool("", result)
+            assert len(result.findings) == 0
+        finally:
+            settings.LANGUAGETOOL_API_URL = original
+
+    def test_languagetool_connection_error_silent(self):
+        """Errore di connessione → silenzioso, nessun finding, nessuna eccezione."""
+        from core.analysis.body_analyzer import _check_languagetool, BodyAnalysisResult
+        from utils.config import settings
+        original = settings.LANGUAGETOOL_API_URL
+        try:
+            settings.LANGUAGETOOL_API_URL = "http://127.0.0.1:19999"  # porta sicuramente chiusa
+            result = BodyAnalysisResult()
+            _check_languagetool("This is some text with possible errors in it.", result)
+            # Nessuna eccezione e nessun finding (connection refused)
+            assert len(result.findings) == 0
+        finally:
+            settings.LANGUAGETOOL_API_URL = original
+
+
+# ─────────────────────────────────────────────
 # Test: PATCH notes e WHOIS toggle (HTTP)
 # ─────────────────────────────────────────────
 
@@ -879,3 +1001,164 @@ class TestCampaignDetector:
             # Test con threshold personalizzato
             r2 = await c.get("/api/campaigns/?threshold=0.8&min_size=2")
             assert r2.status_code == 200
+
+
+# ─────────────────────────────────────────────
+# Test: Header Analyzer v0.13.0
+# (List-Unsubscribe, X-Campaign-ID, ARC chain)
+# ─────────────────────────────────────────────
+
+class TestHeaderAnalyzerV13:
+    """Test per i nuovi check header introdotti in v0.13.0."""
+
+    def _make_parsed(self, **kwargs):
+        """Crea un ParsedEmail minimale con i campi specificati."""
+        return ParsedEmail(
+            mail_from=kwargs.get("mail_from", "sender@example.com"),
+            list_unsubscribe=kwargs.get("list_unsubscribe", ""),
+            x_campaign_id=kwargs.get("x_campaign_id", ""),
+            arc_seal_raw=kwargs.get("arc_seal_raw", []),
+            arc_message_signature_raw=kwargs.get("arc_message_signature_raw", []),
+            arc_authentication_results_raw=kwargs.get("arc_authentication_results_raw", []),
+        )
+
+    # ── List-Unsubscribe ──
+
+    def test_list_unsub_absent_no_finding(self):
+        p = self._make_parsed(list_unsubscribe="")
+        result = analyze_headers(p)
+        unsub_findings = [f for f in result.findings if f.field == "List-Unsubscribe"]
+        assert len(unsub_findings) == 0
+
+    def test_list_unsub_same_domain_info(self):
+        p = self._make_parsed(
+            mail_from="newsletter@example.com",
+            list_unsubscribe="<https://example.com/unsub?id=123>",
+        )
+        result = analyze_headers(p)
+        unsub_findings = [f for f in result.findings if f.field == "List-Unsubscribe"]
+        assert len(unsub_findings) == 1
+        assert unsub_findings[0].severity == "info"
+
+    def test_list_unsub_external_domain_medium(self):
+        p = self._make_parsed(
+            mail_from="sender@legit.com",
+            list_unsubscribe="<https://tracking.external-domain.com/unsub>",
+        )
+        result = analyze_headers(p)
+        unsub_findings = [f for f in result.findings if f.field == "List-Unsubscribe"]
+        severities = {f.severity for f in unsub_findings}
+        assert "medium" in severities
+
+    def test_list_unsub_http_low(self):
+        p = self._make_parsed(
+            mail_from="sender@example.com",
+            list_unsubscribe="<http://example.com/unsub>",
+        )
+        result = analyze_headers(p)
+        unsub_findings = [f for f in result.findings if f.field == "List-Unsubscribe"]
+        severities = {f.severity for f in unsub_findings}
+        assert "low" in severities
+
+    def test_list_unsub_ip_high(self):
+        p = self._make_parsed(
+            mail_from="sender@example.com",
+            list_unsubscribe="<http://185.0.0.1/unsub>",
+        )
+        result = analyze_headers(p)
+        unsub_findings = [f for f in result.findings if f.field == "List-Unsubscribe"]
+        severities = {f.severity for f in unsub_findings}
+        assert "high" in severities
+
+    def test_list_unsub_malformed_low(self):
+        p = self._make_parsed(list_unsubscribe="no-angle-brackets-here")
+        result = analyze_headers(p)
+        unsub_findings = [f for f in result.findings if f.field == "List-Unsubscribe"]
+        assert len(unsub_findings) == 1
+        assert unsub_findings[0].severity == "low"
+
+    # ── X-Campaign-ID ──
+
+    def test_campaign_id_absent_no_finding(self):
+        p = self._make_parsed(x_campaign_id="")
+        result = analyze_headers(p)
+        camp_findings = [f for f in result.findings if f.field == "X-Campaign-ID"]
+        assert len(camp_findings) == 0
+
+    def test_campaign_id_detected_info(self):
+        p = self._make_parsed(x_campaign_id="campaign-2024-abc")
+        result = analyze_headers(p)
+        camp_findings = [f for f in result.findings if f.field == "X-Campaign-ID"]
+        assert any(f.severity == "info" for f in camp_findings)
+
+    def test_campaign_id_no_unsub_low(self):
+        p = self._make_parsed(x_campaign_id="phish-campaign-001", list_unsubscribe="")
+        result = analyze_headers(p)
+        camp_findings = [f for f in result.findings if f.field == "X-Campaign-ID"]
+        # Deve esserci il finding INFO + il finding LOW per assenza List-Unsubscribe
+        assert len(camp_findings) == 2
+        severities = {f.severity for f in camp_findings}
+        assert "low" in severities
+
+    def test_campaign_id_with_unsub_only_info(self):
+        p = self._make_parsed(
+            x_campaign_id="camp-001",
+            list_unsubscribe="<https://example.com/unsub>",
+        )
+        result = analyze_headers(p)
+        camp_findings = [f for f in result.findings if f.field == "X-Campaign-ID"]
+        # Solo il finding INFO, nessun LOW (List-Unsubscribe presente)
+        assert len(camp_findings) == 1
+        assert camp_findings[0].severity == "info"
+
+    def test_phishing_sample_has_campaign_finding(self, phishing_email):
+        """Il sample phishing ha X-Campaign-ID: phish-campaign-001."""
+        result = analyze_headers(phishing_email)
+        camp_findings = [f for f in result.findings if f.field == "X-Campaign-ID"]
+        assert len(camp_findings) >= 1
+
+    # ── ARC chain ──
+
+    def test_arc_absent_no_finding(self):
+        p = self._make_parsed(arc_seal_raw=[])
+        result = analyze_headers(p)
+        arc_findings = [f for f in result.findings if f.field == "ARC-Seal"]
+        assert len(arc_findings) == 0
+
+    def test_arc_single_valid_info(self):
+        p = self._make_parsed(arc_seal_raw=["i=1; a=rsa-sha256; cv=none; d=example.com; s=arc"])
+        result = analyze_headers(p)
+        arc_findings = [f for f in result.findings if f.field == "ARC-Seal"]
+        assert len(arc_findings) == 1
+        assert arc_findings[0].severity == "info"
+
+    def test_arc_chain_cv_fail_high(self):
+        p = self._make_parsed(arc_seal_raw=[
+            "i=1; a=rsa-sha256; cv=none; d=example.com; s=arc",
+            "i=2; a=rsa-sha256; cv=fail; d=other.com; s=arc",
+        ])
+        result = analyze_headers(p)
+        arc_findings = [f for f in result.findings if f.field == "ARC-Seal"]
+        assert len(arc_findings) == 1
+        assert arc_findings[0].severity == "high"
+
+    def test_arc_chain_gap_medium(self):
+        # Sequenza con gap: i=1 e i=3 (manca i=2)
+        p = self._make_parsed(arc_seal_raw=[
+            "i=1; a=rsa-sha256; cv=none; d=example.com; s=arc",
+            "i=3; a=rsa-sha256; cv=pass; d=example.com; s=arc",
+        ])
+        result = analyze_headers(p)
+        arc_findings = [f for f in result.findings if f.field == "ARC-Seal"]
+        assert len(arc_findings) == 1
+        assert arc_findings[0].severity == "medium"
+
+    def test_arc_chain_two_hops_valid_info(self):
+        p = self._make_parsed(arc_seal_raw=[
+            "i=1; a=rsa-sha256; cv=none; d=hop1.com; s=arc",
+            "i=2; a=rsa-sha256; cv=pass; d=hop2.com; s=arc",
+        ])
+        result = analyze_headers(p)
+        arc_findings = [f for f in result.findings if f.field == "ARC-Seal"]
+        assert len(arc_findings) == 1
+        assert arc_findings[0].severity == "info"

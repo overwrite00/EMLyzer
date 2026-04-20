@@ -9,8 +9,9 @@ Struttura:
   4. Analisi Contenuto (Body + URL)
   5. Allegati
   6. Reputazione
-  7. Valutazione del Rischio
-  8. Note Manuali (sezione editabile)
+  7. Campagne Rilevate
+  8. Valutazione del Rischio
+  9. Note Manuali (sezione editabile)
 """
 
 from pathlib import Path
@@ -69,7 +70,7 @@ def _add_finding_row(doc: Document, severity: str, description: str, evidence: s
         ev_run.font.color.rgb = RGBColor(0x78, 0x78, 0x78)
 
 
-def generate_report(record, output_path: Path):
+def generate_report(record, output_path: Path, campaign_clusters: list | None = None):
     doc = Document()
 
     # Stile base
@@ -277,8 +278,11 @@ def generate_report(record, output_path: Path):
             doc.add_paragraph()
             _add_heading(doc, section_label, level=2)
             for r in results:
-                # Servizi informativi (ASN, crt.sh, Redirect Chain) → mostra solo il dettaglio
-                info_services = {"ASN Lookup", "crt.sh", "Redirect Chain", "Shodan InternetDB"}
+                # Servizi informativi → mostra solo il dettaglio (nessun verdetto malicious)
+                info_services = {
+                    "ASN Lookup", "crt.sh", "Redirect Chain",
+                    "Shodan InternetDB", "CIRCL Passive DNS", "SecurityTrails",
+                }
                 if r.get("source") in info_services:
                     if r.get("detail") and not r.get("error"):
                         doc.add_paragraph(
@@ -314,9 +318,38 @@ def generate_report(record, output_path: Path):
     doc.add_page_break()
 
     # ------------------------------------------------------------------ #
-    # 7. VALUTAZIONE DEL RISCHIO
+    # 7. CAMPAGNE RILEVATE
     # ------------------------------------------------------------------ #
-    _add_heading(doc, "7. Valutazione del Rischio")
+    _add_heading(doc, "7. Campagne Rilevate")
+
+    if campaign_clusters:
+        _add_kv(doc, "Cluster di campagna", str(len(campaign_clusters)))
+        for cluster in campaign_clusters:
+            doc.add_paragraph()
+            _add_heading(doc, f"Cluster: {cluster.cluster_id[:16]}…", level=2)
+            _add_kv(doc, "Tipo similarità", cluster.similarity_type)
+            _add_kv(doc, "Descrizione", cluster.description)
+            _add_kv(doc, "Email nel cluster", str(cluster.email_count))
+            _add_kv(doc, "Risk score massimo", f"{cluster.max_risk_score:.1f}/100")
+            if cluster.first_seen:
+                _add_kv(doc, "Prima osservazione", cluster.first_seen[:10])
+            if cluster.last_seen:
+                _add_kv(doc, "Ultima osservazione", cluster.last_seen[:10])
+            if cluster.common_value:
+                _add_kv(doc, "Valore comune", cluster.common_value[:200])
+    else:
+        p = doc.add_paragraph(
+            "Questa email non appartiene a nessun cluster di campagna rilevato. "
+            "Per un'analisi multi-email usa la sezione Campagne nell'interfaccia."
+        )
+        p.runs[0].italic = True
+
+    doc.add_page_break()
+
+    # ------------------------------------------------------------------ #
+    # 8. VALUTAZIONE DEL RISCHIO
+    # ------------------------------------------------------------------ #
+    _add_heading(doc, "8. Valutazione del Rischio")
 
     p = doc.add_paragraph()
     p.add_run(f"Score finale: ").bold = True
@@ -339,9 +372,9 @@ def generate_report(record, output_path: Path):
     doc.add_page_break()
 
     # ------------------------------------------------------------------ #
-    # 8. NOTE MANUALI (sezione editabile)
+    # 9. NOTE MANUALI (sezione editabile)
     # ------------------------------------------------------------------ #
-    _add_heading(doc, "8. Note dell'Analista")
+    _add_heading(doc, "9. Note dell'Analista")
 
     if record.analyst_notes:
         doc.add_paragraph(record.analyst_notes)

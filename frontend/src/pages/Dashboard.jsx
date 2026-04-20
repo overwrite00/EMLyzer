@@ -399,11 +399,23 @@ export default function Dashboard() {
                       title={t('action.delete')}
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', color: 'var(--text-muted)',
-                        fontSize: 14, opacity: 0.5,
+                        cursor: 'pointer',
+                        width: 28, height: 28, borderRadius: 6,
+                        fontSize: 14,
+                        color: 'var(--text-secondary)',
+                        border: '1px solid var(--border-light)',
+                        background: 'transparent',
                       }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                      onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'var(--risk-high-bg)';
+                        e.currentTarget.style.color = 'var(--risk-high)';
+                        e.currentTarget.style.borderColor = 'var(--risk-high)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-secondary)';
+                        e.currentTarget.style.borderColor = 'var(--border-light)';
+                      }}
                     >
                       🗑
                     </div>

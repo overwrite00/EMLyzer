@@ -55,6 +55,11 @@ class ParsedEmail:
     received_spf_raw: str = ""                                       # primo Received-SPF grezzo
     auth_results_raw: list[str] = field(default_factory=list)       # tutti gli Authentication-Results
 
+    # ARC chain — header grezzi (possono essere multipli: i=1, i=2, ...)
+    arc_seal_raw: list[str] = field(default_factory=list)
+    arc_message_signature_raw: list[str] = field(default_factory=list)
+    arc_authentication_results_raw: list[str] = field(default_factory=list)
+
     # Raw headers dict (all headers, lowercased keys)
     raw_headers: dict = field(default_factory=dict)
 
@@ -226,6 +231,11 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
     parsed.dkim_signatures_raw = get_headers("DKIM-Signature")
     received_spf_list          = get_headers("Received-SPF")
     parsed.received_spf_raw    = received_spf_list[0] if received_spf_list else ""
+
+    # ARC chain (multi-value: un header per ogni hop i=1, i=2, ...)
+    parsed.arc_seal_raw                  = get_headers("ARC-Seal")
+    parsed.arc_message_signature_raw     = get_headers("ARC-Message-Signature")
+    parsed.arc_authentication_results_raw = get_headers("ARC-Authentication-Results")
 
     # Fallback SPF da Received-SPF (fix: keyword vuota causava match su qualsiasi '=')
     if not parsed.spf_result and parsed.received_spf_raw:

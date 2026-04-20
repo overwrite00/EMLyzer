@@ -1,5 +1,7 @@
 # 🔍 EMLyzer
 
+![EMLyzer](images/emlyzer_cover.png)
+
 **Piattaforma open-source di analisi delle email** per identificare spam, phishing e contenuti malevoli.
 
 EMLyzer permette di analizzare un'email sospetta caricando il file `.eml` o `.msg`, oppure incollando direttamente il sorgente, e ottiene in pochi secondi un **rapporto completo** con punteggio di rischio spiegabile, analisi degli header, del corpo, degli URL, degli allegati e dei servizi di reputazione.
@@ -14,6 +16,7 @@ EMLyzer permette di analizzare un'email sospetta caricando il file `.eml` o `.ms
 |---|---|
 | [docs/REQUISITI.md](docs/REQUISITI.md) | Requisiti di sistema, software necessario |
 | [docs/INSTALLAZIONE.md](docs/INSTALLAZIONE.md) | Guida installazione passo-passo (Windows e Linux) |
+| [docs/CONFIGURAZIONE.md](docs/CONFIGURAZIONE.md) | Configurazione `.env`, API key servizi di reputazione |
 | [docs/UTILIZZO.md](docs/UTILIZZO.md) | Come usare l'applicazione, tutte le funzioni |
 | [docs/API.md](docs/API.md) | Riferimento API REST (per sviluppatori) |
 
@@ -66,7 +69,12 @@ Email (.eml / .msg / testo incollato)
 │                       OpenPhish, PhishTank, │
 │                       Shodan, URLhaus,      │
 │                       ThreatFox, crt.sh,   │
-│                       MalwareBazaar        │
+│                       MalwareBazaar,       │
+│                       CIRCL Passive DNS,   │
+│                       GreyNoise, URLScan,  │
+│                       Pulsedive, CriminalIP│
+│                       SecurityTrails,      │
+│                       Hybrid Analysis      │
 └─────────────────────────────────────────────┘
          │
          ▼
@@ -77,7 +85,7 @@ Email (.eml / .msg / testo incollato)
 
 ## 🔧 Versione
 
-**v0.10.3** — Python 3.11–3.13, 94 test automatici, Windows + Linux
+**v0.14.1** — Python 3.11–3.13, 119 test automatici, Windows + Linux
 
 ---
 

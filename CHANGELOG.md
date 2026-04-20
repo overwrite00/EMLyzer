@@ -13,30 +13,30 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ### Reputazione — nuovi servizi (priorità alta)
 
-- [ ] **CIRCL Passive DNS** — storico risoluzione DNS per IP e domini; gratuito con registrazione
-- [ ] **GreyNoise Community** — distingue scanner innocui da attori malevoli, riduce falsi positivi; free tier 100 req/g
-- [ ] **URLScan.io** — analisi completa URL con screenshot; free tier 100 req/h
-- [ ] **Pulsedive** — threat intel aggregata su IP/URL/domini; free tier 30 req/min
-- [ ] **Criminal IP** — threat score IP con geolocalizzazione; free tier
-- [ ] **SecurityTrails** — Passive DNS e WHOIS storico per tracciare infrastrutture; 50 req/mese free
-- [ ] **Hybrid Analysis** — analisi statica avanzata hash allegati; gratuito con registrazione
+- [x] **CIRCL Passive DNS** — storico risoluzione DNS per IP e domini; gratuito con registrazione *(v0.11.0)*
+- [x] **GreyNoise Community** — distingue scanner innocui da attori malevoli, riduce falsi positivi; free tier 100 req/g *(v0.12.0)*
+- [x] **URLScan.io** — analisi completa URL con screenshot; free tier 100 req/h *(v0.12.0)*
+- [x] **Pulsedive** — threat intel aggregata su IP/URL/domini; free tier 30 req/min *(v0.12.0)*
+- [x] **Criminal IP** — threat score IP con geolocalizzazione; free tier *(v0.12.0)*
+- [x] **SecurityTrails** — DNS attuale e storico per domini; 50 req/mese free *(v0.12.0)*
+- [x] **Hybrid Analysis** — analisi statica avanzata hash allegati; gratuito con registrazione *(v0.12.0)*
 
 ### Header analysis (priorità media)
 
-- [ ] **List-Unsubscribe** — analisi link di unsubscribe (dominio diverso dal mittente, URL sospetti)
-- [ ] **X-Campaign-ID** — analisi del campo già estratto: correlazione campagne bulk, pattern sospetti
-- [ ] **ARC chain** (Authenticated Received Chain) — rilevante per phishing via account compromessi e forwarding
+- [x] **List-Unsubscribe** — analisi link di unsubscribe (dominio diverso dal mittente, URL sospetti) *(v0.13.0)*
+- [x] **X-Campaign-ID** — analisi del campo già estratto: correlazione campagne bulk, pattern sospetti *(v0.13.0)*
+- [x] **ARC chain** (Authenticated Received Chain) — rilevante per phishing via account compromessi e forwarding *(v0.13.0)*
 
 ### Body analysis (priorità media)
 
-- [ ] **Rilevamento errori grammaticali** — integrazione LanguageTool (locale o API) per testi tradotti/generati automaticamente
-- [ ] **Logistic regression NLP** — miglioramento classificatore attuale (Naive Bayes); migliore calibrazione probabilità
-- [ ] **Dataset Enron/Nazario** — riaddestramento modello NLP con dataset pubblici per migliorare la generalizzazione
-- [ ] **Omoglifi e Unicode spoofing** — rilevamento caratteri Unicode visivamente identici a caratteri latini nel testo (es. `а` cirillica)
+- [x] **Rilevamento errori grammaticali** — integrazione LanguageTool (locale o API) per testi tradotti/generati automaticamente *(v0.14.0)*
+- [x] **Logistic regression NLP** — miglioramento classificatore attuale (Naive Bayes); migliore calibrazione probabilità *(v0.14.0)*
+- [x] **Dataset Enron/Nazario** — riaddestramento modello NLP con dataset pubblici per migliorare la generalizzazione *(v0.14.0)*
+- [x] **Omoglifi e Unicode spoofing** — rilevamento caratteri Unicode visivamente identici a caratteri latini nel testo (es. `а` cirillica) *(v0.14.0)*
 
 ### Report (priorità media)
 
-- [ ] **Sezione Campagne nel .docx** — la sezione Campagne Rilevate esiste nella UI ma non viene inclusa nel report Word generato
+- [x] **Sezione Campagne nel .docx** — la sezione Campagne Rilevate esiste nella UI e ora viene inclusa nel report Word generato *(v0.13.0)*
 
 ### Infrastruttura (priorità bassa)
 
@@ -45,6 +45,63 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 - [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
 - [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
 - [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
+
+---
+
+## [0.14.1] — 2026-04-20
+
+### Corretto
+- **Aggiornamento informazioni piani gratuiti servizi reputazione**: i limiti pubblicati in v0.12.0 per 5 servizi erano diventati obsoleti. Aggiornati commenti in `config.py`, `.env.example`, `_SERVICE_DEFS` in `connectors.py`, `ServicePreview` in `TabReputation.jsx` e tutta la documentazione:
+  - **GreyNoise Community**: 100 req/g → ~50 ricerche/settimana (community tier)
+  - **URLScan.io**: 100 req/h → 1.000 ricerche/g con chiave (ricerca pubblica senza chiave con limiti ridotti)
+  - **Pulsedive**: 30 req/min → **10 req/g** (riduzione significativa da marzo 2024)
+  - **Criminal IP**: "free tier" generica → "free con crediti limitati"
+  - **SecurityTrails**: 50 req/mese free → **NESSUN PIANO FREE** (solo trial temporaneo; da ~$11k/anno)
+- Aggiunta sezione `⚠️ Nota sui piani gratuiti (aggiornamento 2025)` in `docs/CONFIGURAZIONE.md` con tabella riepilogativa dello stato attuale.
+- Aggiunta prominente avviso in `docs/CONFIGURAZIONE.md` che SecurityTrails non offre più un piano gratuito stabile.
+
+---
+
+## [0.14.0] — 2026-04-20
+
+### Aggiunto
+- **Rilevamento omoglifi Unicode**: nuova funzione `_check_homoglyphs` in `body_analyzer.py` con mappa inline di 39 caratteri Cirillici e Greci visivamente identici ai latini. Finding HIGH se ≥3 occorrenze, LOW se 1-2. Evidence mostra i caratteri sospetti trovati. Nessuna dipendenza esterna.
+- **Switch NLP: Naive Bayes → Logistic Regression**: il classificatore NLP passa da `MultinomialNB` a `LogisticRegression + MaxAbsScaler`. Migliore calibrazione delle probabilità, gestione ottimizzata di feature correlate. `MaxAbsScaler` necessario per input sparse TF-IDF. Estrazione top features aggiornata: usa `clf.coef_[0]` (coefficienti positivi = predice phishing) invece di `feature_log_prob_[1]`.
+- **Dataset NLP espanso**: da ~65 a ~165 campioni. Nuove categorie phishing (label=1): banking italiano (UniCredit, Intesa, PosteItaliane, INPS), Microsoft/Office365, sextortion, prize/419 fraud, rimborso fiscale, malware lure. Nuove categorie legittime (label=0): email HR (ferie, buste paga), notifiche GitHub, ricevute e-commerce, email italiane quotidiane, supporto tecnico. Bilanciamento ~50/50.
+- **LanguageTool grammar checker** (opzionale): nuova funzione `_check_languagetool` in `body_analyzer.py`. Se `LANGUAGETOOL_API_URL` è configurato in `.env`, analizza il corpo email (max 5000 caratteri). ≥5 errori grammaticali → finding MEDIUM "Possibili errori grammaticali". Silenzioso se il servizio non è disponibile o l'URL è vuoto.
+- Nuova chiave di configurazione `LANGUAGETOOL_API_URL` in `config.py` e `.env.example`.
+- 9 nuovi test in `TestBodyAnalyzerV14`.
+
+---
+
+## [0.13.0] — 2026-04-20
+
+### Aggiunto
+- **List-Unsubscribe header analysis**: rileva link di unsubscribe con dominio diverso dal mittente (MEDIUM), URL HTTP non sicuro (LOW), IP diretto (HIGH) e formato malformato (LOW). Finding INFO per email bulk legittime con header corretto.
+- **X-Campaign-ID header analysis**: finding INFO se il campo è presente; finding LOW aggiuntivo se manca il List-Unsubscribe (segnale di bulk email non conforme).
+- **ARC chain validation**: verifica sequenza `i=` degli header `ARC-Seal`. Finding HIGH se `cv=fail` (possibile manomissione in transito), MEDIUM se la sequenza è incompleta, INFO se la catena è valida. Nessun finding se ARC è assente (è opzionale).
+- **Sezione Campagne nel report .docx** (§7): al momento della generazione del report, i cluster di campagna rilevati che includono l'email vengono inclusi nel documento Word con cluster_id, tipo similarità, conteggio email, risk score massimo, prima/ultima osservazione.
+- Nuovi campi `ParsedEmail`: `arc_seal_raw`, `arc_message_signature_raw`, `arc_authentication_results_raw` (lista header multipli per hop ARC).
+- 16 nuovi test in `TestHeaderAnalyzerV13`.
+
+---
+
+## [0.12.0] — 2026-04-20
+
+### Aggiunto
+- **GreyNoise Community**: classifica IP come `malicious`, `benign` o `unknown`. Distingue scanner innocui (crawlers, ricercatori) da attori malevoli, riducendo i falsi positivi. Richiede `GREYNOISE_API_KEY` (100 req/g free). Fase FAST.
+- **URLScan.io**: ricerca scansioni esistenti per URL/domini nel database urlscan.io. Mostra verdetto, score e tag dell'ultima scansione disponibile. `URLSCAN_API_KEY` opzionale (ricerca pubblica disponibile anche senza chiave). Fase FAST.
+- **Pulsedive**: threat intel aggregata per IP e URL. Risk level `none`/`low`/`medium`/`high`/`critical` con risk factors dettagliati. Richiede `PULSEDIVE_API_KEY` (30 req/min free). Fase FAST.
+- **Criminal IP**: score rischio IP 0-4 (Safe/Low/Medium/High/Critical) con geolocalizzazione. Richiede `CRIMINALIP_API_KEY` (free tier). Fase FAST.
+- **SecurityTrails**: DNS attuale per domini — record A, MX, NS. Servizio informativo (icona ℹ️, come ASN Lookup e Shodan). Richiede `SECURITYTRAILS_API_KEY` (50 req/mese free). Fase FAST.
+- **Hybrid Analysis** (CrowdStrike Falcon): ricerca hash allegati nel database sandbox. `threat_level` 0-2 (no threat/suspicious/malicious) con verdict, tipo file e tag. Richiede `HYBRID_ANALYSIS_API_KEY` (gratuito con registrazione). Fase FAST.
+
+---
+
+## [0.11.0] — 2026-04-19
+
+### Aggiunto
+- **CIRCL Passive DNS**: nuovo servizio reputazione informativo per IP e domini. Interroga `pdns.circl.lu` per lo storico di risoluzione DNS: per un IP mostra i domini che vi hanno puntato storicamente; per un dominio mostra gli IP a cui ha risolto e i record A/AAAA/MX/NS/CNAME. Gratuito con registrazione (CIRCL_API_KEY in formato `username:password`). Fase FAST, classificato come informativo (icona ℹ️ nel frontend, come ASN Lookup e Shodan InternetDB).
 
 ---
 

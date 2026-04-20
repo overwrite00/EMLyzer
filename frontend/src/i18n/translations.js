@@ -229,6 +229,7 @@ export const translations = {
   "rep.service.asn":            { it: "ASN Lookup",     en: "ASN Lookup" },
   "rep.service.redirect_chain": { it: "Redirect Chain", en: "Redirect Chain" },
   "rep.service.crtsh":          { it: "crt.sh",         en: "crt.sh" },
+  "rep.service.circl_pdns":     { it: "CIRCL Passive DNS", en: "CIRCL Passive DNS" },
 
   // Fonti IP — tooltip
   "rep.ip_sources": {

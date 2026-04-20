@@ -120,6 +120,13 @@ Per usare i servizi di reputazione è necessaria una registrazione gratuita:
 | **URLhaus** | URL malware | `ABUSECH_API_KEY` | [auth.abuse.ch](https://auth.abuse.ch/) *(gratuito)* |
 | **ThreatFox** | IP, URL, hash IOC | `ABUSECH_API_KEY` | [auth.abuse.ch](https://auth.abuse.ch/) *(gratuito, stessa chiave)* |
 | **MalwareBazaar** | Hash allegati | `ABUSECH_API_KEY` | [auth.abuse.ch](https://auth.abuse.ch/) *(gratuito, stessa chiave)* |
+| **CIRCL Passive DNS** | IP, domini | `CIRCL_API_KEY` (`user:password`) | [circl.lu/pdns](https://www.circl.lu/pdns/) *(gratuito)* |
+| **GreyNoise Community** | IP | `GREYNOISE_API_KEY` | [greynoise.io](https://www.greynoise.io/) *(~50 req/settimana free)* |
+| **URLScan.io** | URL, domini | `URLSCAN_API_KEY` *(opzionale)* | [urlscan.io](https://urlscan.io/user/signup) *(1.000 ricerche/g con chiave)* |
+| **Pulsedive** | IP, URL | `PULSEDIVE_API_KEY` | [pulsedive.com](https://pulsedive.com/) *(10 req/g free — ridotto da mar 2024)* |
+| **Criminal IP** | IP | `CRIMINALIP_API_KEY` | [criminalip.io](https://www.criminalip.io/) *(free con crediti limitati)* |
+| **SecurityTrails** | Domini | `SECURITYTRAILS_API_KEY` | [securitytrails.com](https://securitytrails.com/app/account) *(⚠️ solo trial, nessun piano free)* |
+| **Hybrid Analysis** | Hash allegati | `HYBRID_ANALYSIS_API_KEY` | [hybrid-analysis.com](https://www.hybrid-analysis.com/signup) *(gratuito)* |
 | **OpenPhish** | URL phishing | *(nessuna)* | — |
 | **Spamhaus DROP** | IP | *(nessuna)* | — |
 | **ASN Lookup** | IP | *(nessuna)* | — |
