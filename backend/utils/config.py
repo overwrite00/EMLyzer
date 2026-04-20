@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "EMLyzer"
-    VERSION: str = "0.14.0"
+    VERSION: str = "0.14.1"
     DEBUG: bool = False
 
     # CORS - backend in produzione + Vite dev server
@@ -48,15 +48,15 @@ class Settings(BaseSettings):
     MALWAREBAZAAR_API_KEY: str = ""
     # CIRCL Passive DNS: formato "username:password" — registrazione gratuita su circl.lu/pdns
     CIRCL_API_KEY: str = ""
-    # GreyNoise Community: https://www.greynoise.io/ (100 req/g free)
+    # GreyNoise Community: https://www.greynoise.io/ (~50 ricerche/settimana free — community tier)
     GREYNOISE_API_KEY: str = ""
-    # URLScan.io: https://urlscan.io/user/signup (100 req/h free — opzionale per search)
+    # URLScan.io: https://urlscan.io/user/signup (1000 ricerche/g con chiave; search pubblico senza chiave con limiti ridotti — opzionale)
     URLSCAN_API_KEY: str = ""
-    # Pulsedive: https://pulsedive.com/dashboard/ (30 req/min free)
+    # Pulsedive: https://pulsedive.com/dashboard/ (10 req/g free — ridotto da 30/min a mar 2024)
     PULSEDIVE_API_KEY: str = ""
-    # Criminal IP: https://www.criminalip.io/ (free tier)
+    # Criminal IP: https://www.criminalip.io/ (free tier con crediti limitati — verifica limiti aggiornati sul sito)
     CRIMINALIP_API_KEY: str = ""
-    # SecurityTrails: https://securitytrails.com/app/account (50 req/mese free)
+    # SecurityTrails: https://securitytrails.com/app/account — NESSUN PIANO FREE (solo trial; prezzi enterprise da ~$11k/anno)
     SECURITYTRAILS_API_KEY: str = ""
     # Hybrid Analysis: https://www.hybrid-analysis.com/signup (gratuito con registrazione)
     HYBRID_ANALYSIS_API_KEY: str = ""

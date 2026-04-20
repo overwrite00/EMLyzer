@@ -48,6 +48,20 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.14.1] — 2026-04-20
+
+### Corretto
+- **Aggiornamento informazioni piani gratuiti servizi reputazione**: i limiti pubblicati in v0.12.0 per 5 servizi erano diventati obsoleti. Aggiornati commenti in `config.py`, `.env.example`, `_SERVICE_DEFS` in `connectors.py`, `ServicePreview` in `TabReputation.jsx` e tutta la documentazione:
+  - **GreyNoise Community**: 100 req/g → ~50 ricerche/settimana (community tier)
+  - **URLScan.io**: 100 req/h → 1.000 ricerche/g con chiave (ricerca pubblica senza chiave con limiti ridotti)
+  - **Pulsedive**: 30 req/min → **10 req/g** (riduzione significativa da marzo 2024)
+  - **Criminal IP**: "free tier" generica → "free con crediti limitati"
+  - **SecurityTrails**: 50 req/mese free → **NESSUN PIANO FREE** (solo trial temporaneo; da ~$11k/anno)
+- Aggiunta sezione `⚠️ Nota sui piani gratuiti (aggiornamento 2025)` in `docs/CONFIGURAZIONE.md` con tabella riepilogativa dello stato attuale.
+- Aggiunta prominente avviso in `docs/CONFIGURAZIONE.md` che SecurityTrails non offre più un piano gratuito stabile.
+
+---
+
 ## [0.14.0] — 2026-04-20
 
 ### Aggiunto

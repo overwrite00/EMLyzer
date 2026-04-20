@@ -57,6 +57,20 @@ Richiedono account con piano free: **AbuseIPDB**, **VirusTotal**.
 
 ---
 
+> ⚠️ **Nota sui piani gratuiti (aggiornamento 2025)**
+>
+> I piani gratuiti dei servizi di threat intelligence cambiano nel tempo. Verifica sempre il sito ufficiale prima di configurare una chiave.
+>
+> | Servizio | Stato piano free |
+> |---|---|
+> | **GreyNoise Community** | ✅ Free — ~50 ricerche/settimana (community tier) |
+> | **URLScan.io** | ✅ Free — 1.000 ricerche/g con chiave; search pubblico senza chiave |
+> | **Pulsedive** | ⚠️ Free ridotto — **10 req/giorno** (era 30/min prima di marzo 2024) |
+> | **Criminal IP** | ⚠️ Free con crediti — crediti iniziali limitati (verifica limiti aggiornati sul sito) |
+> | **SecurityTrails** | ❌ **Nessun piano free** — solo trial temporaneo; prezzi enterprise da ~$11k/anno |
+
+---
+
 ### AbuseIPDB
 
 Controlla la reputazione degli IP trovati negli header.
@@ -141,7 +155,7 @@ Classifica un IP come `malicious`, `benign` o `unknown`. Distingue i normali sca
 GREYNOISE_API_KEY=incolla_qui_la_tua_chiave
 ```
 
-**Limite gratuito:** 100 richieste al giorno.
+**Limite gratuito:** ~50 ricerche/settimana (community tier).
 
 ---
 
@@ -149,7 +163,7 @@ GREYNOISE_API_KEY=incolla_qui_la_tua_chiave
 
 Ricerca scansioni esistenti per URL e domini nel database di urlscan.io. Mostra il verdetto (`malicious`/`benign`) dell'ultima scansione disponibile con score e tag.
 
-> **Nota:** la ricerca funziona anche **senza API key** (accesso pubblico con rate limit ridotto). La chiave aumenta il limite e sblocca la funzione di invio nuove scansioni.
+> **Nota:** la ricerca funziona anche **senza API key** (accesso pubblico con limiti ridotti). La chiave aumenta il limite a 1.000 ricerche/giorno e sblocca funzioni avanzate.
 
 **Come registrarsi (opzionale):**
 1. Vai su [https://urlscan.io/user/signup](https://urlscan.io/user/signup)
@@ -160,13 +174,15 @@ Ricerca scansioni esistenti per URL e domini nel database di urlscan.io. Mostra 
 URLSCAN_API_KEY=incolla_qui_la_tua_chiave
 ```
 
-**Limite gratuito:** 100 ricerche/ora con chiave; accesso pubblico senza chiave più limitato.
+**Limite gratuito:** 1.000 ricerche/giorno con chiave; accesso pubblico senza chiave con limiti ridotti.
 
 ---
 
 ### Pulsedive
 
 Threat intelligence aggregata per IP e URL: assegna un livello di rischio (`none`/`low`/`medium`/`high`/`critical`) con i fattori di rischio specifici rilevati.
+
+> ⚠️ **Attenzione:** a partire da **marzo 2024** il piano free è stato ridotto a **10 richieste al giorno** (era 30 req/min). Con email che contengono molti URL o IP, la quota può essere esaurita rapidamente.
 
 **Come registrarsi:**
 1. Vai su [https://pulsedive.com/](https://pulsedive.com/)
@@ -177,7 +193,7 @@ Threat intelligence aggregata per IP e URL: assegna un livello di rischio (`none
 PULSEDIVE_API_KEY=incolla_qui_la_tua_chiave
 ```
 
-**Limite gratuito:** 30 richieste al minuto.
+**Limite gratuito:** 10 richieste al giorno (ridotto da marzo 2024).
 
 ---
 
@@ -194,7 +210,7 @@ Score di rischio IP su scala 0-4 (Safe / Low / Medium / High / Critical) con geo
 CRIMINALIP_API_KEY=incolla_qui_la_tua_chiave
 ```
 
-**Limite gratuito:** disponibile con free tier (limiti aggiornati sul sito).
+**Limite gratuito:** free tier con crediti iniziali limitati. Il piano usa un sistema a crediti — verifica i limiti aggiornati sul sito ufficiale.
 
 ---
 
@@ -202,18 +218,20 @@ CRIMINALIP_API_KEY=incolla_qui_la_tua_chiave
 
 DNS attuale per domini: record A, MX, NS. Servizio **informativo** (come ASN Lookup e Shodan), utile per tracciare l'infrastruttura del mittente.
 
-> ⚠️ **Attenzione:** il piano gratuito include solo **50 richieste al mese**. EMLyzer applica un rate limit molto conservativo (1 richiesta ogni 3 secondi) per non consumare il quota rapidamente.
+> ❌ **SecurityTrails non offre più un piano gratuito.** È disponibile solo un trial temporaneo (2.500 query/mese). I piani a pagamento partono da circa $11.000/anno (prezzi enterprise).
+>
+> Se non hai una licenza enterprise o un trial attivo, lascia `SECURITYTRAILS_API_KEY` vuota — EMLyzer funziona correttamente senza questo servizio.
 
-**Come registrarsi:**
+**Come attivare il trial:**
 1. Vai su [https://securitytrails.com/app/account](https://securitytrails.com/app/account)
-2. Crea un account gratuito
+2. Crea un account e attiva il trial
 3. Vai su **"Account"** → **"API Key"** → copia la chiave
 
 ```env
 SECURITYTRAILS_API_KEY=incolla_qui_la_tua_chiave
 ```
 
-**Limite gratuito:** 50 richieste al mese.
+**Limite:** solo trial temporaneo (2.500 query/mese); nessun piano free stabile.
 
 ---
 

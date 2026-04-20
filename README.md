@@ -85,7 +85,7 @@ Email (.eml / .msg / testo incollato)
 
 ## 🔧 Versione
 
-**v0.14.0** — Python 3.11–3.13, 119 test automatici, Windows + Linux
+**v0.14.1** — Python 3.11–3.13, 119 test automatici, Windows + Linux
 
 ---
 

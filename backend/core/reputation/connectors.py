@@ -100,11 +100,11 @@ _RATE_INTERVALS: dict[str, float] = {
     "openphish":    0.0,    # feed locale, nessun limit
     "spamhaus":     0.0,    # feed locale, nessun limit
     "circl":            0.5,    # CIRCL Passive DNS — nessun limite ufficiale, conservativo
-    "greynoise":        1.1,    # GreyNoise Community — 100 req/g free
-    "urlscan":          1.0,    # URLScan.io — 100 req/h free
-    "pulsedive":        2.5,    # Pulsedive — 30 req/min free
-    "criminalip":       1.1,    # Criminal IP — free tier, conservativo
-    "securitytrails":   3.0,    # SecurityTrails — 50 req/mese, molto conservativo
+    "greynoise":        1.1,    # GreyNoise Community — ~50 ricerche/settimana free
+    "urlscan":          1.0,    # URLScan.io — 1000 ricerche/g con chiave
+    "pulsedive":        2.5,    # Pulsedive — 10 req/g free (da mar 2024)
+    "criminalip":       1.1,    # Criminal IP — free con crediti limitati
+    "securitytrails":   3.0,    # SecurityTrails — SOLO trial/a pagamento; rate conservativo
     "hybridanalysis":   1.0,    # Hybrid Analysis — free con registrazione
 }
 
@@ -1596,22 +1596,22 @@ _SERVICE_DEFS = [
     ("ASN Lookup",        "ip",          False, "Autonomous System Number per ogni IP — no API key (ipinfo.io)"),
     ("Shodan InternetDB", "ip",          False, "Porte aperte, CVE e tag per ogni IP — no API key (Shodan)"),
     ("CIRCL Passive DNS", "ip+url",      True,  "Storico risoluzione DNS per IP e domini — gratuito con registrazione (circl.lu/pdns)"),
-    ("GreyNoise Community","ip",         True,  "Classifica IP come scanner/malicious/benign — 100 req/g free (greynoise.io)"),
-    ("Criminal IP",       "ip",          True,  "Score rischio IP 0-4 con geolocalizzazione — free tier (criminalip.io)"),
+    ("GreyNoise Community","ip",         True,  "Classifica IP come scanner/malicious/benign — ~50 req/settimana free (greynoise.io)"),
+    ("Criminal IP",       "ip",          True,  "Score rischio IP 0-4 con geolocalizzazione — free tier con crediti (criminalip.io)"),
     # URL
     ("OpenPhish",         "url",         False, "Feed URL phishing — no API key richiesta"),
     ("PhishTank",         "url",         True,  "Database URL phishing verificati dalla community"),
     ("Redirect Chain",    "url",         False, "Segue i redirect degli URL shortener — no API key"),
     ("crt.sh",            "url",         False, "Certificati TLS emessi per il dominio — no API key"),
     ("URLhaus",           "url",         True,  "Database URL malware di abuse.ch (ABUSECH_API_KEY — auth.abuse.ch)"),
-    ("URLScan.io",        "url",         False, "Ricerca scansioni esistenti per URL/domini — URLSCAN_API_KEY opzionale (urlscan.io)"),
-    ("SecurityTrails",    "url",         True,  "DNS attuale e storico per domini — 50 req/mese free (securitytrails.com)"),
+    ("URLScan.io",        "url",         False, "Ricerca scansioni esistenti per URL/domini — URLSCAN_API_KEY opzionale; 1.000 ricerche/g con chiave (urlscan.io)"),
+    ("SecurityTrails",    "url",         True,  "DNS attuale per domini — SOLO TRIAL/A PAGAMENTO, nessun piano free (securitytrails.com)"),
     # Hash
     ("MalwareBazaar",     "hash",        True,  "Hash allegati nel database malware (ABUSECH_API_KEY o MALWAREBAZAAR_API_KEY)"),
     ("Hybrid Analysis",   "hash",        True,  "Analisi statica allegati nel database sandbox Falcon — gratuito con registrazione (hybrid-analysis.com)"),
     # Multi-tipo
     ("ThreatFox",         "ip+url+hash", True,  "Database IOC abuse.ch (IP, URL, hash) — ABUSECH_API_KEY — auth.abuse.ch"),
-    ("Pulsedive",         "ip+url",      True,  "Threat intel aggregata per IP e URL — 30 req/min free (pulsedive.com)"),
+    ("Pulsedive",         "ip+url",      True,  "Threat intel aggregata per IP e URL — 10 req/g free da mar 2024 (pulsedive.com)"),
 ]
 
 def _build_service_registry(all_results: list[ReputationResult]) -> list[dict]:
