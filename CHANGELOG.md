@@ -23,9 +23,9 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ### Header analysis (priorità media)
 
-- [ ] **List-Unsubscribe** — analisi link di unsubscribe (dominio diverso dal mittente, URL sospetti)
-- [ ] **X-Campaign-ID** — analisi del campo già estratto: correlazione campagne bulk, pattern sospetti
-- [ ] **ARC chain** (Authenticated Received Chain) — rilevante per phishing via account compromessi e forwarding
+- [x] **List-Unsubscribe** — analisi link di unsubscribe (dominio diverso dal mittente, URL sospetti) *(v0.13.0)*
+- [x] **X-Campaign-ID** — analisi del campo già estratto: correlazione campagne bulk, pattern sospetti *(v0.13.0)*
+- [x] **ARC chain** (Authenticated Received Chain) — rilevante per phishing via account compromessi e forwarding *(v0.13.0)*
 
 ### Body analysis (priorità media)
 
@@ -36,7 +36,7 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ### Report (priorità media)
 
-- [ ] **Sezione Campagne nel .docx** — la sezione Campagne Rilevate esiste nella UI ma non viene inclusa nel report Word generato
+- [x] **Sezione Campagne nel .docx** — la sezione Campagne Rilevate esiste nella UI e ora viene inclusa nel report Word generato *(v0.13.0)*
 
 ### Infrastruttura (priorità bassa)
 
@@ -45,6 +45,18 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 - [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
 - [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
 - [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
+
+---
+
+## [0.13.0] — 2026-04-20
+
+### Aggiunto
+- **List-Unsubscribe header analysis**: rileva link di unsubscribe con dominio diverso dal mittente (MEDIUM), URL HTTP non sicuro (LOW), IP diretto (HIGH) e formato malformato (LOW). Finding INFO per email bulk legittime con header corretto.
+- **X-Campaign-ID header analysis**: finding INFO se il campo è presente; finding LOW aggiuntivo se manca il List-Unsubscribe (segnale di bulk email non conforme).
+- **ARC chain validation**: verifica sequenza `i=` degli header `ARC-Seal`. Finding HIGH se `cv=fail` (possibile manomissione in transito), MEDIUM se la sequenza è incompleta, INFO se la catena è valida. Nessun finding se ARC è assente (è opzionale).
+- **Sezione Campagne nel report .docx** (§7): al momento della generazione del report, i cluster di campagna rilevati che includono l'email vengono inclusi nel documento Word con cluster_id, tipo similarità, conteggio email, risk score massimo, prima/ultima osservazione.
+- Nuovi campi `ParsedEmail`: `arc_seal_raw`, `arc_message_signature_raw`, `arc_authentication_results_raw` (lista header multipli per hop ARC).
+- 16 nuovi test in `TestHeaderAnalyzerV13`.
 
 ---
 

@@ -135,6 +135,52 @@ TRANSLATIONS = {
         "en": "ABSENT (no auth results found)",
     },
 
+    # ── List-Unsubscribe findings ─────────────────────────────────────────────
+    "header.list_unsub_present": {
+        "it": "List-Unsubscribe presente — email bulk legittima",
+        "en": "List-Unsubscribe present — legitimate bulk email",
+    },
+    "header.list_unsub_external_domain": {
+        "it": "List-Unsubscribe punta a un dominio esterno al mittente: {domain}",
+        "en": "List-Unsubscribe points to external sender domain: {domain}",
+    },
+    "header.list_unsub_http": {
+        "it": "List-Unsubscribe usa HTTP non sicuro (non HTTPS)",
+        "en": "List-Unsubscribe uses insecure HTTP (not HTTPS)",
+    },
+    "header.list_unsub_ip": {
+        "it": "List-Unsubscribe usa IP diretto invece di dominio",
+        "en": "List-Unsubscribe uses direct IP instead of domain",
+    },
+    "header.list_unsub_malformed": {
+        "it": "Header List-Unsubscribe malformato (formato non valido)",
+        "en": "Malformed List-Unsubscribe header (invalid format)",
+    },
+
+    # ── X-Campaign-ID findings ────────────────────────────────────────────────
+    "header.campaign_id_detected": {
+        "it": "X-Campaign-ID rilevato: {value}",
+        "en": "X-Campaign-ID detected: {value}",
+    },
+    "header.campaign_no_unsub": {
+        "it": "Email bulk con X-Campaign-ID ma senza List-Unsubscribe",
+        "en": "Bulk email with X-Campaign-ID but missing List-Unsubscribe",
+    },
+
+    # ── ARC chain findings ────────────────────────────────────────────────────
+    "header.arc_valid": {
+        "it": "ARC chain valida ({n} hop)",
+        "en": "ARC chain valid ({n} hops)",
+    },
+    "header.arc_incomplete": {
+        "it": "ARC chain incompleta — gap nella sequenza i= (trovati: {found})",
+        "en": "ARC chain incomplete — gap in i= sequence (found: {found})",
+    },
+    "header.arc_fail": {
+        "it": "ARC chain validation fallita (cv=fail) — possibile manomissione in transito",
+        "en": "ARC chain validation failed (cv=fail) — possible in-transit tampering",
+    },
+
     # ── Body analysis findings ────────────────────────────────────────────────
     "body.urgency_high": {
         "it": "Linguaggio di urgenza artificiale rilevato ({count} pattern)",

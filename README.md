@@ -83,7 +83,7 @@ Email (.eml / .msg / testo incollato)
 
 ## 🔧 Versione
 
-**v0.12.0** — Python 3.11–3.13, 94 test automatici, Windows + Linux
+**v0.13.0** — Python 3.11–3.13, 110 test automatici, Windows + Linux
 
 ---
 

@@ -660,6 +660,179 @@ def _check_missing_fields(parsed: ParsedEmail, result: HeaderAnalysisResult):
         ))
 
 
+def _check_list_unsubscribe(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """
+    Analizza l'header List-Unsubscribe.
+    Rileva: dominio esterno, HTTP non sicuro, IP diretto, formato malformato.
+    Finding INFO se presente e corretto (bulk legittimo).
+    """
+    value = parsed.list_unsubscribe.strip()
+    if not value:
+        return
+
+    from_domain = _extract_domain(parsed.mail_from)
+
+    # Estrai tutti gli URI/indirizzi tra < >
+    angle_items = re.findall(r"<([^>]+)>", value)
+    if not angle_items:
+        result.findings.append(HeaderFinding(
+            field="List-Unsubscribe",
+            severity="low",
+            description=t("header.list_unsub_malformed"),
+            evidence=value[:200],
+        ))
+        return
+
+    has_http = False
+    has_ip = False
+    external_domain = ""
+
+    for item in angle_items:
+        item = item.strip()
+        if item.lower().startswith("http://"):
+            has_http = True
+            # Controlla IP diretto
+            m_ip = re.match(r"https?://([\d.]+|[0-9a-fA-F:]+)[/:]", item)
+            if m_ip:
+                has_ip = True
+            # Controlla dominio esterno
+            m_dom = re.match(r"https?://([^/:?#]+)", item)
+            if m_dom and from_domain:
+                link_domain = m_dom.group(1).lower()
+                if not link_domain.endswith(from_domain):
+                    external_domain = link_domain
+        elif item.lower().startswith("https://"):
+            # Controlla IP diretto
+            m_ip = re.match(r"https?://([\d.]+)[/:]", item)
+            if m_ip:
+                has_ip = True
+            # Controlla dominio esterno
+            m_dom = re.match(r"https://([^/:?#]+)", item)
+            if m_dom and from_domain:
+                link_domain = m_dom.group(1).lower()
+                if not link_domain.endswith(from_domain):
+                    external_domain = link_domain
+        elif item.lower().startswith("mailto:"):
+            # Controlla dominio mailto vs mittente
+            m = re.search(r"@([\w.\-]+)", item)
+            if m and from_domain:
+                mailto_domain = m.group(1).lower()
+                if not mailto_domain.endswith(from_domain):
+                    external_domain = mailto_domain
+
+    if has_ip:
+        result.findings.append(HeaderFinding(
+            field="List-Unsubscribe",
+            severity="high",
+            description=t("header.list_unsub_ip"),
+            evidence=value[:200],
+        ))
+    elif has_http:
+        result.findings.append(HeaderFinding(
+            field="List-Unsubscribe",
+            severity="low",
+            description=t("header.list_unsub_http"),
+            evidence=value[:200],
+        ))
+
+    if external_domain:
+        result.findings.append(HeaderFinding(
+            field="List-Unsubscribe",
+            severity="medium",
+            description=t("header.list_unsub_external_domain", domain=external_domain),
+            evidence=value[:200],
+        ))
+
+    # Se nessun problema rilevato, finding informativo (bulk legittimo)
+    if not has_ip and not has_http and not external_domain:
+        result.findings.append(HeaderFinding(
+            field="List-Unsubscribe",
+            severity="info",
+            description=t("header.list_unsub_present"),
+            evidence=value[:200],
+        ))
+
+
+def _check_campaign_id(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """
+    Analizza l'header X-Campaign-ID.
+    Finding INFO se presente; LOW se manca il List-Unsubscribe.
+    """
+    value = parsed.x_campaign_id.strip()
+    if not value:
+        return
+
+    result.findings.append(HeaderFinding(
+        field="X-Campaign-ID",
+        severity="info",
+        description=t("header.campaign_id_detected", value=value[:100]),
+        evidence=f"X-Campaign-ID: {value[:100]}",
+    ))
+
+    # Bulk email senza List-Unsubscribe → segnale sospetto
+    if not parsed.list_unsubscribe.strip():
+        result.findings.append(HeaderFinding(
+            field="X-Campaign-ID",
+            severity="low",
+            description=t("header.campaign_no_unsub"),
+            evidence=f"X-Campaign-ID presente ({value[:60]}) ma List-Unsubscribe assente",
+        ))
+
+
+def _check_arc_chain(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """
+    Valida la catena ARC (Authenticated Received Chain).
+    Verifica sequenza i= negli ARC-Seal e cv= per manomissione.
+    Se ARC assente, nessun finding (è opzionale).
+    """
+    seals = parsed.arc_seal_raw
+    if not seals:
+        return  # ARC opzionale — assenza normale
+
+    # Estrai numeri i= da ciascun ARC-Seal
+    instances = []
+    has_fail = False
+    for seal in seals:
+        m_i = re.search(r"\bi=(\d+)", seal)
+        if m_i:
+            instances.append(int(m_i.group(1)))
+        m_cv = re.search(r"\bcv=(\w+)", seal, re.IGNORECASE)
+        if m_cv and m_cv.group(1).lower() == "fail":
+            has_fail = True
+
+    n = len(instances)
+
+    if has_fail:
+        result.findings.append(HeaderFinding(
+            field="ARC-Seal",
+            severity="high",
+            description=t("header.arc_fail"),
+            evidence=f"ARC-Seal cv=fail rilevato (catena: {sorted(instances)})",
+        ))
+        return
+
+    # Controlla che la sequenza sia continua: {1, 2, ..., n}
+    if instances:
+        expected = set(range(1, n + 1))
+        found_set = set(instances)
+        if found_set != expected:
+            found_str = ",".join(str(i) for i in sorted(found_set))
+            result.findings.append(HeaderFinding(
+                field="ARC-Seal",
+                severity="medium",
+                description=t("header.arc_incomplete", found=found_str),
+                evidence=f"Attesi: {sorted(expected)}, trovati: {sorted(found_set)}",
+            ))
+            return
+
+        result.findings.append(HeaderFinding(
+            field="ARC-Seal",
+            severity="info",
+            description=t("header.arc_valid", n=n),
+            evidence=f"Hop ARC: {sorted(instances)}",
+        ))
+
+
 def _compute_score(result: HeaderAnalysisResult) -> float:
     """Calcola un punteggio di rischio parziale basato sui findings."""
     weights = {"info": 0, "low": 5, "medium": 15, "high": 25}
@@ -678,6 +851,9 @@ def analyze_headers(parsed: ParsedEmail) -> HeaderAnalysisResult:
     _parse_received_chain(parsed, result)
     _check_originating_ip(parsed, result)
     _check_missing_fields(parsed, result)
+    _check_list_unsubscribe(parsed, result)
+    _check_campaign_id(parsed, result)
+    _check_arc_chain(parsed, result)
 
     result.score_contribution = _compute_score(result)
     return result
