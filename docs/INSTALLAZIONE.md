@@ -36,8 +36,6 @@ Fai doppio clic sul file scaricato (es. `python-3.13.2-amd64.exe`).
 
 > ⚠️ **IMPORTANTE:** Prima di cliccare "Install Now", assicurati di spuntare la casella **"Add Python 3.13 to PATH"** in basso. Se non la spunti, il computer non troverà Python quando lo cerca.
 
-![Schermata installer Python con casella PATH evidenziata]
-
 Poi clicca **"Install Now"** e aspetta che finisca.
 
 **Passo 3 — Verifica**

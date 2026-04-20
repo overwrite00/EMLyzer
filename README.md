@@ -25,7 +25,7 @@ EMLyzer permette di analizzare un'email sospetta caricando il file `.eml` o `.ms
 ## ⚡ Avvio rapido
 
 ### Windows
-1. Installa **Python 3.13** da [python.org](https://www.python.org/downloads/)
+1. Installa **Python 3.13** da [python.org](https://www.python.org/downloads/) *(spunta "Add Python to PATH")*
 2. Scarica e decomprimi il progetto
 3. Fai doppio clic su **`start.bat`**
 4. Apri il browser su **http://localhost:8000**
