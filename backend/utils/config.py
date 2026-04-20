@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "EMLyzer"
-    VERSION: str = "0.11.0"
+    VERSION: str = "0.12.0"
     DEBUG: bool = False
 
     # CORS - backend in produzione + Vite dev server
@@ -48,6 +48,18 @@ class Settings(BaseSettings):
     MALWAREBAZAAR_API_KEY: str = ""
     # CIRCL Passive DNS: formato "username:password" — registrazione gratuita su circl.lu/pdns
     CIRCL_API_KEY: str = ""
+    # GreyNoise Community: https://www.greynoise.io/ (100 req/g free)
+    GREYNOISE_API_KEY: str = ""
+    # URLScan.io: https://urlscan.io/user/signup (100 req/h free — opzionale per search)
+    URLSCAN_API_KEY: str = ""
+    # Pulsedive: https://pulsedive.com/dashboard/ (30 req/min free)
+    PULSEDIVE_API_KEY: str = ""
+    # Criminal IP: https://www.criminalip.io/ (free tier)
+    CRIMINALIP_API_KEY: str = ""
+    # SecurityTrails: https://securitytrails.com/app/account (50 req/mese free)
+    SECURITYTRAILS_API_KEY: str = ""
+    # Hybrid Analysis: https://www.hybrid-analysis.com/signup (gratuito con registrazione)
+    HYBRID_ANALYSIS_API_KEY: str = ""
 
     # Lingua interfaccia: it (italiano) o en (english)
     LANGUAGE: str = "it"

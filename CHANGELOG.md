@@ -14,12 +14,12 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 ### Reputazione — nuovi servizi (priorità alta)
 
 - [x] **CIRCL Passive DNS** — storico risoluzione DNS per IP e domini; gratuito con registrazione *(v0.11.0)*
-- [ ] **GreyNoise Community** — distingue scanner innocui da attori malevoli, riduce falsi positivi; free tier 100 req/g
-- [ ] **URLScan.io** — analisi completa URL con screenshot; free tier 100 req/h
-- [ ] **Pulsedive** — threat intel aggregata su IP/URL/domini; free tier 30 req/min
-- [ ] **Criminal IP** — threat score IP con geolocalizzazione; free tier
-- [ ] **SecurityTrails** — Passive DNS e WHOIS storico per tracciare infrastrutture; 50 req/mese free
-- [ ] **Hybrid Analysis** — analisi statica avanzata hash allegati; gratuito con registrazione
+- [x] **GreyNoise Community** — distingue scanner innocui da attori malevoli, riduce falsi positivi; free tier 100 req/g *(v0.12.0)*
+- [x] **URLScan.io** — analisi completa URL con screenshot; free tier 100 req/h *(v0.12.0)*
+- [x] **Pulsedive** — threat intel aggregata su IP/URL/domini; free tier 30 req/min *(v0.12.0)*
+- [x] **Criminal IP** — threat score IP con geolocalizzazione; free tier *(v0.12.0)*
+- [x] **SecurityTrails** — DNS attuale e storico per domini; 50 req/mese free *(v0.12.0)*
+- [x] **Hybrid Analysis** — analisi statica avanzata hash allegati; gratuito con registrazione *(v0.12.0)*
 
 ### Header analysis (priorità media)
 
@@ -45,6 +45,18 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 - [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
 - [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
 - [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
+
+---
+
+## [0.12.0] — 2026-04-20
+
+### Aggiunto
+- **GreyNoise Community**: classifica IP come `malicious`, `benign` o `unknown`. Distingue scanner innocui (crawlers, ricercatori) da attori malevoli, riducendo i falsi positivi. Richiede `GREYNOISE_API_KEY` (100 req/g free). Fase FAST.
+- **URLScan.io**: ricerca scansioni esistenti per URL/domini nel database urlscan.io. Mostra verdetto, score e tag dell'ultima scansione disponibile. `URLSCAN_API_KEY` opzionale (ricerca pubblica disponibile anche senza chiave). Fase FAST.
+- **Pulsedive**: threat intel aggregata per IP e URL. Risk level `none`/`low`/`medium`/`high`/`critical` con risk factors dettagliati. Richiede `PULSEDIVE_API_KEY` (30 req/min free). Fase FAST.
+- **Criminal IP**: score rischio IP 0-4 (Safe/Low/Medium/High/Critical) con geolocalizzazione. Richiede `CRIMINALIP_API_KEY` (free tier). Fase FAST.
+- **SecurityTrails**: DNS attuale per domini — record A, MX, NS. Servizio informativo (icona ℹ️, come ASN Lookup e Shodan). Richiede `SECURITYTRAILS_API_KEY` (50 req/mese free). Fase FAST.
+- **Hybrid Analysis** (CrowdStrike Falcon): ricerca hash allegati nel database sandbox. `threat_level` 0-2 (no threat/suspicious/malicious) con verdict, tipo file e tag. Richiede `HYBRID_ANALYSIS_API_KEY` (gratuito con registrazione). Fase FAST.
 
 ---
 

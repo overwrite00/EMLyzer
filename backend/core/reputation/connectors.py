@@ -99,7 +99,13 @@ _RATE_INTERVALS: dict[str, float] = {
     "threatfox":    0.3,    # ThreatFox abuse.ch
     "openphish":    0.0,    # feed locale, nessun limit
     "spamhaus":     0.0,    # feed locale, nessun limit
-    "circl":        0.5,    # CIRCL Passive DNS — nessun limite ufficiale, conservativo
+    "circl":            0.5,    # CIRCL Passive DNS — nessun limite ufficiale, conservativo
+    "greynoise":        1.1,    # GreyNoise Community — 100 req/g free
+    "urlscan":          1.0,    # URLScan.io — 100 req/h free
+    "pulsedive":        2.5,    # Pulsedive — 30 req/min free
+    "criminalip":       1.1,    # Criminal IP — free tier, conservativo
+    "securitytrails":   3.0,    # SecurityTrails — 50 req/mese, molto conservativo
+    "hybridanalysis":   1.0,    # Hybrid Analysis — free con registrazione
 }
 
 def _rate_limit(connector: str):
@@ -841,6 +847,462 @@ def check_domain_circl_pdns(domain: str) -> ReputationResult:
 
 
 # ---------------------------------------------------------------------------
+# GreyNoise Community — classifica IP come scanner/malicious/benign
+# ---------------------------------------------------------------------------
+
+def check_ip_greynoise(ip: str) -> ReputationResult:
+    """
+    GreyNoise Community API — classifica un IP come malicious, benign o unknown.
+    Distingue scanner innocui (noise=True) da attori malevoli, riducendo i falsi positivi.
+    Richiede GREYNOISE_API_KEY (100 req/g free).
+    """
+    api_key = settings.GREYNOISE_API_KEY.strip()
+    if not api_key:
+        return ReputationResult(
+            source="GreyNoise Community", entity=ip, entity_type="ip",
+            skipped=True, skip_reason="GREYNOISE_API_KEY non configurata — registrati su greynoise.io",
+        )
+    try:
+        resp = _http_get_with_retry(
+            f"https://api.greynoise.io/v3/community/{ip}",
+            headers={"key": api_key, "Accept": "application/json"},
+            timeout=REQUEST_TIMEOUT,
+            rate_key="greynoise",
+        )
+        if resp.status_code == 404:
+            return ReputationResult(
+                source="GreyNoise Community", entity=ip, entity_type="ip",
+                queried=True, detail="IP non presente nel database GreyNoise.",
+            )
+        if resp.status_code == 401:
+            return ReputationResult(
+                source="GreyNoise Community", entity=ip, entity_type="ip",
+                error="API key non valida (GREYNOISE_API_KEY)",
+            )
+        resp.raise_for_status()
+        data = resp.json()
+        classification = data.get("classification", "unknown")
+        noise = data.get("noise", False)
+        riot = data.get("riot", False)
+        name = data.get("name", "")
+        last_seen = (data.get("last_seen") or "")[:10]
+
+        malicious = classification == "malicious"
+        if riot:
+            detail = f"Servizio noto benigno: {name}" if name else "Servizio noto benigno"
+        elif noise and classification == "benign":
+            detail = f"Scanner benigno: {name}" if name else f"Scanner benigno ({classification})"
+        elif malicious:
+            detail = f"Malevolo — {name}" if name else "Classificato come malevolo"
+            if last_seen:
+                detail += f" | ultimo visto: {last_seen}"
+        else:
+            detail = f"Classificazione: {classification}"
+            if noise:
+                detail += " (attivo su internet)"
+            if last_seen:
+                detail += f" | ultimo visto: {last_seen}"
+
+        return ReputationResult(
+            source="GreyNoise Community", entity=ip, entity_type="ip",
+            queried=True, is_malicious=malicious,
+            confidence=90.0 if malicious else 0.0,
+            detail=detail,
+        )
+    except requests.HTTPError as e:
+        return ReputationResult(
+            source="GreyNoise Community", entity=ip, entity_type="ip",
+            error=f"GreyNoise HTTP {e.response.status_code if e.response is not None else '?'}",
+        )
+    except Exception as exc:
+        return ReputationResult(
+            source="GreyNoise Community", entity=ip, entity_type="ip",
+            error=f"GreyNoise: {type(exc).__name__}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# URLScan.io — ricerca scansioni esistenti per dominio
+# ---------------------------------------------------------------------------
+
+def check_url_urlscan(url: str) -> ReputationResult:
+    """
+    URLScan.io — cerca scansioni esistenti per il dominio dell'URL.
+    Restituisce il verdetto dell'ultima scansione disponibile.
+    URLSCAN_API_KEY opzionale per search (ma aumenta il rate limit).
+    """
+    try:
+        host = urllib.parse.urlparse(url).netloc.split(":")[0].lstrip("www.")
+        if not host:
+            return ReputationResult(
+                source="URLScan.io", entity=url, entity_type="url",
+                skipped=True, skip_reason="Impossibile estrarre il dominio dall'URL",
+            )
+        # Verifica che non sia un IP diretto (URLScan preferisce domini)
+        try:
+            ipaddress.ip_address(host)
+            is_ip = True
+        except ValueError:
+            is_ip = False
+    except Exception as exc:
+        return ReputationResult(
+            source="URLScan.io", entity=url, entity_type="url",
+            error=f"URLScan parse: {type(exc).__name__}",
+        )
+
+    query = host if not is_ip else url
+    headers: dict = {"Content-Type": "application/json"}
+    if settings.URLSCAN_API_KEY:
+        headers["API-Key"] = settings.URLSCAN_API_KEY.strip()
+
+    try:
+        resp = _http_get_with_retry(
+            "https://urlscan.io/api/v1/search/",
+            params={"q": f"page.domain:{query}", "size": "3", "sort": "date"},
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+            rate_key="urlscan",
+        )
+        if resp.status_code == 401:
+            return ReputationResult(
+                source="URLScan.io", entity=url, entity_type="url",
+                error="API key non valida (URLSCAN_API_KEY)",
+            )
+        resp.raise_for_status()
+        data = resp.json()
+        results = data.get("results", [])
+
+        if not results:
+            return ReputationResult(
+                source="URLScan.io", entity=url, entity_type="url",
+                queried=True, detail=f"Nessuna scansione trovata per {query}.",
+            )
+
+        latest = results[0]
+        verdict = latest.get("verdicts", {}).get("overall", {})
+        malicious = bool(verdict.get("malicious", False))
+        score = verdict.get("score", 0)
+        tags = verdict.get("tags", [])
+        scan_date = (latest.get("task", {}).get("time") or "")[:10]
+
+        tag_str = ", ".join(tags[:3]) if tags else ""
+        detail = f"{len(results)} scansion{'e' if len(results)==1 else 'i'} trovate"
+        if scan_date:
+            detail += f" | ultima: {scan_date}"
+        if score:
+            detail += f" | score: {score}"
+        if tag_str:
+            detail += f" | tag: {tag_str}"
+
+        return ReputationResult(
+            source="URLScan.io", entity=url, entity_type="url",
+            queried=True, is_malicious=malicious,
+            confidence=float(score) if malicious else 0.0,
+            detail=detail,
+        )
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else "?"
+        return ReputationResult(
+            source="URLScan.io", entity=url, entity_type="url",
+            error=f"URLScan HTTP {code}",
+        )
+    except Exception as exc:
+        return ReputationResult(
+            source="URLScan.io", entity=url, entity_type="url",
+            error=f"URLScan: {type(exc).__name__}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Pulsedive — threat intel aggregata per IP e URL
+# ---------------------------------------------------------------------------
+
+def _check_pulsedive(entity: str, entity_type: str) -> ReputationResult:
+    """Helper comune per IP e URL su Pulsedive."""
+    api_key = settings.PULSEDIVE_API_KEY.strip()
+    if not api_key:
+        return ReputationResult(
+            source="Pulsedive", entity=entity, entity_type=entity_type,
+            skipped=True, skip_reason="PULSEDIVE_API_KEY non configurata — registrati su pulsedive.com",
+        )
+    try:
+        resp = _http_get_with_retry(
+            "https://pulsedive.com/api/info.php",
+            params={"indicator": entity, "pretty": "1", "key": api_key},
+            timeout=REQUEST_TIMEOUT,
+            rate_key="pulsedive",
+        )
+        if resp.status_code == 404:
+            return ReputationResult(
+                source="Pulsedive", entity=entity, entity_type=entity_type,
+                queried=True, detail="Indicatore non presente nel database Pulsedive.",
+            )
+        if resp.status_code == 400:
+            data = resp.json() if resp.content else {}
+            msg = data.get("error", "Indicatore non riconosciuto")
+            return ReputationResult(
+                source="Pulsedive", entity=entity, entity_type=entity_type,
+                queried=True, detail=f"Pulsedive: {msg}",
+            )
+        resp.raise_for_status()
+        data = resp.json()
+        risk = data.get("risk", "unknown").lower()
+        risk_factors = data.get("risk_factors", [])
+
+        malicious = risk in ("high", "critical")
+        confidence_map = {"critical": 95.0, "high": 80.0, "medium": 50.0, "low": 20.0}
+        confidence = confidence_map.get(risk, 0.0)
+
+        factors_str = ", ".join(f["name"] for f in risk_factors[:3]) if risk_factors else ""
+        detail = f"Risk: {risk}"
+        if factors_str:
+            detail += f" | {factors_str}"
+
+        return ReputationResult(
+            source="Pulsedive", entity=entity, entity_type=entity_type,
+            queried=True, is_malicious=malicious, confidence=confidence,
+            detail=detail,
+        )
+    except requests.HTTPError as e:
+        return ReputationResult(
+            source="Pulsedive", entity=entity, entity_type=entity_type,
+            error=f"Pulsedive HTTP {e.response.status_code if e.response is not None else '?'}",
+        )
+    except Exception as exc:
+        return ReputationResult(
+            source="Pulsedive", entity=entity, entity_type=entity_type,
+            error=f"Pulsedive: {type(exc).__name__}",
+        )
+
+
+def check_ip_pulsedive(ip: str) -> ReputationResult:
+    """Pulsedive threat intel per IP."""
+    return _check_pulsedive(ip, "ip")
+
+
+def check_url_pulsedive(url: str) -> ReputationResult:
+    """Pulsedive threat intel per URL."""
+    return _check_pulsedive(url, "url")
+
+
+# ---------------------------------------------------------------------------
+# Criminal IP — score rischio IP con geolocalizzazione
+# ---------------------------------------------------------------------------
+
+def check_ip_criminalip(ip: str) -> ReputationResult:
+    """
+    Criminal IP — score di rischio IP 0-5.
+    0=Safe, 1=Low, 2=Medium, 3=High, 4=Critical.
+    Richiede CRIMINALIP_API_KEY (free tier disponibile).
+    """
+    api_key = settings.CRIMINALIP_API_KEY.strip()
+    if not api_key:
+        return ReputationResult(
+            source="Criminal IP", entity=ip, entity_type="ip",
+            skipped=True, skip_reason="CRIMINALIP_API_KEY non configurata — registrati su criminalip.io",
+        )
+    try:
+        resp = _http_get_with_retry(
+            "https://api.criminalip.io/v1/ip/summary",
+            params={"ip": ip},
+            headers={"x-api-key": api_key},
+            timeout=REQUEST_TIMEOUT,
+            rate_key="criminalip",
+        )
+        if resp.status_code == 401:
+            return ReputationResult(
+                source="Criminal IP", entity=ip, entity_type="ip",
+                error="API key non valida (CRIMINALIP_API_KEY)",
+            )
+        resp.raise_for_status()
+        data = resp.json()
+        status = data.get("status", 0)
+        if status != 200:
+            msg = data.get("message", f"status {status}")
+            return ReputationResult(
+                source="Criminal IP", entity=ip, entity_type="ip",
+                queried=True, detail=f"Criminal IP: {msg}",
+            )
+
+        score_data = data.get("data", {}).get("score", {})
+        inbound = score_data.get("inbound", 0)
+        outbound = score_data.get("outbound", 0)
+        max_score = max(inbound, outbound)
+
+        score_labels = {0: "Safe", 1: "Low", 2: "Medium", 3: "High", 4: "Critical"}
+        label = score_labels.get(max_score, f"Score {max_score}")
+        malicious = max_score >= 3
+        confidence = {3: 70.0, 4: 90.0}.get(max_score, 0.0)
+
+        country = data.get("data", {}).get("country", "")
+        detail = f"Score: {label} ({max_score}/4)"
+        if country:
+            detail += f" | paese: {country}"
+
+        return ReputationResult(
+            source="Criminal IP", entity=ip, entity_type="ip",
+            queried=True, is_malicious=malicious, confidence=confidence,
+            detail=detail,
+        )
+    except requests.HTTPError as e:
+        return ReputationResult(
+            source="Criminal IP", entity=ip, entity_type="ip",
+            error=f"Criminal IP HTTP {e.response.status_code if e.response is not None else '?'}",
+        )
+    except Exception as exc:
+        return ReputationResult(
+            source="Criminal IP", entity=ip, entity_type="ip",
+            error=f"Criminal IP: {type(exc).__name__}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# SecurityTrails — DNS attuale e storico per domini (informativo)
+# ---------------------------------------------------------------------------
+
+def check_domain_securitytrails(domain: str) -> ReputationResult:
+    """
+    SecurityTrails — DNS attuale e storico per dominio.
+    Servizio informativo: non emette giudizi malevolo/pulito.
+    Richiede SECURITYTRAILS_API_KEY (50 req/mese free).
+    """
+    api_key = settings.SECURITYTRAILS_API_KEY.strip()
+    if not api_key:
+        return ReputationResult(
+            source="SecurityTrails", entity=domain, entity_type="url",
+            skipped=True, skip_reason="SECURITYTRAILS_API_KEY non configurata — registrati su securitytrails.com",
+        )
+    try:
+        resp = _http_get_with_retry(
+            f"https://api.securitytrails.com/v1/domain/{domain}/dns",
+            headers={"APIKEY": api_key, "Accept": "application/json"},
+            timeout=REQUEST_TIMEOUT_INFO,
+            rate_key="securitytrails",
+        )
+        if resp.status_code == 401:
+            return ReputationResult(
+                source="SecurityTrails", entity=domain, entity_type="url",
+                error="API key non valida (SECURITYTRAILS_API_KEY)",
+            )
+        if resp.status_code == 404:
+            return ReputationResult(
+                source="SecurityTrails", entity=domain, entity_type="url",
+                queried=True, detail="Dominio non trovato in SecurityTrails.",
+            )
+        resp.raise_for_status()
+        data = resp.json()
+        current = data.get("current_dns", {})
+
+        parts = []
+        a_vals = [r.get("ip", "") for r in current.get("a", {}).get("values", []) if r.get("ip")]
+        if a_vals:
+            parts.append(f"A: {', '.join(a_vals[:3])}" + (f" (+{len(a_vals)-3})" if len(a_vals) > 3 else ""))
+        mx_vals = [r.get("hostname", "") for r in current.get("mx", {}).get("values", []) if r.get("hostname")]
+        if mx_vals:
+            parts.append(f"MX: {', '.join(mx_vals[:2])}" + (f" (+{len(mx_vals)-2})" if len(mx_vals) > 2 else ""))
+        ns_vals = [r.get("nameserver", "") for r in current.get("ns", {}).get("values", []) if r.get("nameserver")]
+        if ns_vals:
+            parts.append(f"NS: {', '.join(ns_vals[:2])}" + (f" (+{len(ns_vals)-2})" if len(ns_vals) > 2 else ""))
+
+        detail = " | ".join(parts) if parts else "Nessun record DNS trovato"
+
+        return ReputationResult(
+            source="SecurityTrails", entity=domain, entity_type="url",
+            queried=True, detail=detail,
+        )
+    except requests.HTTPError as e:
+        return ReputationResult(
+            source="SecurityTrails", entity=domain, entity_type="url",
+            error=f"SecurityTrails HTTP {e.response.status_code if e.response is not None else '?'}",
+        )
+    except Exception as exc:
+        return ReputationResult(
+            source="SecurityTrails", entity=domain, entity_type="url",
+            error=f"SecurityTrails: {type(exc).__name__}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Hybrid Analysis — analisi statica hash allegati
+# ---------------------------------------------------------------------------
+
+def check_hash_hybrid_analysis(sha256: str) -> ReputationResult:
+    """
+    Hybrid Analysis (CrowdStrike Falcon) — ricerca hash nel database sandbox.
+    threat_level: 0=no threat, 1=suspicious, 2=malicious.
+    Richiede HYBRID_ANALYSIS_API_KEY (gratuito con registrazione).
+    """
+    api_key = settings.HYBRID_ANALYSIS_API_KEY.strip()
+    if not api_key:
+        return ReputationResult(
+            source="Hybrid Analysis", entity=sha256, entity_type="hash",
+            skipped=True, skip_reason="HYBRID_ANALYSIS_API_KEY non configurata — registrati su hybrid-analysis.com",
+        )
+    try:
+        resp = _http_post_with_retry(
+            "https://www.hybrid-analysis.com/api/v2/search/hash",
+            data={"hash": sha256},
+            headers={
+                "api-key": api_key,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": f"EMLyzer/{settings.VERSION}",
+            },
+            timeout=REQUEST_TIMEOUT,
+            rate_key="hybridanalysis",
+        )
+        if resp.status_code == 401:
+            return ReputationResult(
+                source="Hybrid Analysis", entity=sha256, entity_type="hash",
+                error="API key non valida (HYBRID_ANALYSIS_API_KEY)",
+            )
+        resp.raise_for_status()
+        results = resp.json()
+
+        if not results:
+            return ReputationResult(
+                source="Hybrid Analysis", entity=sha256, entity_type="hash",
+                queried=True, detail="Hash non trovato nel database Hybrid Analysis.",
+            )
+
+        # Prendi il risultato con il threat_level più alto
+        best = max(results, key=lambda r: r.get("threat_level", 0))
+        threat_level = best.get("threat_level", 0)
+        verdict = best.get("verdict", "no specific threat")
+        tags = best.get("tags") or []
+        threat_score = best.get("threat_score")
+        file_type = best.get("type", "")
+
+        malicious = threat_level >= 2
+
+        detail = f"Verdict: {verdict}"
+        if file_type:
+            detail += f" | tipo: {file_type}"
+        if threat_score is not None:
+            detail += f" | score: {threat_score}/100"
+        if tags:
+            detail += f" | tag: {', '.join(str(t) for t in tags[:3])}"
+        if len(results) > 1:
+            detail += f" | {len(results)} campioni trovati"
+
+        return ReputationResult(
+            source="Hybrid Analysis", entity=sha256, entity_type="hash",
+            queried=True, is_malicious=malicious,
+            confidence=float(threat_score) if (malicious and threat_score is not None) else (80.0 if malicious else 0.0),
+            detail=detail,
+        )
+    except requests.HTTPError as e:
+        return ReputationResult(
+            source="Hybrid Analysis", entity=sha256, entity_type="hash",
+            error=f"Hybrid Analysis HTTP {e.response.status_code if e.response is not None else '?'}",
+        )
+    except Exception as exc:
+        return ReputationResult(
+            source="Hybrid Analysis", entity=sha256, entity_type="hash",
+            error=f"Hybrid Analysis: {type(exc).__name__}",
+        )
+
+
+# ---------------------------------------------------------------------------
 # Redirect chain — segue i redirect degli URL shortener
 # ---------------------------------------------------------------------------
 
@@ -1134,16 +1596,22 @@ _SERVICE_DEFS = [
     ("ASN Lookup",        "ip",          False, "Autonomous System Number per ogni IP — no API key (ipinfo.io)"),
     ("Shodan InternetDB", "ip",          False, "Porte aperte, CVE e tag per ogni IP — no API key (Shodan)"),
     ("CIRCL Passive DNS", "ip+url",      True,  "Storico risoluzione DNS per IP e domini — gratuito con registrazione (circl.lu/pdns)"),
+    ("GreyNoise Community","ip",         True,  "Classifica IP come scanner/malicious/benign — 100 req/g free (greynoise.io)"),
+    ("Criminal IP",       "ip",          True,  "Score rischio IP 0-4 con geolocalizzazione — free tier (criminalip.io)"),
     # URL
     ("OpenPhish",         "url",         False, "Feed URL phishing — no API key richiesta"),
     ("PhishTank",         "url",         True,  "Database URL phishing verificati dalla community"),
     ("Redirect Chain",    "url",         False, "Segue i redirect degli URL shortener — no API key"),
     ("crt.sh",            "url",         False, "Certificati TLS emessi per il dominio — no API key"),
     ("URLhaus",           "url",         True,  "Database URL malware di abuse.ch (ABUSECH_API_KEY — auth.abuse.ch)"),
+    ("URLScan.io",        "url",         False, "Ricerca scansioni esistenti per URL/domini — URLSCAN_API_KEY opzionale (urlscan.io)"),
+    ("SecurityTrails",    "url",         True,  "DNS attuale e storico per domini — 50 req/mese free (securitytrails.com)"),
     # Hash
     ("MalwareBazaar",     "hash",        True,  "Hash allegati nel database malware (ABUSECH_API_KEY o MALWAREBAZAAR_API_KEY)"),
+    ("Hybrid Analysis",   "hash",        True,  "Analisi statica allegati nel database sandbox Falcon — gratuito con registrazione (hybrid-analysis.com)"),
     # Multi-tipo
     ("ThreatFox",         "ip+url+hash", True,  "Database IOC abuse.ch (IP, URL, hash) — ABUSECH_API_KEY — auth.abuse.ch"),
+    ("Pulsedive",         "ip+url",      True,  "Threat intel aggregata per IP e URL — 30 req/min free (pulsedive.com)"),
 ]
 
 def _build_service_registry(all_results: list[ReputationResult]) -> list[dict]:
@@ -1164,7 +1632,13 @@ def _build_service_registry(all_results: list[ReputationResult]) -> list[dict]:
         "URLhaus":           bool(settings.ABUSECH_API_KEY),
         "MalwareBazaar":     bool(settings.ABUSECH_API_KEY or settings.MALWAREBAZAAR_API_KEY),
         "ThreatFox":         bool(settings.ABUSECH_API_KEY),
-        "CIRCL Passive DNS": bool(settings.CIRCL_API_KEY),
+        "CIRCL Passive DNS":   bool(settings.CIRCL_API_KEY),
+        "GreyNoise Community": bool(settings.GREYNOISE_API_KEY),
+        "URLScan.io":          True,   # search è pubblico anche senza chiave
+        "Pulsedive":           bool(settings.PULSEDIVE_API_KEY),
+        "Criminal IP":         bool(settings.CRIMINALIP_API_KEY),
+        "SecurityTrails":      bool(settings.SECURITYTRAILS_API_KEY),
+        "Hybrid Analysis":     bool(settings.HYBRID_ANALYSIS_API_KEY),
     }
 
     registry = []
@@ -1271,6 +1745,9 @@ _FAST_SERVICES = frozenset({
     "check_ip_asn",                # 1 HTTP, 0.3s rate
     "check_ip_shodan_internetdb",  # 1 HTTP, 0.3s rate — InternetDB gratuito
     "check_ip_circl_pdns",         # 1 HTTP, 0.5s rate — CIRCL Passive DNS
+    "check_ip_greynoise",          # 1 HTTP, 1.1s rate — GreyNoise Community
+    "check_ip_pulsedive",          # 1 HTTP, 2.5s rate — Pulsedive
+    "check_ip_criminalip",         # 1 HTTP, 1.1s rate — Criminal IP
     "check_ip_threatfox",          # 1 HTTP, 0.3s rate
     "check_url_openphish",         # feed locale, 0s
     "check_url_redirect_chain",    # 1 HTTP per URL, 0.2s rate
@@ -1278,8 +1755,12 @@ _FAST_SERVICES = frozenset({
     "check_url_urlhaus",           # 1 HTTP, 0.3s rate
     "check_url_threatfox",         # 1 HTTP, 0.3s rate
     "check_domain_circl_pdns",     # 1 HTTP, 0.5s rate — CIRCL Passive DNS
+    "check_url_urlscan",           # 1 HTTP, 1.0s rate — URLScan.io
+    "check_url_pulsedive",         # 1 HTTP, 2.5s rate — Pulsedive
+    "check_domain_securitytrails", # 1 HTTP, 3.0s rate — SecurityTrails
     "check_hash_malwarebazaar",    # 1 HTTP, 0.7s rate
     "check_hash_threatfox",        # 1 HTTP, 0.3s rate
+    "check_hash_hybrid_analysis",  # 1 HTTP, 1.0s rate — Hybrid Analysis
 })
 
 _SLOW_SERVICES = frozenset({
@@ -1344,6 +1825,18 @@ def _build_flat_tasks(
             _c(check_ip_circl_pdns,    ip, "ip")
         else:
             _s("CIRCL Passive DNS", ip, "ip", "CIRCL_API_KEY non configurata — registrati su circl.lu/pdns")
+        if settings.GREYNOISE_API_KEY:
+            _c(check_ip_greynoise, ip, "ip")
+        else:
+            _s("GreyNoise Community", ip, "ip", "GREYNOISE_API_KEY non configurata — registrati su greynoise.io")
+        if settings.PULSEDIVE_API_KEY:
+            _c(check_ip_pulsedive, ip, "ip")
+        else:
+            _s("Pulsedive", ip, "ip", "PULSEDIVE_API_KEY non configurata — registrati su pulsedive.com")
+        if settings.CRIMINALIP_API_KEY:
+            _c(check_ip_criminalip, ip, "ip")
+        else:
+            _s("Criminal IP", ip, "ip", "CRIMINALIP_API_KEY non configurata — registrati su criminalip.io")
         if settings.ABUSECH_API_KEY:
             _c(check_ip_threatfox, ip, "ip")
         else:
@@ -1384,6 +1877,15 @@ def _build_flat_tasks(
                 _c(check_domain_crtsh, domain, "url")
                 if settings.CIRCL_API_KEY:
                     _c(check_domain_circl_pdns, domain, "url")
+                _c(check_url_urlscan, url, "url")
+                if settings.PULSEDIVE_API_KEY:
+                    _c(check_url_pulsedive, url, "url")
+                else:
+                    _s("Pulsedive", url, "url", "PULSEDIVE_API_KEY non configurata — registrati su pulsedive.com")
+                if settings.SECURITYTRAILS_API_KEY:
+                    _c(check_domain_securitytrails, domain, "url")
+                else:
+                    _s("SecurityTrails", url, "url", "SECURITYTRAILS_API_KEY non configurata — registrati su securitytrails.com")
         except Exception:
             pass
 
@@ -1401,6 +1903,10 @@ def _build_flat_tasks(
             _c(check_hash_virustotal, h, "hash")
         else:
             _s("VirusTotal", h, "hash", "VIRUSTOTAL_API_KEY non configurata")
+        if settings.HYBRID_ANALYSIS_API_KEY:
+            _c(check_hash_hybrid_analysis, h, "hash")
+        else:
+            _s("Hybrid Analysis", h, "hash", "HYBRID_ANALYSIS_API_KEY non configurata — registrati su hybrid-analysis.com")
 
     return call_tasks, skip_results
 

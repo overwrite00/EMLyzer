@@ -27,7 +27,13 @@ async def get_settings():
             "URLhaus":           bool(settings.ABUSECH_API_KEY),
             "ThreatFox":         bool(settings.ABUSECH_API_KEY),
             "MalwareBazaar":     bool(settings.ABUSECH_API_KEY or settings.MALWAREBAZAAR_API_KEY),
-            "CIRCL Passive DNS": bool(settings.CIRCL_API_KEY),
+            "CIRCL Passive DNS":   bool(settings.CIRCL_API_KEY),
+            "GreyNoise Community": bool(settings.GREYNOISE_API_KEY),
+            "URLScan.io":          True,
+            "Pulsedive":           bool(settings.PULSEDIVE_API_KEY),
+            "Criminal IP":         bool(settings.CRIMINALIP_API_KEY),
+            "SecurityTrails":      bool(settings.SECURITYTRAILS_API_KEY),
+            "Hybrid Analysis":     bool(settings.HYBRID_ANALYSIS_API_KEY),
         },
     }
 

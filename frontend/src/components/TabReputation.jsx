@@ -261,7 +261,7 @@ function ServiceCard({ svc, expanded, onToggle, lang }) {
 // ── Riga dettaglio singola entità ─────────────────────────────────────────────
 function DetailRow({ r, lang }) {
   // Servizi informativi: non malevoli per natura, mostrano dati contestuali
-  const isInfoService = ['ASN Lookup', 'crt.sh', 'Redirect Chain', 'Shodan InternetDB', 'CIRCL Passive DNS'].includes(r.source)
+  const isInfoService = ['ASN Lookup', 'crt.sh', 'Redirect Chain', 'Shodan InternetDB', 'CIRCL Passive DNS', 'SecurityTrails'].includes(r.source)
   const icon = r.is_malicious ? '🔴'
              : r.error        ? '⚠️'
              : isInfoService  ? 'ℹ️'
@@ -332,17 +332,23 @@ function ServicePreview({ lang, apiKeys }) {
     { name: 'Spamhaus DROP',     needs_key: false, type: 'ip',          desc_it: 'Blocklist IP malevoli di alto profilo — no chiave',             desc_en: 'High-profile malicious IP blocklist — no key' },
     { name: 'ASN Lookup',        needs_key: false, type: 'ip',          desc_it: 'Autonomous System per ogni IP (ipinfo.io) — no chiave',         desc_en: 'ASN info for each IP (ipinfo.io) — no key' },
     { name: 'Shodan InternetDB', needs_key: false, type: 'ip',          desc_it: 'Porte aperte, CVE e tag per ogni IP (Shodan) — no chiave',                   desc_en: 'Open ports, CVEs and tags per IP (Shodan) — no key' },
-    { name: 'CIRCL Passive DNS', needs_key: true,  type: 'ip+url',      desc_it: 'Passive DNS storico IP/domini — CIRCL_API_KEY (gratuita, circl.lu/pdns)',    desc_en: 'Historical passive DNS for IPs/domains — CIRCL_API_KEY (free, circl.lu/pdns)' },
+    { name: 'CIRCL Passive DNS',   needs_key: true,  type: 'ip+url',      desc_it: 'Passive DNS storico IP/domini — CIRCL_API_KEY (gratuita, circl.lu/pdns)',        desc_en: 'Historical passive DNS for IPs/domains — CIRCL_API_KEY (free, circl.lu/pdns)' },
+    { name: 'GreyNoise Community', needs_key: true,  type: 'ip',          desc_it: 'Classifica IP: scanner/malevolo/benigno — GREYNOISE_API_KEY (100 req/g)',        desc_en: 'Classifies IP as scanner/malicious/benign — GREYNOISE_API_KEY (100 req/day)' },
+    { name: 'Criminal IP',         needs_key: true,  type: 'ip',          desc_it: 'Score rischio IP 0-4 con geolocalizzazione — CRIMINALIP_API_KEY (free tier)',   desc_en: 'IP risk score 0-4 with geolocation — CRIMINALIP_API_KEY (free tier)' },
     // ── URL ──────────────────────────────────────────────────────────────────
-    { name: 'OpenPhish',         needs_key: false, type: 'url',         desc_it: 'Feed URL phishing aggiornato — no chiave',                      desc_en: 'Live phishing URL feed — no key' },
-    { name: 'PhishTank',         needs_key: true,  type: 'url',         desc_it: 'URL phishing verificati dalla community',                       desc_en: 'Community-verified phishing URLs' },
-    { name: 'Redirect Chain',    needs_key: false, type: 'url',         desc_it: 'Segue i redirect degli URL shortener — no chiave',              desc_en: 'Follows URL shortener redirects — no key' },
-    { name: 'crt.sh',            needs_key: false, type: 'url',         desc_it: 'Certificati TLS del dominio (età, sottodomini) — no chiave',    desc_en: 'Domain TLS certificates (age, subdomains) — no key' },
-    { name: 'URLhaus',           needs_key: true,  type: 'url',         desc_it: 'Database URL malware di abuse.ch (ABUSECH_API_KEY)',            desc_en: 'Malware URL database by abuse.ch (ABUSECH_API_KEY)' },
+    { name: 'OpenPhish',         needs_key: false, type: 'url',         desc_it: 'Feed URL phishing aggiornato — no chiave',                           desc_en: 'Live phishing URL feed — no key' },
+    { name: 'PhishTank',         needs_key: true,  type: 'url',         desc_it: 'URL phishing verificati dalla community',                            desc_en: 'Community-verified phishing URLs' },
+    { name: 'Redirect Chain',    needs_key: false, type: 'url',         desc_it: 'Segue i redirect degli URL shortener — no chiave',                   desc_en: 'Follows URL shortener redirects — no key' },
+    { name: 'crt.sh',            needs_key: false, type: 'url',         desc_it: 'Certificati TLS del dominio (età, sottodomini) — no chiave',         desc_en: 'Domain TLS certificates (age, subdomains) — no key' },
+    { name: 'URLhaus',           needs_key: true,  type: 'url',         desc_it: 'Database URL malware di abuse.ch (ABUSECH_API_KEY)',                 desc_en: 'Malware URL database by abuse.ch (ABUSECH_API_KEY)' },
+    { name: 'URLScan.io',        needs_key: false, type: 'url',         desc_it: 'Scansioni esistenti per URL/domini — URLSCAN_API_KEY opzionale',     desc_en: 'Existing scans for URLs/domains — URLSCAN_API_KEY optional' },
+    { name: 'SecurityTrails',    needs_key: true,  type: 'url',         desc_it: 'DNS attuale e storico per domini — SECURITYTRAILS_API_KEY (50 req/mese)', desc_en: 'Current and historical DNS for domains — SECURITYTRAILS_API_KEY (50 req/month)' },
     // ── Hash ─────────────────────────────────────────────────────────────────
-    { name: 'MalwareBazaar',     needs_key: true,  type: 'hash',        desc_it: 'Hash allegati nel database malware (API key richiesta)',         desc_en: 'Attachment hashes in malware database (API key required)' },
+    { name: 'MalwareBazaar',     needs_key: true,  type: 'hash',        desc_it: 'Hash allegati nel database malware (API key richiesta)',              desc_en: 'Attachment hashes in malware database (API key required)' },
+    { name: 'Hybrid Analysis',   needs_key: true,  type: 'hash',        desc_it: 'Analisi statica allegati nel database sandbox Falcon — HYBRID_ANALYSIS_API_KEY', desc_en: 'Static analysis in Falcon sandbox database — HYBRID_ANALYSIS_API_KEY' },
     // ── Multi-tipo ───────────────────────────────────────────────────────────
-    { name: 'ThreatFox',         needs_key: true,  type: 'ip+url+hash', desc_it: 'Database IOC abuse.ch (IP, URL, hash) (ABUSECH_API_KEY)',       desc_en: 'abuse.ch IOC database (IPs, URLs, hashes) (ABUSECH_API_KEY)' },
+    { name: 'ThreatFox',         needs_key: true,  type: 'ip+url+hash', desc_it: 'Database IOC abuse.ch (IP, URL, hash) (ABUSECH_API_KEY)',            desc_en: 'abuse.ch IOC database (IPs, URLs, hashes) (ABUSECH_API_KEY)' },
+    { name: 'Pulsedive',         needs_key: true,  type: 'ip+url',      desc_it: 'Threat intel aggregata IP e URL — PULSEDIVE_API_KEY (30 req/min)',   desc_en: 'Aggregated threat intel for IPs and URLs — PULSEDIVE_API_KEY (30 req/min)' },
   ]
   return (
     <div style={{
