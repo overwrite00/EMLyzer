@@ -204,7 +204,7 @@ async def run_analysis(
                 "label":                getattr(body_result.nlp_result, "label", "unknown"),
                 "confidence":           getattr(body_result.nlp_result, "confidence", "n/a"),
                 "top_features":         getattr(body_result.nlp_result, "top_features", []),
-            } if body_result.nlp_result else None,
+            } if body_result.nlp_result else {},
         },
         url_indicators={
             **_dataclass_to_dict(url_result),
@@ -228,10 +228,15 @@ async def run_analysis(
         _logger.info("[%s] [DB DELETE] Existing record deleted", job_id)
 
     _logger.info("[%s] [DB ADD] Adding new EmailAnalysis record to session", job_id)
-    db.add(record)
-    _logger.info("[%s] [DB COMMIT] Committing transaction to database", job_id)
-    await db.commit()
-    _logger.info("[%s] [DB SUCCESS] Analysis persisted successfully, record_id=%s", job_id, record.id)
+    try:
+        db.add(record)
+        _logger.info("[%s] [DB COMMIT] Committing transaction to database", job_id)
+        await db.commit()
+        _logger.info("[%s] [DB SUCCESS] Analysis persisted successfully, record_id=%s", job_id, record.id)
+    except Exception as e:
+        _logger.error("[%s] [DB ERROR] Failed to commit to database: %s", job_id, str(e))
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=t("analysis.db_error"))
 
     return _build_response(job_id, parsed, header_result, body_result, url_result, attachment_result, risk, do_whois)
 

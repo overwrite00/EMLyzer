@@ -10,11 +10,14 @@ Analisi degli header email:
 """
 
 import re
+import logging as _logging
 from dataclasses import dataclass, field
 from typing import Optional
 
 from core.analysis.email_parser import ParsedEmail
 from utils.i18n import t
+
+_logger = _logging.getLogger(__name__)
 
 # DNS queries (dnspython già in requirements.txt)
 try:
@@ -842,8 +845,6 @@ def _compute_score(result: HeaderAnalysisResult) -> float:
 
 def analyze_headers(parsed: ParsedEmail) -> HeaderAnalysisResult:
     """Entry point: esegue tutte le analisi header e restituisce HeaderAnalysisResult."""
-    import logging as _logging
-    _logger = _logging.getLogger(__name__)
     result = HeaderAnalysisResult()
 
     _logger.info("[HEADER START] From=%s, SPF=%s, DKIM=%s, DMARC=%s", parsed.mail_from, parsed.spf_result, parsed.dkim_result, parsed.dmarc_result)

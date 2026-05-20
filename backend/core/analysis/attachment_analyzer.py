@@ -13,9 +13,12 @@ IMPORTANTE: nessun file viene eseguito. Solo analisi statica dei byte.
 """
 
 import re
+import logging as _logging
 from utils.i18n import t
 from dataclasses import dataclass, field
 from typing import Optional
+
+_logger = _logging.getLogger(__name__)
 
 
 # Estensioni eseguibili / pericolose
@@ -252,8 +255,6 @@ def analyze_attachment(att: dict, raw_data: Optional[bytes] = None) -> Attachmen
 
 def analyze_attachments(attachments: list[dict]) -> AttachmentAnalysisResult:
     """Analizza tutti gli allegati (solo metadati, no raw_data in questa fase)."""
-    import logging as _logging
-    _logger = _logging.getLogger(__name__)
     result = AttachmentAnalysisResult()
     result.total_attachments = len(attachments)
 

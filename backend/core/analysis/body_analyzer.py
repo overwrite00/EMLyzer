@@ -9,6 +9,7 @@ Analisi del corpo email:
 
 import re
 import base64
+import logging as _logging
 from dataclasses import dataclass, field
 from bs4 import BeautifulSoup
 import bleach
@@ -16,6 +17,8 @@ import bleach
 from core.analysis.email_parser import ParsedEmail
 from core.analysis.nlp_classifier import classify_text, NLPResult
 from utils.i18n import t
+
+_logger = _logging.getLogger(__name__)
 
 
 # --- Pattern linguistici sospetti (case-insensitive) ---
@@ -417,8 +420,8 @@ def _check_languagetool(body_text: str, result: BodyAnalysisResult):
                 evidence=f"{n} potenziali errori rilevati da LanguageTool",
                 count=n,
             ))
-    except Exception:
-        pass  # Servizio non disponibile — analisi continua senza errori
+    except Exception as e:
+        _logger.debug("[BODY] LanguageTool check failed (non-critical): %s", str(e))
 
 
 def _compute_score(result: BodyAnalysisResult) -> float:
@@ -429,8 +432,6 @@ def _compute_score(result: BodyAnalysisResult) -> float:
 
 def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
     """Entry point analisi body. Analizza sia testo plain che HTML."""
-    import logging as _logging
-    _logger = _logging.getLogger(__name__)
     result = BodyAnalysisResult()
 
     _logger.info("[BODY START] text_len=%d, html_len=%d", len(parsed.body_text or ''), len(parsed.body_html or ''))
