@@ -158,8 +158,24 @@ async def run_analysis(
     parsed, header_result, body_result, url_result, attachment_result, risk = \
         await run_in_threadpool(_pipeline)
 
-    # --- Logging del pipeline ---
+    # --- P0-4: Verify Analyzer Execution ---
     _logger.info("[%s] Pipeline completato: header=%d findings, body=%d findings, urls=%d urls", job_id, len(header_result.findings), len(body_result.findings), len(url_result.urls))
+
+    # Check if any findings were detected
+    total_findings = (
+        len(header_result.findings or []) +
+        len(body_result.findings or []) +
+        len(url_result.urls or []) +
+        len(attachment_result.attachments or [])
+    )
+    _logger.info("[%s] [RESULT CHECK] Total entities analyzed: headers=%d, body_checks=%d, urls=%d, attachments=%d",
+                 job_id, len(header_result.findings or []), len(body_result.findings or []),
+                 len(url_result.urls or []), len(attachment_result.attachments or []))
+
+    if total_findings == 0 and risk.score == 0:
+        _logger.warning("[%s] [RESULT WARNING] All analyzers returned 0 findings - email appears clean or analyzers not executing", job_id)
+    else:
+        _logger.info("[%s] [RESULT OK] Found %d total indicators, risk_score=%.1f", job_id, total_findings, risk.score)
 
     # --- Persisti nel DB ---
     record = EmailAnalysis(
@@ -206,11 +222,16 @@ async def run_analysis(
     # Upsert: se già esiste (riesecuzione analisi), aggiorna
     existing = await db.get(EmailAnalysis, job_id)
     if existing:
+        _logger.info("[%s] [DB DELETE] Existing analysis found, deleting for upsert", job_id)
         await db.delete(existing)
         await db.flush()
+        _logger.info("[%s] [DB DELETE] Existing record deleted", job_id)
 
+    _logger.info("[%s] [DB ADD] Adding new EmailAnalysis record to session", job_id)
     db.add(record)
+    _logger.info("[%s] [DB COMMIT] Committing transaction to database", job_id)
     await db.commit()
+    _logger.info("[%s] [DB SUCCESS] Analysis persisted successfully, record_id=%s", job_id, record.id)
 
     return _build_response(job_id, parsed, header_result, body_result, url_result, attachment_result, risk, do_whois)
 

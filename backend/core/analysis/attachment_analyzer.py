@@ -257,15 +257,20 @@ def analyze_attachments(attachments: list[dict]) -> AttachmentAnalysisResult:
     result = AttachmentAnalysisResult()
     result.total_attachments = len(attachments)
 
+    _logger.info("[ATTACH START] Analyzing %d attachments", result.total_attachments)
+
     for att in attachments:
         analysis = analyze_attachment(att, raw_data=None)
         result.attachments.append(analysis)
         if any(f.severity == "critical" for f in analysis.findings):
             result.critical_count += 1
+        _logger.debug("[ATTACH] %s: %d findings, score=%.1f", att.get("filename", "unknown"), len(analysis.findings), analysis.risk_score)
 
     if result.attachments:
         scores = [a.risk_score for a in result.attachments]
         result.score_contribution = min(max(scores) + result.critical_count * 10, 100.0)
+    else:
+        result.score_contribution = 0.0
 
-    _logger.debug(f"Attachment analysis: {result.total_attachments} attachments, {result.critical_count} critical")
+    _logger.info("[ATTACH END] Total: %d attachments, %d critical, score=%.1f", result.total_attachments, result.critical_count, result.score_contribution)
     return result

@@ -433,15 +433,23 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
     _logger = _logging.getLogger(__name__)
     result = BodyAnalysisResult()
 
-    _logger.debug(f"Body analysis: text_len={len(parsed.body_text or '')}, html_len={len(parsed.body_html or '')}")
+    _logger.info("[BODY START] text_len=%d, html_len=%d", len(parsed.body_text or ''), len(parsed.body_html or ''))
+
     _analyze_text(parsed.body_text, result)
+    _logger.debug("[BODY] text analysis: %d findings", len(result.findings))
+
     _analyze_html(parsed.body_html, result)
+    _logger.debug("[BODY] html analysis: %d findings, %d urls extracted", len(result.findings), len(result.extracted_urls))
+
     _check_homoglyphs(parsed.body_text, result)
+    _logger.debug("[BODY] homoglyphs checked: %d findings", len(result.findings))
+
     _check_languagetool(parsed.body_text, result)
-    _logger.debug(f"Body findings: {len(result.findings)} (urgency={result.urgency_count}, cta={result.phishing_cta_count}, creds={result.credential_keyword_count})")
+    _logger.debug("[BODY] languagetool checked: %d findings", len(result.findings))
 
     # Deduplica URL
     result.extracted_urls = list(dict.fromkeys(result.extracted_urls))
+    _logger.info("[BODY] Extracted %d unique URLs from body", len(result.extracted_urls))
 
     # Classificatore NLP (se scikit-learn disponibile)
     try:
@@ -454,8 +462,11 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
                 description=t("body.nlp_phishing", **{"prob": int(result.nlp_result.phishing_probability * 100), "confidence": result.nlp_result.confidence}),
                 evidence="Feature: " + ", ".join(result.nlp_result.top_features[:5]) if result.nlp_result.top_features else "",
             ))
-    except Exception:
-        pass
+            _logger.info("[BODY] NLP: label=%s, prob=%.2f, confidence=%s", result.nlp_result.label, result.nlp_result.phishing_probability, result.nlp_result.confidence)
+    except Exception as e:
+        _logger.warning("[BODY] NLP classification failed: %s", e)
 
     result.score_contribution = _compute_score(result)
+    _logger.info("[BODY END] Total findings: %d (urgency=%d, cta=%d, creds=%d, score=%.1f)",
+                 len(result.findings), result.urgency_count, result.phishing_cta_count, result.credential_keyword_count, result.score_contribution)
     return result

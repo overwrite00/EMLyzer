@@ -287,9 +287,10 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
 
     capped_urls = valid_urls[:50]  # limite di sicurezza: max 50 URL per email
     result.total_urls = len(capped_urls)
-    _logger.debug(f"URL analysis: {result.total_urls} URLs (dedup from {len(urls)})")
+    _logger.info("[URL START] Processing %d URLs (dedup from %d raw extractions)", result.total_urls, len(urls))
 
     if not capped_urls:
+        _logger.info("[URL END] No valid URLs found")
         return result
 
     # ── Pre-calcola WHOIS per dominio unico ──────────────────────────────────
@@ -366,5 +367,5 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
             sum(scores) / len(scores) + result.high_risk_count * 5, 100.0
         )
 
-    _logger.debug(f"URL analysis complete: {len(analyses)}/{result.total_urls} analyzed, {result.high_risk_count} high-risk")
+    _logger.info("[URL END] Analyzed %d/%d URLs, %d high-risk (score=%.1f)", len(analyses), result.total_urls, result.high_risk_count, result.score_contribution if analyses else 0)
     return result

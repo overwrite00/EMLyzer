@@ -846,19 +846,39 @@ def analyze_headers(parsed: ParsedEmail) -> HeaderAnalysisResult:
     _logger = _logging.getLogger(__name__)
     result = HeaderAnalysisResult()
 
-    _logger.debug(f"Header analysis: From={parsed.mail_from}, SPF={parsed.spf_result}, DKIM={parsed.dkim_result}, DMARC={parsed.dmarc_result}")
+    _logger.info("[HEADER START] From=%s, SPF=%s, DKIM=%s, DMARC=%s", parsed.mail_from, parsed.spf_result, parsed.dkim_result, parsed.dmarc_result)
+
     _check_identity_mismatch(parsed, result)
+    _logger.debug("[HEADER] identity_mismatch checked: %d findings", len(result.findings))
+
     _check_auth(parsed, result)
+    _logger.info("[HEADER] auth checked: SPF=%s, DKIM=%s, DMARC=%s, %d findings", result.spf_ok, result.dkim_ok, result.dmarc_ok, len(result.findings))
+
     _check_bulk_sender(parsed, result)
+    _logger.debug("[HEADER] bulk_sender checked: %d findings", len(result.findings))
+
     _check_header_injection(parsed, result)
+    _logger.debug("[HEADER] injection checked: %d findings", len(result.findings))
+
     _parse_received_chain(parsed, result)
+    _logger.info("[HEADER] received_chain parsed: %d hops", len(result.received_hops))
+
     _check_originating_ip(parsed, result)
+    _logger.debug("[HEADER] originating_ip checked: %d findings", len(result.findings))
+
     _check_missing_fields(parsed, result)
+    _logger.debug("[HEADER] missing_fields checked: %d findings", len(result.findings))
+
     _check_list_unsubscribe(parsed, result)
+    _logger.debug("[HEADER] list_unsubscribe checked: %d findings", len(result.findings))
+
     _check_campaign_id(parsed, result)
+    _logger.debug("[HEADER] campaign_id checked: %d findings", len(result.findings))
+
     _check_arc_chain(parsed, result)
+    _logger.debug("[HEADER] arc_chain checked: %d findings", len(result.findings))
 
     result.score_contribution = _compute_score(result)
-    _logger.debug(f"Header findings: {len(result.findings)} (auth_ok={result.spf_ok}/{result.dkim_ok}/{result.dmarc_ok})")
+    _logger.info("[HEADER END] Total findings: %d (score=%.1f, auth_ok=%s/%s/%s)", len(result.findings), result.score_contribution, result.spf_ok, result.dkim_ok, result.dmarc_ok)
     return result
 
