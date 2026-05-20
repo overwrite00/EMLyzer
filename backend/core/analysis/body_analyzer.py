@@ -31,10 +31,19 @@ URGENCY_PATTERNS = [
     r"\burgente\b", r"\bscadenza\b", r"\bverifica.*account",
     r"\bconferma.*identit", r"\baccesso.*bloccato", r"\bsospeso\b",
     r"\bclicca.*ora\b", r"\bimmediatamente\b",
-    # Portoghese
-    r"\bexpirando\b", r"\bexpira\b", r"\bimediato\b",
+    # Portoghese — espanso
+    r"\bexpirando\b", r"\bexpira\b", r"\bimediato\b", r"\bimediatamente\b",
     r"\bverificar.*conta", r"\bconfirme.*identidade", r"\bacesso.*bloqueado\b",
     r"\bclique.*agora\b",
+    # Portoghese — aggiunti
+    r"\bur(?:gência|gencia|gência|gencia|ência|encia)\b",  # varianti di urgência/urgência
+    r"\bação\s+obrigatória\b", r"\bação\s+necessária\b",
+    r"\bserá\s+suspenso\b", r"\bser[aá]\s+bloquead[oa]\b",
+    r"\bdesbloqueie\b", r"\bdesbloqu[a-z]*", r"\breativar\b", r"\breativaç",
+    r"\batividade\s+(?:suspeita|inusitada|suspeito|anormal)\b",
+    r"\bconfirme\s+(?:sua|seu|seus|sua)\s+(?:conta|email|e-mail|identidade)\b",
+    r"\bprazo\s+final\b", r"\blimite.*tempo\b",
+    r"\bsuspen[dç][ãa]o?\b",
 ]
 
 PHISHING_CTAS = [
@@ -44,18 +53,31 @@ PHISHING_CTAS = [
     # Italiano
     r"\baccedi ora\b", r"\bclicca qui\b", r"\bconferma.*dati",
     r"\baggiornam.*pagam", r"\binserisci.*password",
-    # Portoghese
-    r"\bresgatar agora\b", r"\bclique aqui\b", r"\bconfirme.*dados",
-    r"\batualize.*pagam", r"\binserir.*senha", r"\bfaça login",
-    r"\bverificar agora\b", r"\blogar\b",
+    # Portoghese — espanso
+    r"\bresgatar agora\b", r"\bclique aqui\b", r"\bclique.*aqui\b", r"\bclique.*agora\b",
+    r"\bconfirme.*dados", r"\batualize.*pagam", r"\binserir.*senha",
+    r"\bfaça login\b", r"\bfaça.*acesso\b", r"\bverificar agora\b", r"\blogar\b",
+    # Portoghese — aggiunti
+    r"\bacesse\s+(?:sua|seu|seus|sua)\s+conta\b",
+    r"\batualize\s+(?:seus|sua|seu)\s+(?:dados|password|passwd|senha)\b",
+    r"\bconfirme\s+seu\s+(?:e-?mail|email|e-mail)\b",
+    r"\bvalide\s+sua\s+identidade\b",
+    r"\bautentique-?se\b", r"\bautenticate\b",
+    r"\bfaça\s+(?:seu\s+)?(?:login|acesso)\b",
 ]
 
 CREDENTIAL_KEYWORDS = [
     r"\bpassword\b", r"\bpin\b", r"\bcredential", r"\bsocial security\b",
     r"\bcredit card\b", r"\biban\b", r"\bconto bancario\b",
     r"\bcodice fiscale\b",
-    # Portoghese — mantieni solo pattern specifici per credenziali
+    # Portoghese — specifici e finanziari
     r"\bsenha\b", r"\bcartão.*crédito\b", r"\bcpf\b",
+    # Portoghese — aggiunti per contesto bancario brasiliano
+    r"\bagência\b", r"\bconta\s+(?:bancária|corrente|poupança)\b",
+    r"\bnúmero\s+da\s+conta\b", r"\bcódigo\s+de\s+segurança\b",
+    r"\botp\b", r"\bone-?time\s+password\b",
+    r"\bpix\b",  # Sistema di pagamento istantaneo brasiliano — altamente rilevante
+    r"\b(?:rg|identidade|cédula)\b",
 ]
 
 # Mappa omoglifi Unicode → carattere latino equivalente
@@ -144,53 +166,73 @@ def _analyze_text(body_text: str, result: BodyAnalysisResult):
         return
     text_lower = body_text.lower()
 
+    # Traccia i pattern specifici per l'evidence
+    urgency_matches = []
+    cta_matches = []
+    credential_matches = []
+
     for pattern in URGENCY_PATTERNS:
         matches = re.findall(pattern, text_lower)
         result.urgency_count += len(matches)
+        if matches:
+            urgency_matches.extend(matches)
 
     for pattern in PHISHING_CTAS:
         matches = re.findall(pattern, text_lower)
         result.phishing_cta_count += len(matches)
+        if matches:
+            cta_matches.extend(matches)
 
     for pattern in CREDENTIAL_KEYWORDS:
         matches = re.findall(pattern, text_lower)
         result.credential_keyword_count += len(matches)
+        if matches:
+            credential_matches.extend(matches)
 
     if result.urgency_count >= 3:
+        evidence = "Rilevati pattern urgenti: " + ", ".join(list(dict.fromkeys(urgency_matches))[:5])
         result.findings.append(BodyFinding(
             category="text",
             severity="high",
             description=t("body.urgency_high", count=result.urgency_count),
-            evidence=t("body.urgency_high", count=result.urgency_count),
+            evidence=evidence,
             count=result.urgency_count,
         ))
     elif result.urgency_count >= 1:
+        evidence = "Rilevati pattern urgenti: " + ", ".join(list(dict.fromkeys(urgency_matches))[:5])
         result.findings.append(BodyFinding(
             category="text",
             severity="medium",
             description=t("body.urgency_medium", count=result.urgency_count),
+            evidence=evidence,
             count=result.urgency_count,
         ))
 
     if result.phishing_cta_count >= 2:
+        evidence = "Rilevati CTA sospetti: " + ", ".join(list(dict.fromkeys(cta_matches))[:5])
         result.findings.append(BodyFinding(
             category="text",
             severity="high",
             description=t("body.cta_high", count=result.phishing_cta_count),
+            evidence=evidence,
             count=result.phishing_cta_count,
         ))
     elif result.phishing_cta_count == 1:
+        evidence = "Rilevato CTA sospetto: " + ", ".join(cta_matches[:3])
         result.findings.append(BodyFinding(
             category="text",
             severity="medium",
             description=t("body.cta_medium"),
+            evidence=evidence,
         ))
 
     if result.credential_keyword_count >= 1:
+        evidence = "Rilevate credenziali: " + ", ".join(list(dict.fromkeys(credential_matches))[:5])
         result.findings.append(BodyFinding(
             category="text",
             severity="high",
             description=t("body.credentials", count=result.credential_keyword_count),
+            evidence=evidence,
             count=result.credential_keyword_count,
         ))
 
@@ -438,6 +480,19 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
 
     _analyze_text(parsed.body_text, result)
     _logger.debug("[BODY] text analysis: %d findings", len(result.findings))
+
+    # Se il testo plain è vuoto o molto piccolo, estrarre il testo dall'HTML
+    # (alcuni email sono HTML-only e non hanno body_text)
+    if not parsed.body_text or len(parsed.body_text.strip()) < 50:
+        try:
+            if parsed.body_html:
+                soup = BeautifulSoup(parsed.body_html, "html.parser")
+                html_text = soup.get_text(separator=" ", strip=True)
+                if html_text and len(html_text) > 50:
+                    _logger.debug("[BODY] Extracting text from HTML for pattern analysis")
+                    _analyze_text(html_text, result)
+        except Exception as e:
+            _logger.debug("[BODY] Failed to extract text from HTML: %s", e)
 
     _analyze_html(parsed.body_html, result)
     _logger.debug("[BODY] html analysis: %d findings, %d urls extracted", len(result.findings), len(result.extracted_urls))

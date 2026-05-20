@@ -952,7 +952,8 @@ def check_url_urlscan(url: str) -> ReputationResult:
 
     query = host if not is_ip else url
     headers: dict = {"Content-Type": "application/json"}
-    if settings.URLSCAN_API_KEY:
+    has_api_key = bool(settings.URLSCAN_API_KEY)
+    if has_api_key:
         headers["API-Key"] = settings.URLSCAN_API_KEY.strip()
 
     try:
@@ -964,10 +965,19 @@ def check_url_urlscan(url: str) -> ReputationResult:
             rate_key="urlscan",
         )
         if resp.status_code == 401:
-            return ReputationResult(
-                source="URLScan.io", entity=url, entity_type="url",
-                error="API key non valida (URLSCAN_API_KEY)",
-            )
+            # Diagnostic logging per 401 error
+            logger.warning(f"URLScan.io 401 Unauthorized for {url}")
+            if has_api_key:
+                return ReputationResult(
+                    source="URLScan.io", entity=url, entity_type="url",
+                    skipped=True, skip_reason="URLScan.io API key invalida — verifica configurazione .env",
+                )
+            else:
+                # Public search failed without key
+                return ReputationResult(
+                    source="URLScan.io", entity=url, entity_type="url",
+                    skipped=True, skip_reason="URLScan.io ricerca pubblica non disponibile",
+                )
         resp.raise_for_status()
         data = resp.json()
         results = data.get("results", [])
@@ -1002,14 +1012,18 @@ def check_url_urlscan(url: str) -> ReputationResult:
         )
     except requests.HTTPError as e:
         code = e.response.status_code if e.response is not None else "?"
+        # Fallback: mark as skipped instead of error on HTTP failures
+        logger.warning(f"URLScan.io HTTP {code} for {url}")
         return ReputationResult(
             source="URLScan.io", entity=url, entity_type="url",
-            error=f"URLScan HTTP {code}",
+            skipped=True, skip_reason=f"URLScan.io indisponibile (HTTP {code})",
         )
     except Exception as exc:
+        # Fallback: mark as skipped on other errors
+        logger.exception(f"URLScan.io error for {url}: {type(exc).__name__}")
         return ReputationResult(
             source="URLScan.io", entity=url, entity_type="url",
-            error=f"URLScan: {type(exc).__name__}",
+            skipped=True, skip_reason=f"URLScan.io errore: {type(exc).__name__}",
         )
 
 

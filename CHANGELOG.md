@@ -48,6 +48,24 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.14.3] — 2026-05-20
+
+### Aggiunto
+- **Rilevamento phishing portoghese (Portoghese/Brasiliano)**: espansione patterns body analyzer con 23 nuovi regex per urgenza/CTA/credenziali specifici della lingua portoghese. Inclusi pattern bancari Bradesco, Caixa, Itaú, e-commerce Shopee/Mercado Livre, autorità fiscale, frodi credential harvesting.
+- **Dataset NLP portoghese**: estensione dataset training NLP da 106 a 143 campioni con 37 nuove frasi portoghesi (19 phishing + 18 legittime). Migliora confidenza classificazione per email brasiliane.
+- **Analisi email HTML-only**: fix: estrazione testo da HTML quando body_text è vuoto. L'analizzatore body ora decodifica HTML e estrae il testo semplice con BeautifulSoup se la parte plain-text è < 50 caratteri.
+- **Evidence pattern visibility**: aggiunta visibilità degli specifici pattern rilevati nei finding. Ogni finding body_analyzer ora mostra gli esempi effettivi dei pattern matched (es. "Rilevati pattern urgenti: expirando, urgência").
+
+### Corretto
+- **CodeQL security alert**: rimosso riferimento a variabili derivate da API key nel logging URLScan.io error. Il log ora contiene solo l'URL richiesto, non dati derivati dalla chiave API.
+
+### Testing
+- ✅ Tutti i 119 test passano senza regressioni
+- ✅ sample-1.eml risk score migliorato: 48/100 → 75/100 (CRITICO)
+- ✅ Pattern rilevati per email portoghese con evidence visibili all'analista
+
+---
+
 ## [0.14.2] — 2026-05-20
 
 ### Corretto
