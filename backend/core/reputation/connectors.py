@@ -965,10 +965,9 @@ def check_url_urlscan(url: str) -> ReputationResult:
             rate_key="urlscan",
         )
         if resp.status_code == 401:
-            # Diagnostic logging per 401 error
-            key_prefix = settings.URLSCAN_API_KEY[:10] if has_api_key else "(not configured)"
+            # Diagnostic logging per 401 error (log only has_key, not key prefix)
             logger.warning(
-                f"URLScan.io 401 Unauthorized: has_key={has_api_key}, key_prefix={key_prefix}, entity={url}"
+                f"URLScan.io 401 Unauthorized: has_key={has_api_key}, entity={url}"
             )
             if has_api_key:
                 return ReputationResult(
