@@ -166,53 +166,73 @@ def _analyze_text(body_text: str, result: BodyAnalysisResult):
         return
     text_lower = body_text.lower()
 
+    # Traccia i pattern specifici per l'evidence
+    urgency_matches = []
+    cta_matches = []
+    credential_matches = []
+
     for pattern in URGENCY_PATTERNS:
         matches = re.findall(pattern, text_lower)
         result.urgency_count += len(matches)
+        if matches:
+            urgency_matches.extend(matches)
 
     for pattern in PHISHING_CTAS:
         matches = re.findall(pattern, text_lower)
         result.phishing_cta_count += len(matches)
+        if matches:
+            cta_matches.extend(matches)
 
     for pattern in CREDENTIAL_KEYWORDS:
         matches = re.findall(pattern, text_lower)
         result.credential_keyword_count += len(matches)
+        if matches:
+            credential_matches.extend(matches)
 
     if result.urgency_count >= 3:
+        evidence = "Rilevati pattern urgenti: " + ", ".join(list(dict.fromkeys(urgency_matches))[:5])
         result.findings.append(BodyFinding(
             category="text",
             severity="high",
             description=t("body.urgency_high", count=result.urgency_count),
-            evidence=t("body.urgency_high", count=result.urgency_count),
+            evidence=evidence,
             count=result.urgency_count,
         ))
     elif result.urgency_count >= 1:
+        evidence = "Rilevati pattern urgenti: " + ", ".join(list(dict.fromkeys(urgency_matches))[:5])
         result.findings.append(BodyFinding(
             category="text",
             severity="medium",
             description=t("body.urgency_medium", count=result.urgency_count),
+            evidence=evidence,
             count=result.urgency_count,
         ))
 
     if result.phishing_cta_count >= 2:
+        evidence = "Rilevati CTA sospetti: " + ", ".join(list(dict.fromkeys(cta_matches))[:5])
         result.findings.append(BodyFinding(
             category="text",
             severity="high",
             description=t("body.cta_high", count=result.phishing_cta_count),
+            evidence=evidence,
             count=result.phishing_cta_count,
         ))
     elif result.phishing_cta_count == 1:
+        evidence = "Rilevato CTA sospetto: " + ", ".join(cta_matches[:3])
         result.findings.append(BodyFinding(
             category="text",
             severity="medium",
             description=t("body.cta_medium"),
+            evidence=evidence,
         ))
 
     if result.credential_keyword_count >= 1:
+        evidence = "Rilevate credenziali: " + ", ".join(list(dict.fromkeys(credential_matches))[:5])
         result.findings.append(BodyFinding(
             category="text",
             severity="high",
             description=t("body.credentials", count=result.credential_keyword_count),
+            evidence=evidence,
             count=result.credential_keyword_count,
         ))
 
