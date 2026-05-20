@@ -85,7 +85,7 @@ Email (.eml / .msg / testo incollato)
 
 ## 🔧 Versione
 
-**v0.14.2** — Python 3.11–3.13, 119 test automatici, Windows + Linux, code review & error handling fixes
+**v0.14.3** — Python 3.11–3.13, 119 test automatici, Windows + Linux, rilevamento phishing portoghese, supporto email HTML-only, evidence visibility
 
 ---
 
