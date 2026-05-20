@@ -31,10 +31,19 @@ URGENCY_PATTERNS = [
     r"\burgente\b", r"\bscadenza\b", r"\bverifica.*account",
     r"\bconferma.*identit", r"\baccesso.*bloccato", r"\bsospeso\b",
     r"\bclicca.*ora\b", r"\bimmediatamente\b",
-    # Portoghese
-    r"\bexpirando\b", r"\bexpira\b", r"\bimediato\b",
+    # Portoghese — espanso
+    r"\bexpirando\b", r"\bexpira\b", r"\bimediato\b", r"\bimediatamente\b",
     r"\bverificar.*conta", r"\bconfirme.*identidade", r"\bacesso.*bloqueado\b",
     r"\bclique.*agora\b",
+    # Portoghese — aggiunti
+    r"\burgên[ci]a\b", r"\bur[gé]ncia\b",
+    r"\bação\s+obrigatória\b", r"\bação\s+necessária\b",
+    r"\bserá\s+suspenso\b", r"\bser[aá]\s+bloquead[oa]\b",
+    r"\bdesbloqueie\b", r"\bdesbloqu[a-z]*", r"\breativar\b", r"\breativaç",
+    r"\batividade\s+(?:suspeita|inusitada|suspeito|anormal)\b",
+    r"\bconfirme\s+(?:sua|seu|seus|sua)\s+(?:conta|email|e-mail|identidade)\b",
+    r"\bprazo\s+final\b", r"\blimite.*tempo\b",
+    r"\bsuspen[dç][ãa]o?\b",
 ]
 
 PHISHING_CTAS = [
@@ -44,18 +53,31 @@ PHISHING_CTAS = [
     # Italiano
     r"\baccedi ora\b", r"\bclicca qui\b", r"\bconferma.*dati",
     r"\baggiornam.*pagam", r"\binserisci.*password",
-    # Portoghese
-    r"\bresgatar agora\b", r"\bclique aqui\b", r"\bconfirme.*dados",
-    r"\batualize.*pagam", r"\binserir.*senha", r"\bfaça login",
-    r"\bverificar agora\b", r"\blogar\b",
+    # Portoghese — espanso
+    r"\bresgatar agora\b", r"\bclique aqui\b", r"\bclique.*aqui\b", r"\bclique.*agora\b",
+    r"\bconfirme.*dados", r"\batualize.*pagam", r"\binserir.*senha",
+    r"\bfaça login\b", r"\bfaça.*acesso\b", r"\bverificar agora\b", r"\blogar\b",
+    # Portoghese — aggiunti
+    r"\bacesse\s+(?:sua|seu|seus|sua)\s+conta\b",
+    r"\batualize\s+(?:seus|sua|seu)\s+(?:dados|password|passwd|senha)\b",
+    r"\bconfirme\s+seu\s+(?:e-?mail|email|e-mail)\b",
+    r"\bvalide\s+sua\s+identidade\b",
+    r"\bautentique-?se\b", r"\bautenticate\b",
+    r"\bfaça\s+(?:seu\s+)?(?:login|acesso)\b",
 ]
 
 CREDENTIAL_KEYWORDS = [
     r"\bpassword\b", r"\bpin\b", r"\bcredential", r"\bsocial security\b",
     r"\bcredit card\b", r"\biban\b", r"\bconto bancario\b",
     r"\bcodice fiscale\b",
-    # Portoghese — mantieni solo pattern specifici per credenziali
+    # Portoghese — specifici e finanziari
     r"\bsenha\b", r"\bcartão.*crédito\b", r"\bcpf\b",
+    # Portoghese — aggiunti per contesto bancario brasiliano
+    r"\bagência\b", r"\bconta\s+(?:bancária|corrente|poupança)\b",
+    r"\bnúmero\s+da\s+conta\b", r"\bcódigo\s+de\s+segurança\b",
+    r"\botp\b", r"\bone-?time\s+password\b",
+    r"\bpix\b",  # Sistema di pagamento istantaneo brasiliano — altamente rilevante
+    r"\b(?:rg|identidade|cédula)\b",
 ]
 
 # Mappa omoglifi Unicode → carattere latino equivalente

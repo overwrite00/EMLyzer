@@ -98,6 +98,29 @@ _TRAINING_SAMPLES: list[tuple[str, int]] = [
     ("tuo conto paypal limitato fornisci informazioni per sbloccare accesso", 1),
     ("urgente la tua email verra eliminata aggiorna le credenziali entro oggi", 1),
 
+    # --- Phishing bancario brasileiro (PT-BR) ---
+    ("bradesco conta bancaria suspensa acesse agora para reativar sua conta", 1),
+    ("aviso de seguranca atividade suspeita detectada confirme sua identidade urgentemente", 1),
+    ("caixa economica federal atualize seus dados para receber o auxilio emergencial", 1),
+    ("itau banco nao reconhece a transacao clique para validar sua identidade agora", 1),
+    ("santander sua senha vai expirar hoje clique para redefini la imediatamente", 1),
+    ("receita federal restituicao disponivel acesse o portal para receber seu reembolso", 1),
+    ("banco do brasil conta temporariamente limitada atualize dados para desbloquear", 1),
+    ("notificacao inps beneficio suspenso comprove sua identidade em 24 horas", 1),
+    ("mercado livre sua conta sera fechada confirme email em 48 horas ou perde acesso", 1),
+    ("paypal transferencia nao identificada forneca dados para liberar seu pagamento", 1),
+    ("atividade inusitada na sua conta pix autorize transacao clicando aqui agora", 1),
+    ("urgencia sua identidade nao foi validada confirme rg cpf dados bancarios hoje", 1),
+    ("boleto vencendo hoje pague agora para evitar suspensao de servicos", 1),
+    ("whatsapp business sua conta foi comprometida faca login novo imediatamente", 1),
+    ("samsung pay seu cartao foi bloqueado desbloqueie agora com seus dados", 1),
+
+    # --- Phishing e-commerce brasileiro (PT-BR) ---
+    ("shopee pedido nao pude entregar clique para pagar taxa aduaneira agora", 1),
+    ("amazon você não autorizou esta compra clique para confirmar identidade urgente", 1),
+    ("oba seu pacote chegou retire na agencia clique para confirmar endereco", 1),
+    ("lojas americanas resgate seu cupom promocional forneca dados pessoais aqui", 1),
+
     # --- Phishing Amazon / shipping (EN+IT) ---
     ("your amazon order has been placed verify your payment method click here", 1),
     ("amazon your account was used to make a purchase you did not authorize verify", 1),
@@ -169,6 +192,28 @@ _TRAINING_SAMPLES: list[tuple[str, int]] = [
     ("promemoria appuntamento con il dottore martedi prossimo alle 15 30", 0),
     ("benvenuto nel team siamo lieti di averti a bordo ecco il piano di onboarding", 0),
     ("la nostra newsletter mensile novita aggiornamenti e articoli selezionati", 0),
+
+    # --- Email cotidianas português brasileiro (PT-BR) ---
+    ("reuniao amanha as 9 em sala de conferencia segue agenda dos itens", 0),
+    ("segue anexado o orcamento como solicitado qualquer duvida me avise", 0),
+    ("relatorio mensal pronto voce encontra na pasta compartilhada para revisar", 0),
+    ("lembrete feriado proxima segunda escritorios fechados aproveite o feriado", 0),
+    ("sua reserva confirmada nos vemos dia 15 as 10 horas obrigado", 0),
+    ("obrigado pelo seu pedido recebemos o pagamento faremos envio amanha", 0),
+    ("atualizacao de projeto andamento conforme programado proxima call agendada", 0),
+    ("fatura numero 2024 001 disponivel para pagamento prazo 30 dias", 0),
+    ("seu assincatura renovada obrigado pela confianca segue resumo em anexo", 0),
+    ("lembrança seu agendamento amanha as 14 horas com dermatologista", 0),
+    ("bem vindo ao time ficamos felizes em te ter no projeto veja onboarding", 0),
+    ("nossa newsletter mensal novidades atualizacoes artigos selecionados", 0),
+
+    # --- Transações e-commerce brasileiras (PT-BR) ---
+    ("obrigado pela compra seu pedido foi enviado numero rastreamento anexo", 0),
+    ("comprovante da sua compra encontra se em anexo valor e data", 0),
+    ("seu pedido foi entregue foto em anexo na porta da sua residencia", 0),
+    ("seu pacote esta a caminho chegada prevista para proxima terca", 0),
+    ("promocao para voce cupom 50 porcento desconto valido ate final mes", 0),
+    ("seu cashback foi creditado na conta confira saldo atualizado aqui", 0),
 
     # --- Supporto tecnico / notifiche sistema (EN) ---
     ("your support ticket has been resolved please rate your experience", 0),
