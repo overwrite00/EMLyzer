@@ -48,6 +48,22 @@ Ogni voce passa a una sezione con numero di versione quando viene completata.
 
 ---
 
+## [0.14.2] — 2026-05-20
+
+### Corretto
+- **Database error handling**: aggiunto try-except attorno a `db.add()` e `await db.commit()` in `POST /api/analysis/{job_id}` per gestire errori di connessione/constraint in modo robusto. La funzione ora fa rollback automatico e restituisce HTTP 500 con messaggio di errore al client.
+- **Logging imports optimization**: spostati tutti gli import di logging a livello di modulo (top-level) in `header_analyzer.py`, `body_analyzer.py`, `url_analyzer.py`, `attachment_analyzer.py`. Evita ricreazioni ripetute del logger e migliora le performance.
+- **URL analyzer exception logging**: aggiunto logging dettagliato nei handler di eccezioni per batch timeout e fallimenti per-URL. Facilita il debugging dei timeout di rete.
+- **LanguageTool exception logging**: aggiunto logging con dettagli dell'eccezione quando il servizio non è disponibile.
+- **NLP serialization type safety**: corretto body_indicators["nlp"] per restituire `{}` (empty dict) invece di `None` quando nlp_result è falsy. Garantisce coerenza nella struttura JSON serializzata.
+
+### Testing
+- ✅ Tutti i 119 test passano senza regressioni
+- ✅ Code review comprehensiva completata con Opus agent
+- ✅ Tutti i CRITICAL e MEDIUM priority issues risolti
+
+---
+
 ## [0.14.1] — 2026-04-20
 
 ### Corretto

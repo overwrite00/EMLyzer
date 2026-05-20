@@ -117,7 +117,7 @@ Se hai ricevuto il file come `.tar.gz`:
 
 **Linux / macOS:**
 ```bash
-tar -xzf EMLyzer_v0.14.1.tar.gz
+tar -xzf EMLyzer_v0.14.2.tar.gz
 cd EMLyzer
 ```
 
@@ -144,7 +144,7 @@ Si aprirà una finestra nera (il Prompt dei comandi) che mostrerà i progressi:
 
 ```
 ============================================
-  EMLyzer v0.14.1
+  EMLyzer v0.14.2
 ============================================
 
 [INFO] Python trovato:
