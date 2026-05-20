@@ -9,34 +9,6 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
 Questa sezione raccoglie tutto ciò che è pianificato ma non ancora implementato.
 Le funzionalità sono ordinate per priorità di implementazione.
-Ogni voce passa a una sezione con numero di versione quando viene completata.
-
-### Reputazione — nuovi servizi (priorità alta)
-
-- [x] **CIRCL Passive DNS** — storico risoluzione DNS per IP e domini; gratuito con registrazione *(v0.11.0)*
-- [x] **GreyNoise Community** — distingue scanner innocui da attori malevoli, riduce falsi positivi; free tier 100 req/g *(v0.12.0)*
-- [x] **URLScan.io** — analisi completa URL con screenshot; free tier 100 req/h *(v0.12.0)*
-- [x] **Pulsedive** — threat intel aggregata su IP/URL/domini; free tier 30 req/min *(v0.12.0)*
-- [x] **Criminal IP** — threat score IP con geolocalizzazione; free tier *(v0.12.0)*
-- [x] **SecurityTrails** — DNS attuale e storico per domini; 50 req/mese free *(v0.12.0)*
-- [x] **Hybrid Analysis** — analisi statica avanzata hash allegati; gratuito con registrazione *(v0.12.0)*
-
-### Header analysis (priorità media)
-
-- [x] **List-Unsubscribe** — analisi link di unsubscribe (dominio diverso dal mittente, URL sospetti) *(v0.13.0)*
-- [x] **X-Campaign-ID** — analisi del campo già estratto: correlazione campagne bulk, pattern sospetti *(v0.13.0)*
-- [x] **ARC chain** (Authenticated Received Chain) — rilevante per phishing via account compromessi e forwarding *(v0.13.0)*
-
-### Body analysis (priorità media)
-
-- [x] **Rilevamento errori grammaticali** — integrazione LanguageTool (locale o API) per testi tradotti/generati automaticamente *(v0.14.0)*
-- [x] **Logistic regression NLP** — miglioramento classificatore attuale (Naive Bayes); migliore calibrazione probabilità *(v0.14.0)*
-- [x] **Dataset Enron/Nazario** — riaddestramento modello NLP con dataset pubblici per migliorare la generalizzazione *(v0.14.0)*
-- [x] **Omoglifi e Unicode spoofing** — rilevamento caratteri Unicode visivamente identici a caratteri latini nel testo (es. `а` cirillica) *(v0.14.0)*
-
-### Report (priorità media)
-
-- [x] **Sezione Campagne nel .docx** — la sezione Campagne Rilevate esiste nella UI e ora viene inclusa nel report Word generato *(v0.13.0)*
 
 ### Infrastruttura (priorità bassa)
 
