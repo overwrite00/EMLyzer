@@ -36,7 +36,7 @@ URGENCY_PATTERNS = [
     r"\bverificar.*conta", r"\bconfirme.*identidade", r"\bacesso.*bloqueado\b",
     r"\bclique.*agora\b",
     # Portoghese — aggiunti
-    r"\burgên[ci]a\b", r"\bur[gé]ncia\b",
+    r"\bur(?:gência|gencia|gência|gencia|ência|encia)\b",  # varianti di urgência/urgência
     r"\bação\s+obrigatória\b", r"\bação\s+necessária\b",
     r"\bserá\s+suspenso\b", r"\bser[aá]\s+bloquead[oa]\b",
     r"\bdesbloqueie\b", r"\bdesbloqu[a-z]*", r"\breativar\b", r"\breativaç",
@@ -460,6 +460,19 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
 
     _analyze_text(parsed.body_text, result)
     _logger.debug("[BODY] text analysis: %d findings", len(result.findings))
+
+    # Se il testo plain è vuoto o molto piccolo, estrarre il testo dall'HTML
+    # (alcuni email sono HTML-only e non hanno body_text)
+    if not parsed.body_text or len(parsed.body_text.strip()) < 50:
+        try:
+            if parsed.body_html:
+                soup = BeautifulSoup(parsed.body_html, "html.parser")
+                html_text = soup.get_text(separator=" ", strip=True)
+                if html_text and len(html_text) > 50:
+                    _logger.debug("[BODY] Extracting text from HTML for pattern analysis")
+                    _analyze_text(html_text, result)
+        except Exception as e:
+            _logger.debug("[BODY] Failed to extract text from HTML: %s", e)
 
     _analyze_html(parsed.body_html, result)
     _logger.debug("[BODY] html analysis: %d findings, %d urls extracted", len(result.findings), len(result.extracted_urls))
