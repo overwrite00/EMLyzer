@@ -337,6 +337,8 @@ echo.
 :: ── Avvio server ─────────────────────────────────────────────────────────────
 :: Nota: --reload rimosso perche' causa crash con multiprocessing su Windows
 cd /d "%BACKEND_DIR%"
+set "PYTHONIOENCODING=utf-8"
+set "PYTHONUTF8=1"
 "%VENV_PYTHON%" -m uvicorn main:app --host 0.0.0.0 --port 8000
 
 echo.

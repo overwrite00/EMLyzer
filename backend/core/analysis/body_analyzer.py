@@ -9,6 +9,7 @@ Analisi del corpo email:
 
 import re
 import base64
+import logging as _logging
 from dataclasses import dataclass, field
 from bs4 import BeautifulSoup
 import bleach
@@ -16,6 +17,8 @@ import bleach
 from core.analysis.email_parser import ParsedEmail
 from core.analysis.nlp_classifier import classify_text, NLPResult
 from utils.i18n import t
+
+_logger = _logging.getLogger(__name__)
 
 
 # --- Pattern linguistici sospetti (case-insensitive) ---
@@ -28,6 +31,10 @@ URGENCY_PATTERNS = [
     r"\burgente\b", r"\bscadenza\b", r"\bverifica.*account",
     r"\bconferma.*identit", r"\baccesso.*bloccato", r"\bsospeso\b",
     r"\bclicca.*ora\b", r"\bimmediatamente\b",
+    # Portoghese
+    r"\bexpirando\b", r"\bexpira\b", r"\bimediato\b",
+    r"\bverificar.*conta", r"\bconfirme.*identidade", r"\bacesso.*bloqueado\b",
+    r"\bclique.*agora\b",
 ]
 
 PHISHING_CTAS = [
@@ -37,12 +44,18 @@ PHISHING_CTAS = [
     # Italiano
     r"\baccedi ora\b", r"\bclicca qui\b", r"\bconferma.*dati",
     r"\baggiornam.*pagam", r"\binserisci.*password",
+    # Portoghese
+    r"\bresgatar agora\b", r"\bclique aqui\b", r"\bconfirme.*dados",
+    r"\batualize.*pagam", r"\binserir.*senha", r"\bfaça login",
+    r"\bverificar agora\b", r"\blogar\b",
 ]
 
 CREDENTIAL_KEYWORDS = [
     r"\bpassword\b", r"\bpin\b", r"\bcredential", r"\bsocial security\b",
     r"\bcredit card\b", r"\biban\b", r"\bconto bancario\b",
     r"\bcodice fiscale\b",
+    # Portoghese — mantieni solo pattern specifici per credenziali
+    r"\bsenha\b", r"\bcartão.*crédito\b", r"\bcpf\b",
 ]
 
 # Mappa omoglifi Unicode → carattere latino equivalente
@@ -222,8 +235,10 @@ def _analyze_html(body_html: str, result: BodyAnalysisResult):
                     visible_text, re.IGNORECASE
                 )
                 if domain_in_text:
-                    text_domain = domain_in_text.group(1).lower().lstrip("www.")
-                    href_domain_clean = href_domain.lstrip("www.")
+                    text_domain = domain_in_text.group(1).lower()
+                    if text_domain.startswith("www."):
+                        text_domain = text_domain[4:]
+                    href_domain_clean = href_domain[4:] if href_domain.startswith("www.") else href_domain
                     if text_domain and text_domain not in href_domain_clean:
                         result.obfuscated_links.append({
                             "visible_text": visible_text[:200],
@@ -405,8 +420,8 @@ def _check_languagetool(body_text: str, result: BodyAnalysisResult):
                 evidence=f"{n} potenziali errori rilevati da LanguageTool",
                 count=n,
             ))
-    except Exception:
-        pass  # Servizio non disponibile — analisi continua senza errori
+    except Exception as e:
+        _logger.debug("[BODY] LanguageTool check failed (non-critical): %s", str(e))
 
 
 def _compute_score(result: BodyAnalysisResult) -> float:
@@ -419,13 +434,23 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
     """Entry point analisi body. Analizza sia testo plain che HTML."""
     result = BodyAnalysisResult()
 
+    _logger.info("[BODY START] text_len=%d, html_len=%d", len(parsed.body_text or ''), len(parsed.body_html or ''))
+
     _analyze_text(parsed.body_text, result)
+    _logger.debug("[BODY] text analysis: %d findings", len(result.findings))
+
     _analyze_html(parsed.body_html, result)
+    _logger.debug("[BODY] html analysis: %d findings, %d urls extracted", len(result.findings), len(result.extracted_urls))
+
     _check_homoglyphs(parsed.body_text, result)
+    _logger.debug("[BODY] homoglyphs checked: %d findings", len(result.findings))
+
     _check_languagetool(parsed.body_text, result)
+    _logger.debug("[BODY] languagetool checked: %d findings", len(result.findings))
 
     # Deduplica URL
     result.extracted_urls = list(dict.fromkeys(result.extracted_urls))
+    _logger.info("[BODY] Extracted %d unique URLs from body", len(result.extracted_urls))
 
     # Classificatore NLP (se scikit-learn disponibile)
     try:
@@ -438,8 +463,11 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
                 description=t("body.nlp_phishing", **{"prob": int(result.nlp_result.phishing_probability * 100), "confidence": result.nlp_result.confidence}),
                 evidence="Feature: " + ", ".join(result.nlp_result.top_features[:5]) if result.nlp_result.top_features else "",
             ))
-    except Exception:
-        pass
+            _logger.info("[BODY] NLP: label=%s, prob=%.2f, confidence=%s", result.nlp_result.label, result.nlp_result.phishing_probability, result.nlp_result.confidence)
+    except Exception as e:
+        _logger.warning("[BODY] NLP classification failed: %s", e)
 
     result.score_contribution = _compute_score(result)
+    _logger.info("[BODY END] Total findings: %d (urgency=%d, cta=%d, creds=%d, score=%.1f)",
+                 len(result.findings), result.urgency_count, result.phishing_cta_count, result.credential_keyword_count, result.score_contribution)
     return result

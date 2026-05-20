@@ -1,0 +1,628 @@
+{
+  "timestamp": "2026-05-20T00:00:00",
+  "report_version": "1.0",
+  "project_version": "0.14.1",
+  "validation_approach": "static_analysis_of_codebase",
+  "summary": {
+    "total_services_implemented": 19,
+    "fast_services": 15,
+    "slow_services": 2,
+    "informational_services": 2,
+    "api_keys_required": 11,
+    "api_keys_optional": 8,
+    "rate_limiting_implemented": true,
+    "two_phase_reputation_system": true,
+    "disk_cache_implemented": true,
+    "background_task_support": true
+  },
+  "services_catalog": {
+    "fast_services": [
+      {
+        "name": "Spamhaus DROP",
+        "type": "ip",
+        "api_key_required": false,
+        "cache_enabled": true,
+        "cache_ttl_hours": 24,
+        "rate_limit_seconds": 0.0,
+        "description": "Blocklist of malicious IPs and CIDR blocks",
+        "data_source": "https://www.spamhaus.org/drop/drop.txt",
+        "confidence_model": "95% when match found",
+        "notes": "Public feed, disk-cached for resilience"
+      },
+      {
+        "name": "ASN Lookup",
+        "type": "ip",
+        "api_key_required": false,
+        "cache_enabled": false,
+        "rate_limit_seconds": 0.3,
+        "timeout_seconds": 4,
+        "description": "Autonomous System Number lookup via ipinfo.io",
+        "data_source": "https://ipinfo.io/",
+        "confidence_model": "informational (no malicious/benign classification)",
+        "rate_limit_notes": "50k req/month free quota"
+      },
+      {
+        "name": "OpenPhish",
+        "type": "url",
+        "api_key_required": false,
+        "cache_enabled": true,
+        "cache_ttl_hours": 12,
+        "rate_limit_seconds": 0.0,
+        "description": "Phishing URL feed updated hourly",
+        "data_source": "https://openphish.com/feed.txt",
+        "confidence_model": "90% when URL match found",
+        "notes": "Disk-cached, fast local lookup"
+      },
+      {
+        "name": "PhishTank",
+        "type": "url",
+        "api_key_required": true,
+        "api_key_env": "PHISHTANK_API_KEY",
+        "rate_limit_seconds": 0.5,
+        "description": "Community-verified phishing database",
+        "api_endpoint": "https://checkurl.phishtank.com/checkurl/",
+        "confidence_model": "100% if in_database AND verified, 50% if in_database only"
+      },
+      {
+        "name": "MalwareBazaar",
+        "type": "hash",
+        "api_key_required": true,
+        "api_key_env": "ABUSECH_API_KEY",
+        "api_key_legacy": "MALWAREBAZAAR_API_KEY",
+        "rate_limit_seconds": 0.7,
+        "description": "Hash-based malware intelligence from abuse.ch",
+        "api_endpoint": "https://mb-api.abuse.ch/api/v1/",
+        "confidence_model": "100% when hash found in database"
+      },
+      {
+        "name": "crt.sh",
+        "type": "url",
+        "api_key_required": false,
+        "cache_enabled": false,
+        "rate_limit_seconds": 2.5,
+        "timeout_seconds": 5,
+        "description": "SSL/TLS certificate history for domains",
+        "api_endpoint": "https://crt.sh/",
+        "confidence_model": "30% if domain very recent (<=2 certs, post-2024)",
+        "notes": "Informational service, helps identify newly created domains"
+      },
+      {
+        "name": "CIRCL Passive DNS",
+        "type": "ip_and_url",
+        "api_key_required": true,
+        "api_key_env": "CIRCL_API_KEY",
+        "api_key_format": "username:password",
+        "rate_limit_seconds": 0.5,
+        "timeout_seconds": 5,
+        "description": "Passive DNS query service (domain-to-IP history)",
+        "api_endpoint": "https://www.circl.lu/pdns/query/",
+        "confidence_model": "informational (no threat classification)",
+        "notes": "Free registration at circl.lu/pdns"
+      },
+      {
+        "name": "GreyNoise Community",
+        "type": "ip",
+        "api_key_required": true,
+        "api_key_env": "GREYNOISE_API_KEY",
+        "rate_limit_seconds": 1.1,
+        "description": "IP classification: malicious, benign, scanner, or unknown",
+        "api_endpoint": "https://api.greynoise.io/v3/community/",
+        "confidence_model": "90% if classified as malicious",
+        "rate_limit_notes": "100 req/day free, reduces false positives from scanners"
+      },
+      {
+        "name": "Criminal IP",
+        "type": "ip",
+        "api_key_required": true,
+        "api_key_env": "CRIMINALIP_API_KEY",
+        "rate_limit_seconds": 1.1,
+        "description": "IP risk score 0-4 (free tier with limited credits)",
+        "api_endpoint": "https://api.criminalip.io/",
+        "confidence_model": "risk score based"
+      },
+      {
+        "name": "URLScan.io",
+        "type": "url",
+        "api_key_required": false,
+        "api_key_optional": true,
+        "api_key_env": "URLSCAN_API_KEY",
+        "rate_limit_seconds": 1.0,
+        "description": "Searches existing URL scans, retrieves verdict",
+        "api_endpoint": "https://urlscan.io/api/v1/search/",
+        "confidence_model": "based on latest scan verdict (overall.malicious)",
+        "rate_limit_notes": "1000 searches/day free (public), higher with API key"
+      },
+      {
+        "name": "SecurityTrails",
+        "type": "url",
+        "api_key_required": true,
+        "api_key_env": "SECURITYTRAILS_API_KEY",
+        "rate_limit_seconds": 3.0,
+        "timeout_seconds": 5,
+        "description": "DNS records and domain infrastructure (TRIAL ONLY, no free plan)",
+        "api_endpoint": "https://securitytrails.com/",
+        "confidence_model": "informational (DNS records only)",
+        "notes": "⚠ Trial API only — no active free tier as of 2025"
+      },
+      {
+        "name": "Shodan InternetDB",
+        "type": "ip",
+        "api_key_required": false,
+        "rate_limit_seconds": 0.3,
+        "timeout_seconds": 8,
+        "description": "Open ports, running services, CVE information for IP",
+        "api_endpoint": "https://internetdb.shodan.io/",
+        "confidence_model": "informational (service/CVE details, not threat classification)",
+        "notes": "Free API, informational use (helps context of compromised hosts)"
+      },
+      {
+        "name": "Redirect Chain",
+        "type": "url",
+        "api_key_required": false,
+        "rate_limit_seconds": 0.2,
+        "description": "Follows HTTP redirects to detect obfuscation",
+        "confidence_model": "based on redirect chain analysis"
+      },
+      {
+        "name": "Hybrid Analysis",
+        "type": "hash",
+        "api_key_required": true,
+        "api_key_env": "HYBRID_ANALYSIS_API_KEY",
+        "rate_limit_seconds": 1.0,
+        "description": "Falcon Sandbox file analysis and threat intel",
+        "api_endpoint": "https://hybrid-analysis.com/",
+        "confidence_model": "based on sandbox analysis verdict"
+      },
+      {
+        "name": "URLhaus",
+        "type": "url",
+        "api_key_required": true,
+        "api_key_env": "ABUSECH_API_KEY",
+        "rate_limit_seconds": 0.3,
+        "description": "URLhaus malware hosting database from abuse.ch",
+        "api_endpoint": "https://urlhaus-api.abuse.ch/v1/url/",
+        "confidence_model": "based on threat type (malware, phishing, etc)"
+      },
+      {
+        "name": "ThreatFox",
+        "type": "ip_url_hash",
+        "api_key_required": true,
+        "api_key_env": "ABUSECH_API_KEY",
+        "rate_limit_seconds": 0.3,
+        "description": "Threat intelligence on IP/URL/hash from abuse.ch",
+        "api_endpoint": "https://threatfox-api.abuse.ch/api/v1/",
+        "confidence_model": "based on hit in threat database"
+      },
+      {
+        "name": "Pulsedive",
+        "type": "ip_url",
+        "api_key_required": true,
+        "api_key_env": "PULSEDIVE_API_KEY",
+        "rate_limit_seconds": 2.5,
+        "description": "Threat intelligence aggregation (10 req/day free as of Mar 2024)",
+        "api_endpoint": "https://pulsedive.com/",
+        "rate_limit_notes": "⚠ Severely rate-limited free tier (10 req/day)"
+      }
+    ],
+    "slow_services": [
+      {
+        "name": "AbuseIPDB",
+        "type": "ip",
+        "api_key_required": true,
+        "api_key_env": "ABUSEIPDB_API_KEY",
+        "rate_limit_seconds": 1.1,
+        "timeout_seconds": 8,
+        "description": "IP abuse score 0-100 based on community reports",
+        "api_endpoint": "https://api.abuseipdb.com/api/v2/check",
+        "confidence_model": "malicious if score >= 50",
+        "performance_note": "Slower service, executed in background phase",
+        "rate_limit_notes": "1000 reports/day free → ~1 req/sec acceptable"
+      },
+      {
+        "name": "VirusTotal",
+        "type": "ip_url_hash",
+        "api_key_required": true,
+        "api_key_env": "VIRUSTOTAL_API_KEY",
+        "rate_limit_seconds": 15.5,
+        "timeout_seconds": 8,
+        "api_endpoint": "https://www.virustotal.com/api/v3/",
+        "description": "Multi-engine scan results from 70+ antivirus engines",
+        "confidence_model": "malicious if >0 engines detect",
+        "performance_note": "Rate-limited 4 req/min (free tier) → background phase only",
+        "note_on_missing_urls": "Missing URLs are queued for future scanning"
+      }
+    ]
+  },
+  "architecture": {
+    "two_phase_system": {
+      "phase_1_fast": {
+        "description": "Executes within 50 seconds (browser timeout safe)",
+        "services": 15,
+        "typical_response_time": "5-15 seconds",
+        "blocking": true,
+        "endpoint": "POST /api/reputation/{job_id}",
+        "includes_slow_indicators_extraction": true
+      },
+      "phase_2_slow": {
+        "description": "Runs in background after phase 1 returns",
+        "services": 2,
+        "uses_background_tasks": true,
+        "timeout_per_request": 8,
+        "indicator_selection": "priority-based (only high-value indicators)",
+        "max_urls_slow": 4,
+        "max_ips_slow": "all from received headers + x_originating_ip",
+        "frontend_polling": "GET /api/analysis/{job_id} every 5 seconds"
+      }
+    },
+    "indicator_extraction": {
+      "fast_phase_indicators": {
+        "ips": "all received hops + x_originating_ip + URL hosts + resolved IPs",
+        "urls": "all discovered URLs",
+        "hashes": "all attachment SHA256s"
+      },
+      "slow_phase_indicators": {
+        "ips": "ONLY received hops + x_originating_ip (not resolved_ip to avoid CDN IPs)",
+        "urls": "max 4, only suspicious ones (shortener, new domain, IP direct, punycode, score>=25, obfuscated)",
+        "hashes": "all attachments"
+      }
+    },
+    "rate_limiting": {
+      "implementation": "thread-safe per-service locks",
+      "mechanism": "threading.Lock + minimum interval between requests",
+      "intervals_by_service": {
+        "virustotal": 15.5,
+        "abuseipdb": 1.1,
+        "crtsh": 2.5,
+        "malwarebazaar": 0.7,
+        "phishtank": 0.5,
+        "asnlookup": 0.3,
+        "redirectchain": 0.2,
+        "shodaninternetdb": 0.3,
+        "urlhaus": 0.3,
+        "threatfox": 0.3,
+        "openphish": 0.0,
+        "spamhaus": 0.0
+      },
+      "retry_strategy": "backoff 2s/4s on 429/502/503/504"
+    },
+    "caching": {
+      "spamhaus_drop": {
+        "location": "backend/data/cache/spamhaus_drop.json",
+        "ttl_hours": 24,
+        "format": "CIDR networks as JSON list"
+      },
+      "openphish_feed": {
+        "location": "backend/data/cache/openphish_feed.json",
+        "ttl_hours": 12,
+        "format": "URLs as JSON list"
+      },
+      "fallback_on_failure": true,
+      "fallback_behavior": "use stale cache if download fails"
+    }
+  },
+  "service_dependencies": {
+    "shared_libraries": [
+      "requests (HTTP)",
+      "ipaddress (stdlib, IP validation)",
+      "urllib.parse (URL parsing)",
+      "threading (rate limiting)",
+      "json (data serialization)"
+    ],
+    "timeout_hierarchy": {
+      "REQUEST_TIMEOUT": 8,
+      "REQUEST_TIMEOUT_ASN": 4,
+      "REQUEST_TIMEOUT_INFO": 5
+    },
+    "http_retry_logic": {
+      "max_retries": 2,
+      "retry_on_codes": [429, 502, 503, 504],
+      "exponential_backoff": "2s, 4s",
+      "retry_after_header": true
+    }
+  },
+  "api_key_configuration": {
+    "required_keys": {
+      "ABUSEIPDB_API_KEY": {
+        "service": "AbuseIPDB",
+        "type": "bearer token",
+        "obtained_from": "https://www.abuseipdb.com",
+        "cost": "free (paid plans available)"
+      },
+      "VIRUSTOTAL_API_KEY": {
+        "service": "VirusTotal",
+        "type": "bearer token",
+        "obtained_from": "https://www.virustotal.com",
+        "cost": "free (limited 4 req/min)",
+        "note": "Rate limit severely impacts SLOW phase"
+      },
+      "PHISHTANK_API_KEY": {
+        "service": "PhishTank",
+        "type": "app_key",
+        "obtained_from": "https://www.phishtank.com",
+        "cost": "free"
+      },
+      "ABUSECH_API_KEY": {
+        "service": "Multiple (URLhaus, MalwareBazaar, ThreatFox)",
+        "type": "bearer token",
+        "obtained_from": "https://auth.abuse.ch/",
+        "cost": "free",
+        "note": "Single key covers 3 services"
+      },
+      "CIRCL_API_KEY": {
+        "service": "CIRCL Passive DNS",
+        "type": "basic_auth (user:password)",
+        "obtained_from": "https://www.circl.lu/pdns",
+        "cost": "free",
+        "registration_required": true
+      },
+      "GREYNOISE_API_KEY": {
+        "service": "GreyNoise Community",
+        "type": "bearer token",
+        "obtained_from": "https://www.greynoise.io",
+        "cost": "free (100 req/day)",
+        "registration_required": true
+      },
+      "URLSCAN_API_KEY": {
+        "service": "URLScan.io",
+        "type": "bearer token",
+        "obtained_from": "https://urlscan.io",
+        "cost": "free (public search)",
+        "optional": true,
+        "note": "Required for increased rate limits"
+      },
+      "CRIMINALIP_API_KEY": {
+        "service": "Criminal IP",
+        "type": "bearer token",
+        "obtained_from": "https://www.criminalip.io",
+        "cost": "free (limited credits)"
+      },
+      "SECURITYTRAILS_API_KEY": {
+        "service": "SecurityTrails",
+        "type": "bearer token",
+        "obtained_from": "https://securitytrails.com",
+        "cost": "paid only",
+        "note": "No active free tier as of 2025"
+      },
+      "HYBRID_ANALYSIS_API_KEY": {
+        "service": "Hybrid Analysis",
+        "type": "bearer token",
+        "obtained_from": "https://hybrid-analysis.com",
+        "cost": "free (registration required)"
+      },
+      "PULSEDIVE_API_KEY": {
+        "service": "Pulsedive",
+        "type": "bearer token",
+        "obtained_from": "https://pulsedive.com",
+        "cost": "free (severely rate-limited as of Mar 2024)"
+      }
+    },
+    "no_api_key_required": [
+      "Spamhaus DROP (public blocklist)",
+      "ASN Lookup (ipinfo.io free)",
+      "OpenPhish (public feed)",
+      "crt.sh (free certificate database)",
+      "Shodan InternetDB (free API)",
+      "Redirect Chain (local analysis)"
+    ]
+  },
+  "response_structure": {
+    "service_registry": {
+      "structure": [
+        {
+          "service": "string",
+          "entity": "string",
+          "entity_type": "ip|url|hash",
+          "status": "clean|malicious|pending|skipped|not_applicable|error",
+          "confidence": "float 0-100",
+          "detail": "string"
+        }
+      ],
+      "status_definitions": {
+        "clean": "Service checked, no threat found",
+        "malicious": "Threat indicators detected",
+        "pending": "Slow service still processing (SLOW phase)",
+        "skipped": "API key not configured",
+        "not_applicable": "Entity type not relevant for service (e.g., IP to PhishTank)",
+        "error": "Network/API error occurred"
+      }
+    },
+    "slow_indicators": {
+      "structure": {
+        "ips": ["list of IPs sent to SLOW services"],
+        "urls": ["list of URLs sent to SLOW services"],
+        "hashes": ["list of hashes sent to SLOW services"]
+      },
+      "purpose": "frontend diagnostics and audit trail"
+    },
+    "reputation_phase": {
+      "values": ["fast", "complete"],
+      "definition": {
+        "fast": "Phase 1 complete, Phase 2 running (has_slow=true)",
+        "complete": "All phases done (no SLOW indicators) or Phase 2 finished"
+      }
+    }
+  },
+  "implementation_details": {
+    "database_integration": {
+      "table": "EmailAnalysis",
+      "columns_used": [
+        "header_indicators (JSON)",
+        "url_indicators (JSON)",
+        "body_indicators (JSON)",
+        "attachment_indicators (JSON)",
+        "x_originating_ip (direct column)",
+        "reputation_results (JSON)"
+      ]
+    },
+    "critical_field_names": {
+      "url_field": "original_url (NOT 'url')",
+      "url_ip_check": "is_ip_address (NOT 'is_ip')",
+      "x_originating_ip": "top-level column (NOT inside header_indicators)",
+      "attachment_hash": "hash_sha256",
+      "received_hops_ip": "header_indicators.received_hops[].ip"
+    },
+    "sqlalchemy_mutations": {
+      "json_field_mutation": "must use flag_modified(record, 'reputation_results') before commit on SQLite",
+      "reason": "SQLite JSON mutation tracking requires explicit flag"
+    }
+  },
+  "validation_checklist": {
+    "api_key_validation": {
+      "method": "check settings.FIELD_NAME for each API key",
+      "required": 11,
+      "optional": 1,
+      "missing_creates": "skipped status in service registry"
+    },
+    "service_health_checks": {
+      "FAST_phase_must_complete": "within 50 seconds",
+      "SLOW_phase_timeout": "no client timeout, runs indefinitely",
+      "rate_limiting": "must respect _RATE_INTERVALS per connector",
+      "retry_logic": "must handle 429/5xx with backoff"
+    },
+    "response_validation": {
+      "service_registry_required": "every email analysis",
+      "reputation_phase_field": "must be 'fast' or 'complete'",
+      "status_distribution": "clean|malicious|pending|skipped|not_applicable|error",
+      "slow_indicators": "populated only if has_slow=true"
+    },
+    "frontend_polling": {
+      "requirement": "GET /api/analysis/{job_id}",
+      "frequency": "every 5 seconds",
+      "completion_signal": "reputation_results.reputation_phase === 'complete'"
+    }
+  },
+  "known_issues_and_workarounds": {
+    "issue_1_urlhouse_auth_required": {
+      "title": "URLhaus requires authentication as of June 2025",
+      "api_key": "ABUSECH_API_KEY (from auth.abuse.ch)",
+      "status": "⚠ Affects service availability without key"
+    },
+    "issue_2_threatfox_result_parsing": {
+      "title": "ThreatFox returns 'illegal_search_term' and 'no_result' (singular)",
+      "workaround": "Both must be added to 'no result' cases in _parse_threatfox_result",
+      "impact": "malformed URLs could show status instead of clean verdict"
+    },
+    "issue_3_securitytrails_no_free": {
+      "title": "SecurityTrails has no free tier anymore (trial only)",
+      "impact": "Service returns skipped unless valid credentials",
+      "recommendation": "Mark as informational, not critical"
+    },
+    "issue_4_pulsedive_rate_limit": {
+      "title": "Pulsedive free tier reduced to 10 req/day (March 2024)",
+      "impact": "Barely usable for production",
+      "recommendation": "Consider removing from automatic checks"
+    },
+    "issue_5_slow_phase_placeholder_finalization": {
+      "title": "finalize_fast_only() must be called when has_slow=false",
+      "problem": "Without it, AbuseIPDB/VirusTotal/crt.sh show 'pending' forever",
+      "status": "✓ Fixed in v0.9.4"
+    }
+  },
+  "performance_benchmarks": {
+    "fast_phase_expected_time": {
+      "min_seconds": 3,
+      "typical_seconds": 8,
+      "max_seconds": 50,
+      "browser_timeout": 60,
+      "safety_margin": 10
+    },
+    "slow_phase_time": {
+      "depends_on": "number of SLOW indicators",
+      "abuseipdb_per_ip": 1.1,
+      "virustotal_per_url": 15.5,
+      "virustotal_per_ip": 15.5,
+      "virustotal_per_hash": 15.5,
+      "crtsh_per_url": 2.5,
+      "typical_total": "20-60 seconds for 1 IP + 4 URLs"
+    },
+    "throughput": {
+      "virustotal_free": "4 req/min (every 15s)",
+      "abuseipdb_free": "1000 reports/day (~1 req/s)",
+      "rate_limiting": "thread-safe serialization per service"
+    }
+  },
+  "test_scenarios": {
+    "scenario_1_email_with_sender_ip": {
+      "description": "Email from known spam IP",
+      "expected_results": {
+        "fast_services": "Spamhaus DROP, ASN, GreyNoise (if key), Criminal IP (if key)",
+        "slow_services": "AbuseIPDB (if key), VirusTotal (if key)",
+        "expected_status": "HIGH reputation risk"
+      }
+    },
+    "scenario_2_email_with_phishing_url": {
+      "description": "Email containing known phishing URL",
+      "expected_results": {
+        "fast_services": "OpenPhish, PhishTank (if key), URLhaus (if key), ThreatFox (if key)",
+        "slow_services": "VirusTotal (if key)",
+        "expected_status": "MALICIOUS detection"
+      }
+    },
+    "scenario_3_benign_email": {
+      "description": "Email from trusted domain (GitHub, Microsoft, etc)",
+      "expected_results": {
+        "all_services": "CLEAN status",
+        "expected_risk": "LOW (0-20)"
+      }
+    },
+    "scenario_4_no_indicators": {
+      "description": "Email with no URLs, attachments, suspicious IPs",
+      "expected_results": {
+        "many_services": "NOT_APPLICABLE",
+        "available_services": "Header analysis only"
+      }
+    }
+  },
+  "recommendations": {
+    "for_api_key_strategy": [
+      "CRITICAL: Obtain ABUSECH_API_KEY (covers 3 services)",
+      "HIGH: Obtain ABUSEIPDB_API_KEY (slowest IP service, valuable)",
+      "HIGH: Obtain VIRUSTOTAL_API_KEY (multi-type detection)",
+      "MEDIUM: Obtain PHISHTANK_API_KEY (phishing-specific)",
+      "MEDIUM: Obtain GREYNOISE_API_KEY (reduces false positives on scanners)",
+      "LOW: CIRCL_API_KEY (free registration, informational DNS history)",
+      "SKIP: SecurityTrails (no free tier as of 2025)"
+    ],
+    "for_service_prioritization": [
+      "Always enable FAST services (no rate limit burden)",
+      "Selectively enable SLOW services (VirusTotal free = 4 req/min cap)",
+      "Monitor SLOW phase completion in frontend polling",
+      "Consider disabling Pulsedive (10 req/day is negligible)",
+      "Monitor crt.sh for domain age assessment (good signal for newly created phishing domains)"
+    ],
+    "for_monitoring": [
+      "Track reputation_phase transitions (fast → complete)",
+      "Monitor service_registry status distribution",
+      "Alert on > 50% ERROR status for any service",
+      "Alert on SLOW phase stuck > 5 minutes",
+      "Log API key expiration/rotation dates"
+    ],
+    "for_testing": [
+      "Test with 8.8.8.8 (Google DNS, known benign)",
+      "Test with localhost 127.0.0.1 (should be skipped as private)",
+      "Test with https://github.com (known legitimate)",
+      "Test without any API keys (all services should skip appropriately)",
+      "Monitor response times to catch rate limit issues early"
+    ]
+  },
+  "file_locations": {
+    "connectors_code": "backend/core/reputation/connectors.py",
+    "router_code": "backend/api/routes/reputation.py",
+    "dataclasses": "backend/core/reputation/connectors.py:ReputationResult, ReputationSummary",
+    "settings": "backend/utils/config.py",
+    "database_schema": "backend/models/database.py:EmailAnalysis",
+    "tests": "backend/tests/test_core.py (various reputation tests)",
+    "cache_directory": "backend/data/cache/",
+    "sample_emails": "samples/phishing_sample.eml, clean_sample.eml"
+  },
+  "next_steps": [
+    "Run reputation_services_validator.py to test all services",
+    "Configure API keys in .env file based on priority recommendations",
+    "Test with real email samples from samples/ directory",
+    "Monitor FAST phase response times (target: <15 seconds)",
+    "Monitor SLOW phase polling completion times",
+    "Track service_registry status distribution over time",
+    "Create monitoring dashboard for reputation service health",
+    "Document rate limit strategies for production deployments"
+  ]
+}

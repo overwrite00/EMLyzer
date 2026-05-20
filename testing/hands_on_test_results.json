@@ -1,0 +1,280 @@
+{
+  "timestamp": "2026-05-20 18:29:35",
+  "api_base": "http://localhost:8000/api",
+  "total_samples": 15,
+  "analyses": [
+    {
+      "filename": "sample-755.eml",
+      "file_size_kb": 11.5,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-2899.eml",
+      "file_size_kb": 13.5,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-2208.eml",
+      "file_size_kb": 15.0,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-1047.eml",
+      "file_size_kb": 16.3,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-1709.eml",
+      "file_size_kb": 17.8,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-467.eml",
+      "file_size_kb": 18.8,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-1662.eml",
+      "file_size_kb": 19.9,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-673.eml",
+      "file_size_kb": 21.3,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-6353.eml",
+      "file_size_kb": 23.3,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-6109.eml",
+      "file_size_kb": 25.7,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-4072.eml",
+      "file_size_kb": 28.2,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-6196.eml",
+      "file_size_kb": 47.1,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    },
+    {
+      "filename": "sample-2676.eml",
+      "file_size_kb": 102.0,
+      "risk_score": 0,
+      "risk_label": "unknown",
+      "indicators": {
+        "header": 0,
+        "body": 0,
+        "url": 0,
+        "attachment": 0,
+        "total": 0
+      },
+      "reputation_phase": "unknown",
+      "findings": {
+        "header": [],
+        "body": [],
+        "url": [],
+        "attachment": []
+      }
+    }
+  ],
+  "statistics": {
+    "unknown": 13
+  },
+  "issues": [
+    {
+      "file": "sample-2227.eml",
+      "error": "Upload failed"
+    },
+    {
+      "file": "sample-4485.eml",
+      "error": "Analysis failed"
+    }
+  ]
+}

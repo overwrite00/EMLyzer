@@ -10,11 +10,14 @@ Analisi degli header email:
 """
 
 import re
+import logging as _logging
 from dataclasses import dataclass, field
 from typing import Optional
 
 from core.analysis.email_parser import ParsedEmail
 from utils.i18n import t
+
+_logger = _logging.getLogger(__name__)
 
 # DNS queries (dnspython già in requirements.txt)
 try:
@@ -362,9 +365,9 @@ def _query_dkim_key(selector: str, domain: str) -> tuple[str, bool, str]:
 
 def _check_auth(parsed: ParsedEmail, result: HeaderAnalysisResult):
     """Valuta i risultati SPF / DKIM / DMARC."""
-    spf = parsed.spf_result.lower()
-    dkim = parsed.dkim_result.lower()
-    dmarc = parsed.dmarc_result.lower()
+    spf = (parsed.spf_result or "").lower()
+    dkim = (parsed.dkim_result or "").lower()
+    dmarc = (parsed.dmarc_result or "").lower()
 
     result.spf_ok = spf in ("pass",)
     result.dkim_ok = dkim in ("pass",)
@@ -560,7 +563,7 @@ def _build_auth_detail(parsed: ParsedEmail, result: HeaderAnalysisResult) -> Non
 
 def _check_bulk_sender(parsed: ParsedEmail, result: HeaderAnalysisResult):
     """Rileva tool di invio massivo tramite X-Mailer / User-Agent."""
-    mailer = parsed.x_mailer.lower()
+    mailer = (parsed.x_mailer or "").lower()
     if not mailer:
         return
     for pattern in BULK_SENDER_PATTERNS:
@@ -630,7 +633,7 @@ def _parse_received_chain(parsed: ParsedEmail, result: HeaderAnalysisResult):
 
 def _check_originating_ip(parsed: ParsedEmail, result: HeaderAnalysisResult):
     """Controlla X-Originating-IP per IP privati o anomali."""
-    ip = parsed.x_originating_ip.strip()
+    ip = (parsed.x_originating_ip or "").strip()
     if not ip:
         return
     # Rimuovi parentesi quadre se presenti
@@ -666,7 +669,7 @@ def _check_list_unsubscribe(parsed: ParsedEmail, result: HeaderAnalysisResult):
     Rileva: dominio esterno, HTTP non sicuro, IP diretto, formato malformato.
     Finding INFO se presente e corretto (bulk legittimo).
     """
-    value = parsed.list_unsubscribe.strip()
+    value = (parsed.list_unsubscribe or "").strip()
     if not value:
         return
 
@@ -758,7 +761,7 @@ def _check_campaign_id(parsed: ParsedEmail, result: HeaderAnalysisResult):
     Analizza l'header X-Campaign-ID.
     Finding INFO se presente; LOW se manca il List-Unsubscribe.
     """
-    value = parsed.x_campaign_id.strip()
+    value = (parsed.x_campaign_id or "").strip()
     if not value:
         return
 
@@ -770,7 +773,7 @@ def _check_campaign_id(parsed: ParsedEmail, result: HeaderAnalysisResult):
     ))
 
     # Bulk email senza List-Unsubscribe → segnale sospetto
-    if not parsed.list_unsubscribe.strip():
+    if not (parsed.list_unsubscribe or "").strip():
         result.findings.append(HeaderFinding(
             field="X-Campaign-ID",
             severity="low",
@@ -844,16 +847,39 @@ def analyze_headers(parsed: ParsedEmail) -> HeaderAnalysisResult:
     """Entry point: esegue tutte le analisi header e restituisce HeaderAnalysisResult."""
     result = HeaderAnalysisResult()
 
+    _logger.info("[HEADER START] From=%s, SPF=%s, DKIM=%s, DMARC=%s", parsed.mail_from, parsed.spf_result, parsed.dkim_result, parsed.dmarc_result)
+
     _check_identity_mismatch(parsed, result)
+    _logger.debug("[HEADER] identity_mismatch checked: %d findings", len(result.findings))
+
     _check_auth(parsed, result)
+    _logger.info("[HEADER] auth checked: SPF=%s, DKIM=%s, DMARC=%s, %d findings", result.spf_ok, result.dkim_ok, result.dmarc_ok, len(result.findings))
+
     _check_bulk_sender(parsed, result)
+    _logger.debug("[HEADER] bulk_sender checked: %d findings", len(result.findings))
+
     _check_header_injection(parsed, result)
+    _logger.debug("[HEADER] injection checked: %d findings", len(result.findings))
+
     _parse_received_chain(parsed, result)
+    _logger.info("[HEADER] received_chain parsed: %d hops", len(result.received_hops))
+
     _check_originating_ip(parsed, result)
+    _logger.debug("[HEADER] originating_ip checked: %d findings", len(result.findings))
+
     _check_missing_fields(parsed, result)
+    _logger.debug("[HEADER] missing_fields checked: %d findings", len(result.findings))
+
     _check_list_unsubscribe(parsed, result)
+    _logger.debug("[HEADER] list_unsubscribe checked: %d findings", len(result.findings))
+
     _check_campaign_id(parsed, result)
+    _logger.debug("[HEADER] campaign_id checked: %d findings", len(result.findings))
+
     _check_arc_chain(parsed, result)
+    _logger.debug("[HEADER] arc_chain checked: %d findings", len(result.findings))
 
     result.score_contribution = _compute_score(result)
+    _logger.info("[HEADER END] Total findings: %d (score=%.1f, auth_ok=%s/%s/%s)", len(result.findings), result.score_contribution, result.spf_ok, result.dkim_ok, result.dmarc_ok)
     return result
+

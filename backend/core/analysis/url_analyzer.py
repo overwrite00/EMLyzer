@@ -12,6 +12,7 @@ Analisi URL estratti dal corpo email:
 import re
 import urllib.parse
 import concurrent.futures
+import logging as _logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
@@ -20,6 +21,8 @@ import tldextract
 import dns.resolver
 import dns.exception
 from utils.i18n import t
+
+_logger = _logging.getLogger(__name__)
 
 
 # URL shortener noti (stesso set usato in body_analyzer)
@@ -285,8 +288,10 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
 
     capped_urls = valid_urls[:50]  # limite di sicurezza: max 50 URL per email
     result.total_urls = len(capped_urls)
+    _logger.info("[URL START] Processing %d URLs (dedup from %d raw extractions)", result.total_urls, len(urls))
 
     if not capped_urls:
+        _logger.info("[URL END] No valid URLs found")
         return result
 
     # ── Pre-calcola WHOIS per dominio unico ──────────────────────────────────
@@ -342,16 +347,19 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
             for future in concurrent.futures.as_completed(future_map, timeout=URL_BATCH_TIMEOUT):
                 try:
                     analyses.append(future.result())
-                except Exception:
-                    pass  # URL non analizzabile: skippa senza bloccare
+                except Exception as e:
+                    url = future_map[future]
+                    _logger.warning("[URL] Failed to analyze URL %s: %s", url, str(e))
         except concurrent.futures.TimeoutError:
             # Raccoglie i risultati già disponibili entro il timeout di batch
+            _logger.warning("[URL] Batch analysis timeout (%ds) - collecting partial results", URL_BATCH_TIMEOUT)
             for future in future_map:
                 if future.done():
                     try:
                         analyses.append(future.result())
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        url = future_map[future]
+                        _logger.warning("[URL] Failed to analyze URL %s after timeout: %s", url, str(e))
 
     result.urls            = analyses
     result.high_risk_count = sum(1 for a in analyses if a.risk_score >= 25)
@@ -363,4 +371,5 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
             sum(scores) / len(scores) + result.high_risk_count * 5, 100.0
         )
 
+    _logger.info("[URL END] Analyzed %d/%d URLs, %d high-risk (score=%.1f)", len(analyses), result.total_urls, result.high_risk_count, result.score_contribution if analyses else 0)
     return result

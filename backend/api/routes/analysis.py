@@ -158,13 +158,32 @@ async def run_analysis(
     parsed, header_result, body_result, url_result, attachment_result, risk = \
         await run_in_threadpool(_pipeline)
 
+    # --- P0-4: Verify Analyzer Execution ---
+    _logger.info("[%s] Pipeline completato: header=%d findings, body=%d findings, urls=%d urls", job_id, len(header_result.findings), len(body_result.findings), len(url_result.urls))
+
+    # Check if any findings were detected
+    total_findings = (
+        len(header_result.findings or []) +
+        len(body_result.findings or []) +
+        len(url_result.urls or []) +
+        len(attachment_result.attachments or [])
+    )
+    _logger.info("[%s] [RESULT CHECK] Total entities analyzed: headers=%d, body_checks=%d, urls=%d, attachments=%d",
+                 job_id, len(header_result.findings or []), len(body_result.findings or []),
+                 len(url_result.urls or []), len(attachment_result.attachments or []))
+
+    if total_findings == 0 and risk.score == 0:
+        _logger.warning("[%s] [RESULT WARNING] All analyzers returned 0 findings - email appears clean or analyzers not executing", job_id)
+    else:
+        _logger.info("[%s] [RESULT OK] Found %d total indicators, risk_score=%.1f", job_id, total_findings, risk.score)
+
     # --- Persisti nel DB ---
     record = EmailAnalysis(
         id=job_id,
         filename=original_filename,
         file_hash_sha256=parsed.file_hash_sha256,
         mail_from=parsed.mail_from,
-        mail_to=str(parsed.mail_to),
+        mail_to=json.dumps(parsed.mail_to),
         mail_subject=parsed.mail_subject,
         mail_date=parsed.mail_date,
         message_id=parsed.message_id,
@@ -185,7 +204,7 @@ async def run_analysis(
                 "label":                getattr(body_result.nlp_result, "label", "unknown"),
                 "confidence":           getattr(body_result.nlp_result, "confidence", "n/a"),
                 "top_features":         getattr(body_result.nlp_result, "top_features", []),
-            } if body_result.nlp_result else None,
+            } if body_result.nlp_result else {},
         },
         url_indicators={
             **_dataclass_to_dict(url_result),
@@ -203,11 +222,21 @@ async def run_analysis(
     # Upsert: se già esiste (riesecuzione analisi), aggiorna
     existing = await db.get(EmailAnalysis, job_id)
     if existing:
+        _logger.info("[%s] [DB DELETE] Existing analysis found, deleting for upsert", job_id)
         await db.delete(existing)
         await db.flush()
+        _logger.info("[%s] [DB DELETE] Existing record deleted", job_id)
 
-    db.add(record)
-    await db.commit()
+    _logger.info("[%s] [DB ADD] Adding new EmailAnalysis record to session", job_id)
+    try:
+        db.add(record)
+        _logger.info("[%s] [DB COMMIT] Committing transaction to database", job_id)
+        await db.commit()
+        _logger.info("[%s] [DB SUCCESS] Analysis persisted successfully, record_id=%s", job_id, record.id)
+    except Exception as e:
+        _logger.error("[%s] [DB ERROR] Failed to commit to database: %s", job_id, str(e))
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=t("analysis.db_error"))
 
     return _build_response(job_id, parsed, header_result, body_result, url_result, attachment_result, risk, do_whois)
 
