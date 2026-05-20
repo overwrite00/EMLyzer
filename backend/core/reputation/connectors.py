@@ -965,10 +965,8 @@ def check_url_urlscan(url: str) -> ReputationResult:
             rate_key="urlscan",
         )
         if resp.status_code == 401:
-            # Diagnostic logging per 401 error (log only has_key, not key prefix)
-            logger.warning(
-                f"URLScan.io 401 Unauthorized: has_key={has_api_key}, entity={url}"
-            )
+            # Diagnostic logging per 401 error
+            logger.warning(f"URLScan.io 401 Unauthorized for {url}")
             if has_api_key:
                 return ReputationResult(
                     source="URLScan.io", entity=url, entity_type="url",
