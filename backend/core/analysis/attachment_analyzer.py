@@ -252,6 +252,8 @@ def analyze_attachment(att: dict, raw_data: Optional[bytes] = None) -> Attachmen
 
 def analyze_attachments(attachments: list[dict]) -> AttachmentAnalysisResult:
     """Analizza tutti gli allegati (solo metadati, no raw_data in questa fase)."""
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
     result = AttachmentAnalysisResult()
     result.total_attachments = len(attachments)
 
@@ -265,4 +267,5 @@ def analyze_attachments(attachments: list[dict]) -> AttachmentAnalysisResult:
         scores = [a.risk_score for a in result.attachments]
         result.score_contribution = min(max(scores) + result.critical_count * 10, 100.0)
 
+    _logger.debug(f"Attachment analysis: {result.total_attachments} attachments, {result.critical_count} critical")
     return result

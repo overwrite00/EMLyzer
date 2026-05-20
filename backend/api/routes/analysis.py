@@ -158,13 +158,16 @@ async def run_analysis(
     parsed, header_result, body_result, url_result, attachment_result, risk = \
         await run_in_threadpool(_pipeline)
 
+    # --- Logging del pipeline ---
+    _logger.info("[%s] Pipeline completato: header=%d findings, body=%d findings, urls=%d urls", job_id, len(header_result.findings), len(body_result.findings), len(url_result.urls))
+
     # --- Persisti nel DB ---
     record = EmailAnalysis(
         id=job_id,
         filename=original_filename,
         file_hash_sha256=parsed.file_hash_sha256,
         mail_from=parsed.mail_from,
-        mail_to=str(parsed.mail_to),
+        mail_to=json.dumps(parsed.mail_to),
         mail_subject=parsed.mail_subject,
         mail_date=parsed.mail_date,
         message_id=parsed.message_id,

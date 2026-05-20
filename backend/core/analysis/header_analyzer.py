@@ -362,9 +362,9 @@ def _query_dkim_key(selector: str, domain: str) -> tuple[str, bool, str]:
 
 def _check_auth(parsed: ParsedEmail, result: HeaderAnalysisResult):
     """Valuta i risultati SPF / DKIM / DMARC."""
-    spf = parsed.spf_result.lower()
-    dkim = parsed.dkim_result.lower()
-    dmarc = parsed.dmarc_result.lower()
+    spf = (parsed.spf_result or "").lower()
+    dkim = (parsed.dkim_result or "").lower()
+    dmarc = (parsed.dmarc_result or "").lower()
 
     result.spf_ok = spf in ("pass",)
     result.dkim_ok = dkim in ("pass",)
@@ -560,7 +560,7 @@ def _build_auth_detail(parsed: ParsedEmail, result: HeaderAnalysisResult) -> Non
 
 def _check_bulk_sender(parsed: ParsedEmail, result: HeaderAnalysisResult):
     """Rileva tool di invio massivo tramite X-Mailer / User-Agent."""
-    mailer = parsed.x_mailer.lower()
+    mailer = (parsed.x_mailer or "").lower()
     if not mailer:
         return
     for pattern in BULK_SENDER_PATTERNS:
@@ -630,7 +630,7 @@ def _parse_received_chain(parsed: ParsedEmail, result: HeaderAnalysisResult):
 
 def _check_originating_ip(parsed: ParsedEmail, result: HeaderAnalysisResult):
     """Controlla X-Originating-IP per IP privati o anomali."""
-    ip = parsed.x_originating_ip.strip()
+    ip = (parsed.x_originating_ip or "").strip()
     if not ip:
         return
     # Rimuovi parentesi quadre se presenti
@@ -666,7 +666,7 @@ def _check_list_unsubscribe(parsed: ParsedEmail, result: HeaderAnalysisResult):
     Rileva: dominio esterno, HTTP non sicuro, IP diretto, formato malformato.
     Finding INFO se presente e corretto (bulk legittimo).
     """
-    value = parsed.list_unsubscribe.strip()
+    value = (parsed.list_unsubscribe or "").strip()
     if not value:
         return
 
@@ -758,7 +758,7 @@ def _check_campaign_id(parsed: ParsedEmail, result: HeaderAnalysisResult):
     Analizza l'header X-Campaign-ID.
     Finding INFO se presente; LOW se manca il List-Unsubscribe.
     """
-    value = parsed.x_campaign_id.strip()
+    value = (parsed.x_campaign_id or "").strip()
     if not value:
         return
 
@@ -770,7 +770,7 @@ def _check_campaign_id(parsed: ParsedEmail, result: HeaderAnalysisResult):
     ))
 
     # Bulk email senza List-Unsubscribe → segnale sospetto
-    if not parsed.list_unsubscribe.strip():
+    if not (parsed.list_unsubscribe or "").strip():
         result.findings.append(HeaderFinding(
             field="X-Campaign-ID",
             severity="low",
@@ -842,8 +842,11 @@ def _compute_score(result: HeaderAnalysisResult) -> float:
 
 def analyze_headers(parsed: ParsedEmail) -> HeaderAnalysisResult:
     """Entry point: esegue tutte le analisi header e restituisce HeaderAnalysisResult."""
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
     result = HeaderAnalysisResult()
 
+    _logger.debug(f"Header analysis: From={parsed.mail_from}, SPF={parsed.spf_result}, DKIM={parsed.dkim_result}, DMARC={parsed.dmarc_result}")
     _check_identity_mismatch(parsed, result)
     _check_auth(parsed, result)
     _check_bulk_sender(parsed, result)
@@ -856,4 +859,6 @@ def analyze_headers(parsed: ParsedEmail) -> HeaderAnalysisResult:
     _check_arc_chain(parsed, result)
 
     result.score_contribution = _compute_score(result)
+    _logger.debug(f"Header findings: {len(result.findings)} (auth_ok={result.spf_ok}/{result.dkim_ok}/{result.dmarc_ok})")
     return result
+

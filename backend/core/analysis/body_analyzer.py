@@ -28,6 +28,10 @@ URGENCY_PATTERNS = [
     r"\burgente\b", r"\bscadenza\b", r"\bverifica.*account",
     r"\bconferma.*identit", r"\baccesso.*bloccato", r"\bsospeso\b",
     r"\bclicca.*ora\b", r"\bimmediatamente\b",
+    # Portoghese
+    r"\bexpirando\b", r"\bexpira\b", r"\bimediato\b",
+    r"\bverificar.*conta", r"\bconfirme.*identidade", r"\bacesso.*bloqueado\b",
+    r"\bclique.*agora\b",
 ]
 
 PHISHING_CTAS = [
@@ -37,12 +41,18 @@ PHISHING_CTAS = [
     # Italiano
     r"\baccedi ora\b", r"\bclicca qui\b", r"\bconferma.*dati",
     r"\baggiornam.*pagam", r"\binserisci.*password",
+    # Portoghese
+    r"\bresgatar agora\b", r"\bclique aqui\b", r"\bconfirme.*dados",
+    r"\batualize.*pagam", r"\binserir.*senha", r"\bfaça login",
+    r"\bverificar agora\b", r"\blogar\b",
 ]
 
 CREDENTIAL_KEYWORDS = [
     r"\bpassword\b", r"\bpin\b", r"\bcredential", r"\bsocial security\b",
     r"\bcredit card\b", r"\biban\b", r"\bconto bancario\b",
     r"\bcodice fiscale\b",
+    # Portoghese — mantieni solo pattern specifici per credenziali
+    r"\bsenha\b", r"\bcartão.*crédito\b", r"\bcpf\b",
 ]
 
 # Mappa omoglifi Unicode → carattere latino equivalente
@@ -222,8 +232,10 @@ def _analyze_html(body_html: str, result: BodyAnalysisResult):
                     visible_text, re.IGNORECASE
                 )
                 if domain_in_text:
-                    text_domain = domain_in_text.group(1).lower().lstrip("www.")
-                    href_domain_clean = href_domain.lstrip("www.")
+                    text_domain = domain_in_text.group(1).lower()
+                    if text_domain.startswith("www."):
+                        text_domain = text_domain[4:]
+                    href_domain_clean = href_domain[4:] if href_domain.startswith("www.") else href_domain
                     if text_domain and text_domain not in href_domain_clean:
                         result.obfuscated_links.append({
                             "visible_text": visible_text[:200],
@@ -417,12 +429,16 @@ def _compute_score(result: BodyAnalysisResult) -> float:
 
 def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
     """Entry point analisi body. Analizza sia testo plain che HTML."""
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
     result = BodyAnalysisResult()
 
+    _logger.debug(f"Body analysis: text_len={len(parsed.body_text or '')}, html_len={len(parsed.body_html or '')}")
     _analyze_text(parsed.body_text, result)
     _analyze_html(parsed.body_html, result)
     _check_homoglyphs(parsed.body_text, result)
     _check_languagetool(parsed.body_text, result)
+    _logger.debug(f"Body findings: {len(result.findings)} (urgency={result.urgency_count}, cta={result.phishing_cta_count}, creds={result.credential_keyword_count})")
 
     # Deduplica URL
     result.extracted_urls = list(dict.fromkeys(result.extracted_urls))

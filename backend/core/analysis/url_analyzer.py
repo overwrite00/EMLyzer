@@ -272,6 +272,8 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
     Un cap complessivo di URL_BATCH_TIMEOUT secondi garantisce che l'intera fase
     URL non superi mai il budget di tempo dell'endpoint, anche con 50 URL lenti.
     """
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
     result = URLAnalysisResult()
 
     # Deduplica e filtra URL validi
@@ -285,6 +287,7 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
 
     capped_urls = valid_urls[:50]  # limite di sicurezza: max 50 URL per email
     result.total_urls = len(capped_urls)
+    _logger.debug(f"URL analysis: {result.total_urls} URLs (dedup from {len(urls)})")
 
     if not capped_urls:
         return result
@@ -363,4 +366,5 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
             sum(scores) / len(scores) + result.high_risk_count * 5, 100.0
         )
 
+    _logger.debug(f"URL analysis complete: {len(analyses)}/{result.total_urls} analyzed, {result.high_risk_count} high-risk")
     return result
