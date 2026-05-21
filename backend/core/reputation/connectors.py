@@ -983,25 +983,25 @@ def check_url_urlscan(url: str) -> ReputationResult:
                     skipped=True, skip_reason="URLScan.io ricerca pubblica non disponibile",
                 )
 
-        # Phase 2B: Fallback retry con query param se HTTP 403 con API key (v0.14.3+)
+        # Phase 2B: Fallback retry senza API-Key header se HTTP 403 con API key (v0.14.3+)
+        # URLScan.io rifiuta custom sort values senza auth. Rimuovi sort per retry pubblico
         if resp.status_code == 403 and has_api_key:
-            logger.debug(f"URLScan.io HTTP 403 con API-Key header, ritentando con query param per {url}")
+            logger.debug(f"URLScan.io HTTP 403 con API-Key header, ritentando senza sort param per {url}")
             resp = _http_get_with_retry(
                 "https://urlscan.io/api/v1/search/",
                 params={
                     "q": f"page.domain:{query}",
-                    "key": settings.URLSCAN_API_KEY.strip(),
-                    "size": "3",
-                    "sort": "date"
+                    "size": "3"
+                    # Nota: 'sort' rimosso perché non è consentito senza auth
                 },
                 headers={"Content-Type": "application/json"},  # Senza API-Key header
                 timeout=REQUEST_TIMEOUT,
                 rate_key="urlscan",
             )
             if resp.status_code == 200:
-                logger.debug(f"URLScan.io: retry con query param riuscito per {url}")
+                logger.debug(f"URLScan.io: retry senza sort riuscito per {url}")
             else:
-                logger.debug(f"URLScan.io: retry con query param fallito (HTTP {resp.status_code}) per {url}")
+                logger.debug(f"URLScan.io: retry senza sort fallito (HTTP {resp.status_code}) per {url}")
 
         resp.raise_for_status()
         data = resp.json()
