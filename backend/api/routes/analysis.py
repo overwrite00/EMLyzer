@@ -118,14 +118,19 @@ async def bulk_delete_analyses(
     if not valid_ids:
         raise HTTPException(status_code=400, detail=t("analysis.no_valid_ids"))
 
+    # CRITICAL: Batch delete instead of N+1 queries
+    # Old approach (N+1): for each job_id, await db.get() → 100 jobs = 100 queries
+    # New approach (batch): single query with .where(id.in_(valid_ids)) → 1 query
+    stmt = select(EmailAnalysis).where(EmailAnalysis.id.in_(valid_ids))
+    result = await db.execute(stmt)
+    records_to_delete = result.scalars().all()
+
     deleted_count = 0
     files_removed = 0
-    for jid in valid_ids:
-        record = await db.get(EmailAnalysis, jid)
-        if record:
-            await db.delete(record)
-            deleted_count += 1
-            files_removed += _cleanup_files(jid)
+    for record in records_to_delete:
+        await db.delete(record)
+        deleted_count += 1
+        files_removed += _cleanup_files(record.id)
 
     await db.commit()
     # VACUUM dopo eliminazioni massive per recuperare spazio su disco
