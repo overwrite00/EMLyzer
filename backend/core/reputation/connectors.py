@@ -239,6 +239,14 @@ class ReputationResult:
 # ---------------------------------------------------------------------------
 
 def check_ip_abuseipdb(ip: str) -> ReputationResult:
+    """
+    Verifica reputazione IP tramite AbuseIPDB (SLOW service, 1.1s rate limit).
+
+    Score: 0-100% confidence che IP sia malevolo.
+    Threshold: score >= 50 → malicious.
+
+    Richiede ABUSEIPDB_API_KEY configurata in .env.
+    """
     r = ReputationResult(source="AbuseIPDB", entity=ip, entity_type="ip")
     if not settings.ABUSEIPDB_API_KEY:
         r.skipped = True
@@ -305,6 +313,15 @@ def _vt_http_error(e: requests.HTTPError) -> str:
 
 
 def check_ip_virustotal(ip: str) -> ReputationResult:
+    """
+    Verifica reputazione IP tramite VirusTotal (SLOW service, 15.5s rate limit).
+
+    Aggregato: numero di vendor che riportano IP come malevolo.
+    Threshold: >= 3 vendor malicious → is_malicious=True.
+
+    Richiede VIRUSTOTAL_API_KEY configurata in .env.
+    Rate limit: 4 req/min piano gratuito.
+    """
     r = ReputationResult(source="VirusTotal", entity=ip, entity_type="ip")
     if not settings.VIRUSTOTAL_API_KEY:
         r.skipped = True; r.skip_reason = "VIRUSTOTAL_API_KEY non configurata nel file .env"; return r
@@ -329,6 +346,15 @@ def check_ip_virustotal(ip: str) -> ReputationResult:
 
 
 def check_url_virustotal(url: str) -> ReputationResult:
+    """
+    Verifica reputazione URL tramite VirusTotal (SLOW service, 15.5s rate limit).
+
+    Nota: URL viene codificato con base64 URL-safe per compatibilità API.
+    Threshold: >= 3 vendor malicious → is_malicious=True.
+
+    Richiede VIRUSTOTAL_API_KEY configurata in .env.
+    Rate limit: 4 req/min piano gratuito.
+    """
     r = ReputationResult(source="VirusTotal", entity=url, entity_type="url")
     if not settings.VIRUSTOTAL_API_KEY:
         r.skipped = True; r.skip_reason = "VIRUSTOTAL_API_KEY non configurata nel file .env"; return r
@@ -365,6 +391,14 @@ def check_url_virustotal(url: str) -> ReputationResult:
 
 
 def check_hash_virustotal(sha256: str) -> ReputationResult:
+    """
+    Verifica reputazione hash SHA256 tramite VirusTotal (SLOW service, 15.5s rate limit).
+
+    Database: file già scansionati e catalogati da VirusTotal.
+    Threshold: >= 3 vendor malicious → is_malicious=True.
+
+    Richiede VIRUSTOTAL_API_KEY configurata in .env.
+    """
     r = ReputationResult(source="VirusTotal", entity=sha256, entity_type="hash")
     if not settings.VIRUSTOTAL_API_KEY:
         r.skipped = True; r.skip_reason = "VIRUSTOTAL_API_KEY non configurata nel file .env"; return r
@@ -429,6 +463,15 @@ def _load_openphish():
         _openphish_loaded = True
 
 def check_url_openphish(url: str) -> ReputationResult:
+    """
+    Verifica URL nel feed locale OpenPhish (FAST service, 0s rate limit).
+
+    Feed: lista di URL phishing confermati, aggiornata periodicamente.
+    Lookup: semplice membership test su set (O(1)).
+    Confidence: 90% se trovato, 0% altrimenti.
+
+    No API key richiesta — feed è pubblico e cachato localmente.
+    """
     r = ReputationResult(source="OpenPhish", entity=url, entity_type="url", queried=True)
     try:
         _load_openphish()
@@ -449,6 +492,13 @@ def check_url_openphish(url: str) -> ReputationResult:
 # ---------------------------------------------------------------------------
 
 def check_url_phishtank(url: str) -> ReputationResult:
+    """
+    Verifica URL nel database PhishTank (FAST service, 0.5s rate limit).
+
+    Database: segnalazioni crowdsourced di phishing da comunità.
+    Richiede PHISHTANK_API_KEY configurata in .env.
+    Confidence: 100% se verificato, <100% se sospetto.
+    """
     r = ReputationResult(source="PhishTank", entity=url, entity_type="url")
     if not settings.PHISHTANK_API_KEY:
         r.skipped = True; r.skip_reason = "PHISHTANK_API_KEY non configurata nel file .env"; return r
@@ -488,6 +538,12 @@ def check_url_phishtank(url: str) -> ReputationResult:
 # ---------------------------------------------------------------------------
 
 def check_hash_malwarebazaar(sha256: str) -> ReputationResult:
+    """
+    MalwareBazaar (abuse.ch) — ricerca hash nel database campioni malware.
+    Database: malware confermato raccolto da honeypot e segnalazioni.
+    Richiede ABUSECH_API_KEY o MALWAREBAZAAR_API_KEY (legacy) registrata su auth.abuse.ch.
+    Confidence: 100% se trovato come malware, 0% se non trovato.
+    """
     r = ReputationResult(source="MalwareBazaar", entity=sha256, entity_type="hash")
     _key = settings.ABUSECH_API_KEY or settings.MALWAREBAZAAR_API_KEY
 
@@ -584,6 +640,12 @@ def _load_spamhaus():
         _spamhaus_loaded = True
 
 def check_ip_spamhaus(ip: str) -> ReputationResult:
+    """
+    Spamhaus DROP — controlla se l'IP è in una blocklist malevola di alto profilo.
+    DROP è la lista gestita manualmente (alta precisione, pochi falsi positivi).
+    Feed cachato localmente con TTL 24h, si aggiorna al riavvio.
+    Nessuna API key richiesta — servizio gratuito.
+    """
     r = ReputationResult(source="Spamhaus DROP", entity=ip, entity_type="ip", queried=True)
     try:
         _load_spamhaus()
