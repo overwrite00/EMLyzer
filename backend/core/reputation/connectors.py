@@ -529,7 +529,7 @@ def check_hash_malwarebazaar(sha256: str) -> ReputationResult:
 # Spamhaus DROP — blocklist IP pubblica, no API key
 # ---------------------------------------------------------------------------
 
-_spamhaus_cache: set[str] = set()
+_spamhaus_cache: list[ipaddress.ip_network] = []
 _spamhaus_loaded = False
 _spamhaus_error: str = ""
 
@@ -787,7 +787,7 @@ def check_domain_circl_pdns(domain: str) -> ReputationResult:
     api_key = settings.CIRCL_API_KEY.strip()
     if not api_key:
         return ReputationResult(
-            source="CIRCL Passive DNS", entity=domain, entity_type="url",
+            source="CIRCL Passive DNS", entity=domain, entity_type="domain",
             skipped=True, skip_reason="CIRCL_API_KEY non configurata",
         )
     user, _, pwd = api_key.partition(":")
@@ -803,14 +803,14 @@ def check_domain_circl_pdns(domain: str) -> ReputationResult:
         )
         if resp.status_code == 404:
             return ReputationResult(
-                source="CIRCL Passive DNS", entity=domain, entity_type="url",
+                source="CIRCL Passive DNS", entity=domain, entity_type="domain",
                 queried=True, detail="Nessun record trovato.",
             )
         resp.raise_for_status()
         records = [json.loads(ln) for ln in resp.text.splitlines() if ln.strip()]
         if not records:
             return ReputationResult(
-                source="CIRCL Passive DNS", entity=domain, entity_type="url",
+                source="CIRCL Passive DNS", entity=domain, entity_type="domain",
                 queried=True, detail="Nessun record trovato.",
             )
         # Raggruppa per rrtype — mostra A/AAAA/MX/NS/CNAME
@@ -832,23 +832,23 @@ def check_domain_circl_pdns(domain: str) -> ReputationResult:
         body = " | ".join(parts) if parts else f"{len(records)} record"
         detail = f"{body} | ultimo visto: {time_last_str}"
         return ReputationResult(
-            source="CIRCL Passive DNS", entity=domain, entity_type="url",
+            source="CIRCL Passive DNS", entity=domain, entity_type="domain",
             queried=True, detail=detail,
         )
     except requests.exceptions.HTTPError as e:
         code = e.response.status_code if e.response is not None else 0
         if code == 401:
             return ReputationResult(
-                source="CIRCL Passive DNS", entity=domain, entity_type="url",
+                source="CIRCL Passive DNS", entity=domain, entity_type="domain",
                 error="Credenziali CIRCL non valide (CIRCL_API_KEY=user:password)",
             )
         return ReputationResult(
-            source="CIRCL Passive DNS", entity=domain, entity_type="url",
+            source="CIRCL Passive DNS", entity=domain, entity_type="domain",
             error=f"CIRCL HTTP {code}",
         )
     except Exception as exc:
         return ReputationResult(
-            source="CIRCL Passive DNS", entity=domain, entity_type="url",
+            source="CIRCL Passive DNS", entity=domain, entity_type="domain",
             error=f"CIRCL: {type(exc).__name__}",
         )
 
@@ -1808,6 +1808,18 @@ class ReputationSummary:
     reputation_score: float = 0.0
 
 
+def _append_result(summary: ReputationSummary, result: ReputationResult) -> None:
+    """Distribuisce un ReputationResult nella lista corretta basato su entity_type."""
+    if result.entity_type == "ip":
+        summary.ip_results.append(result)
+    elif result.entity_type == "url":
+        summary.url_results.append(result)
+    elif result.entity_type == "domain":
+        summary.domain_results.append(result)
+    else:  # hash
+        summary.hash_results.append(result)
+
+
 # ---------------------------------------------------------------------------
 # Classificazione servizi per velocità
 # ---------------------------------------------------------------------------
@@ -2042,7 +2054,7 @@ def _build_flat_tasks(
     return call_tasks, skip_results
 
 
-def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) -> ReputationSummary:
+def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str], domains: list[str] | None = None) -> ReputationSummary:
     """
     Esegue TUTTI i check reputazionali in un unico ThreadPoolExecutor flat.
     Design:
@@ -2060,7 +2072,7 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
     _load_spamhaus()
     _load_openphish()
 
-    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes)
+    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes, domains)
 
     # Distribuisce i risultati skip nelle liste corrette
     for r in skip_results:
@@ -2092,7 +2104,7 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
                 pool.submit(fn, entity): (kind, entity, fn.__name__)
                 for fn, entity, kind in call_tasks
             }
-            done, not_done = wait(future_map.keys(), timeout=single_timeout)
+            done, not_done = futures_wait(future_map.keys(), timeout=single_timeout)
 
             for future in done:
                 kind, entity, fn_name = future_map[future]
@@ -2100,17 +2112,10 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
                     r = future.result()
                 except Exception as e:
                     r = ReputationResult(
-                        source=fn_name, entity=entity, entity_type=kind,
+                        source=_FN_TO_SOURCE.get(fn_name, fn_name), entity=entity, entity_type=kind,
                         error=f"Errore: {e}",
                     )
-                if kind == "ip":
-                    summary.ip_results.append(r)
-                elif kind == "url":
-                    summary.url_results.append(r)
-                elif kind == "domain":
-                    summary.domain_results.append(r)
-                else:
-                    summary.hash_results.append(r)
+                _append_result(summary, r)
 
             for future in not_done:
                 future.cancel()
@@ -2169,10 +2174,7 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str], domains:
 
     summary = ReputationSummary()
     for r in skip_results + slow_skips:
-        if r.entity_type == "ip":      summary.ip_results.append(r)
-        elif r.entity_type == "url":   summary.url_results.append(r)
-        elif r.entity_type == "domain": summary.domain_results.append(r)
-        else:                          summary.hash_results.append(r)
+        _append_result(summary, r)
 
     if fast_calls:
         n_workers = min(len(fast_calls), 16)
@@ -2191,21 +2193,15 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str], domains:
                 try:
                     r = future.result()
                 except Exception as e:
-                    r = ReputationResult(source=fn_name, entity=entity,
+                    r = ReputationResult(source=_FN_TO_SOURCE.get(fn_name, fn_name), entity=entity,
                                          entity_type=kind, error=f"Errore: {e}")
-                if kind == "ip":      summary.ip_results.append(r)
-                elif kind == "url":   summary.url_results.append(r)
-                elif kind == "domain": summary.domain_results.append(r)
-                else:                 summary.hash_results.append(r)
+                _append_result(summary, r)
             for future in not_done:
                 future.cancel()
                 kind, entity, fn_name = future_map[future]
-                r = ReputationResult(source=fn_name, entity=entity,
+                r = ReputationResult(source=_FN_TO_SOURCE.get(fn_name, fn_name), entity=entity,
                                      entity_type=kind, error="Timeout")
-                if kind == "ip":      summary.ip_results.append(r)
-                elif kind == "url":   summary.url_results.append(r)
-                elif kind == "domain": summary.domain_results.append(r)
-                else:                 summary.hash_results.append(r)
+                _append_result(summary, r)
         finally:
             # shutdown(wait=False, cancel_futures=True): non blocca
             # threading._shutdown() alla chiusura → nessun KeyboardInterrupt su CTRL+C
@@ -2276,12 +2272,9 @@ def run_slow_checks(ips: list[str], urls: list[str], hashes: list[str],
             try:
                 r = future.result()
             except Exception as e:
-                r = ReputationResult(source=fn_name, entity=entity,
+                r = ReputationResult(source=_FN_TO_SOURCE.get(fn_name, fn_name), entity=entity,
                                      entity_type=kind, error=f"Errore: {e}")
-            if kind == "ip":      existing.ip_results.append(r)
-            elif kind == "url":   existing.url_results.append(r)
-            elif kind == "domain": existing.domain_results.append(r)
-            else:                 existing.hash_results.append(r)
+            _append_result(existing, r)
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 

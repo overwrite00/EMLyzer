@@ -179,7 +179,7 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
         try:
             from urllib.parse import urlparse
             hostname = urlparse(url).netloc.split(":")[0].lstrip("www.")
-        except:
+        except Exception:
             hostname = ""
 
         # Se è URL sospetta (shortener, IP diretto, nuovo dominio, punycode)
@@ -217,7 +217,7 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
                     seen_domains.add(hostname)
                     domains.append(hostname)
                     _logger.debug(f"[DOMAIN] {hostname} - estratto da URL")
-        except:
+        except Exception:
             pass
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -370,7 +370,7 @@ def _extract_priority_indicators(
         try:
             from urllib.parse import urlparse
             hostname = urlparse(url_str).netloc.split(":")[0].lstrip("www.")
-        except:
+        except Exception:
             hostname = ""
 
         if _is_trusted_cdn(hostname):
@@ -462,7 +462,7 @@ def _extract_priority_indicators(
                         seen_domains.add(hostname)
                         domains.append(hostname)
                         _logger.debug(f"[FILTRO SLOW] Domain {hostname} - estratto da URL sospetta")
-            except:
+            except Exception:
                 pass
 
     return ips, urls, hashes, domains
@@ -500,13 +500,7 @@ async def run_reputation_fast(
     ips, urls, hashes, domains = _extract_indicators(record)
 
     # DEBUG LOGGING: Mostra esattamente cosa viene estratto
-    _logger.info(f"[REPUTATION DEBUG] Extracted indicators for job {job_id}:")
-    _logger.info(f"  IPs: {ips}")
-    _logger.info(f"  URLs: {urls}")
-    _logger.info(f"  Hashes: {hashes}")
-    _logger.info(f"  Domains: {domains}")
-    _logger.info(f"  Header received_hops count: {len(record.header_indicators.get('received_hops', []) if record.header_indicators else [])}")
-    _logger.info(f"  X-Originating-IP: {record.x_originating_ip}")
+    _logger.debug(f"[REPUTATION] Extracted indicators for job {job_id}: IPs={len(ips)}, URLs={len(urls)}, Hashes={len(hashes)}, Domains={len(domains)}, received_hops={len(record.header_indicators.get('received_hops', []) if record.header_indicators else [])}, x_originating_ip={record.x_originating_ip}")
 
     # Fase 1: servizi fast, timeout generoso 25s
     loop = asyncio.get_event_loop()
@@ -532,17 +526,7 @@ async def run_reputation_fast(
     slow_indicators = {"ips": slow_ips, "urls": slow_urls, "hashes": slow_hashes, "domains": slow_domains}
 
     # DEBUG LOGGING: Mostra indicatori selettivi per SLOW services
-    _logger.info(f"[REPUTATION DEBUG] Slow indicators for job {job_id}:")
-    _logger.info(f"  SLOW IPs: {slow_ips}")
-    _logger.info(f"  SLOW URLs: {slow_urls}")
-    _logger.info(f"  SLOW Hashes: {slow_hashes}")
-    _logger.info(f"  SLOW Domains: {slow_domains}")
-
-    # DEBUG LOGGING: Mostra indicatori selettivi per SLOW services
-    _logger.info(f"[REPUTATION DEBUG] Slow indicators for job {job_id}:")
-    _logger.info(f"  SLOW IPs: {slow_ips}")
-    _logger.info(f"  SLOW URLs: {slow_urls}")
-    _logger.info(f"  SLOW Hashes: {slow_hashes}")
+    _logger.debug(f"[REPUTATION] Slow indicators for job {job_id}: IPs={len(slow_ips)}, URLs={len(slow_urls)}, Hashes={len(slow_hashes)}, Domains={len(slow_domains)}")
 
     if has_slow:
         rep_dict["slow_indicators"] = slow_indicators
