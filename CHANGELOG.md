@@ -5,7 +5,19 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
 ---
 
-## [Unreleased] — Roadmap
+## [Unreleased] — Next Release
+
+### Aggiunto
+- **Intelligent data filtering for reputation services** (v0.14.5+): Implementato sistema di filtraggio a livello analista per estrarre SOLO indicatori rilevanti per ogni tipo di servizio di reputazione. Riduce il rumore e previene query non necessarie che causano timeout.
+  - **CDN Domain Whitelist**: 40+ domini trusted (Google, Microsoft, CloudFlare, AWS, Akamai, CDN networks, social media, payment services, email providers)
+  - **CDN IP Whitelist**: IP prefix ranges per provider principali (Google AS15169, CloudFlare AS13335, Microsoft Azure AS8075, Amazon AWS AS16509)
+  - **Intelligent IP Extraction**: Solo sender IP + primi 2-3 received hops (SKIP trusted CDN IPs, SKIP resolved IPs da URLs)
+  - **Intelligent URL Extraction**: Solo URL sospette (shortener, IP diretto, dominio nuovo, punycode, risk score alto) da host NON-CDN
+  - **Priority Extraction for SLOW services**: Sender IP + primi 2 hops, max 4 URL, skip IPv6 (troppi false positives), rispetta rate limit VirusTotal 4 req/min
+  - **Debug logging**: [FILTRO] e [FILTRO SLOW] prefixes per transparency sui dati filtrati
+  - **Risultati**: Riduce query volume, previene timeout (crt.sh), rispetta rate limits, migliora precision dell'analisi
+
+### Roadmap (priorità bassa)
 
 Questa sezione raccoglie tutto ciò che è pianificato ma non ancora implementato.
 Le funzionalità sono ordinate per priorità di implementazione.
