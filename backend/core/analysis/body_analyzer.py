@@ -460,10 +460,19 @@ def _analyze_html(body_html: str, result: BodyAnalysisResult):
 
 
 def _looks_like_url(text: str) -> bool:
+    """Controlla se una stringa inizia con http:// o https://."""
     return bool(re.match(r'https?://', text.strip()))
 
 
 def _extract_domain_from_url(url: str) -> str:
+    """
+    Estrae il dominio da un URL (hostname senza protocollo, porta, path).
+
+    Esempi:
+    - 'https://example.com/path' → 'example.com'
+    - 'https://sub.example.com:8080' → 'sub.example.com'
+    - 'example.com' → ''  (ritorna stringa vuota per input non-standard)
+    """
     m = re.match(r'https?://([^/?\s]+)', url.strip())
     if m:
         host = m.group(1).lower()

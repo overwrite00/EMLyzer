@@ -469,6 +469,15 @@ def _extract_priority_indicators(
 
 
 def _summary_to_dict(summary: ReputationSummary) -> dict:
+    """
+    Converte ReputationSummary dataclass a dict JSON-serializable.
+
+    Utilizzata per serializzare i risultati di run_fast_checks e run_slow_checks
+    in formato JSON pronto per il database e l'API response.
+
+    Nota: asdict() + json.dumps(..., default=str) gestisce tipi non-serializable
+    come datetime, ipaddress.ip_network, ecc. convertendoli a string.
+    """
     return json.loads(json.dumps(asdict(summary), default=str))
 
 

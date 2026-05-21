@@ -287,9 +287,19 @@ def check_ip_abuseipdb(ip: str) -> ReputationResult:
 # ---------------------------------------------------------------------------
 
 def _vt_headers():
+    """Headers HTTP per autenticazione VirusTotal v3."""
     return {"x-apikey": settings.VIRUSTOTAL_API_KEY}
 
 def _vt_stats_detail(stats: dict, name: str = "") -> tuple[bool, float, str]:
+    """
+    Interpreta le statistiche di detection VirusTotal v3.
+
+    Stats dict contiene: {'malicious': N, 'suspicious': N, 'harmless': N, 'undetected': N}
+    Ritorna: (is_malicious, confidence%, detail_string)
+
+    Nota: is_malicious=True se ALMENO 1 vendor riporta come malevolo.
+    Confidence = (malicious_count / total_vendors) * 100
+    """
     malicious  = stats.get("malicious", 0)
     suspicious = stats.get("suspicious", 0)
     harmless   = stats.get("harmless", 0)
@@ -305,6 +315,11 @@ def _vt_stats_detail(stats: dict, name: str = "") -> tuple[bool, float, str]:
     return is_mal, confidence, detail
 
 def _vt_http_error(e: requests.HTTPError) -> str:
+    """
+    Converte HTTP error VirusTotal a messaggio diagnostico user-friendly.
+
+    Gestisce: 429 (quota), 401 (auth), 404 (not found), altri errori.
+    """
     code = e.response.status_code
     if code == 429: return "Quota VirusTotal esaurita (4 req/min piano gratuito — riprova tra poco)"
     if code == 401: return "Chiave API VirusTotal non valida"
@@ -435,6 +450,17 @@ _openphish_loaded = False
 _openphish_error: str = ""
 
 def _load_openphish():
+    """
+    Carica il feed OpenPhish di URL phishing confermati.
+
+    Strategie:
+    1. Memoria: ritorna subito se già caricato (_openphish_loaded=True)
+    2. Disco: carica da cache locale se presente e TTL<12h
+    3. Rete: scarica da https://openphish.com/feed.txt (feed pubblico)
+    4. Fallback: usa cache scaduta se il download fallisce
+
+    Cache formato: file JSON su disco, una URL per riga.
+    """
     global _openphish_cache, _openphish_loaded, _openphish_error
     if _openphish_loaded:
         return

@@ -68,6 +68,11 @@ class RiskScore:
 
 
 def _label_for_score(score: float) -> tuple[str, str]:
+    """
+    Mappa risk score (0-100) a label e spiegazione tradotta.
+
+    Returns: (label, label_text) dove label in ('low', 'medium', 'high', 'critical')
+    """
     for (lo, hi), (label, text) in RISK_LABELS.items():
         if lo <= score < hi:
             return label, text
@@ -75,6 +80,11 @@ def _label_for_score(score: float) -> tuple[str, str]:
 
 
 def _top_reasons_header(result: HeaderAnalysisResult) -> list[str]:
+    """
+    Estrae i 3 top finding dal header analysis, ordinati per severity (high > medium > low).
+
+    Formato: "[Header/HIGH] description"
+    """
     reasons = []
     for f in sorted(result.findings,
                     key=lambda x: {"high": 0, "medium": 1, "low": 2, "info": 3}.get(x.severity, 4)):
@@ -85,6 +95,11 @@ def _top_reasons_header(result: HeaderAnalysisResult) -> list[str]:
 
 
 def _top_reasons_body(result: BodyAnalysisResult) -> list[str]:
+    """
+    Estrae i 3 top finding dal body analysis, ordinati per severity.
+
+    Formato: "[Body/HIGH] description"
+    """
     reasons = []
     for f in sorted(result.findings,
                     key=lambda x: {"high": 0, "medium": 1, "low": 2, "info": 3}.get(x.severity, 4)):
@@ -95,6 +110,11 @@ def _top_reasons_body(result: BodyAnalysisResult) -> list[str]:
 
 
 def _top_reasons_url(result: URLAnalysisResult) -> list[str]:
+    """
+    Estrae i 3 top URL per risk_score, con il loro principale finding.
+
+    Formato: "[URL/HIGH] description: hostname"
+    """
     reasons = []
     for url_analysis in sorted(result.urls, key=lambda x: -x.risk_score)[:3]:
         for f in url_analysis.findings[:1]:
@@ -103,6 +123,11 @@ def _top_reasons_url(result: URLAnalysisResult) -> list[str]:
 
 
 def _top_reasons_attachment(result: AttachmentAnalysisResult) -> list[str]:
+    """
+    Estrae i 3 top allegati per risk_score, con il loro principale finding.
+
+    Formato: "[Allegato/CRITICAL] description: filename"
+    """
     reasons = []
     for att in sorted(result.attachments, key=lambda x: -x.risk_score)[:3]:
         for f in sorted(att.findings,

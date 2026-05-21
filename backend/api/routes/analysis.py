@@ -168,6 +168,19 @@ async def run_analysis(
     # (CPU-bound + I/O bloccante) che su Linux possono saturare il loop
     # e causare timeout del client se eseguite direttamente nell'async handler.
     def _pipeline():
+        """
+        Esegue la full analysis pipeline per un'email.
+
+        Ordine di esecuzione (sequenziale):
+        1. parse_email_file() — parsing RFC 2822/MSG, estrazioni header, body, allegati
+        2. analyze_headers() — SPF/DKIM/DMARC, auth injection, bulk sender, originatingIP
+        3. analyze_body() — urgency patterns, phishing CTA, credentials, homoglyphs, LanguageTool
+        4. analyze_urls() — resolving, whois, domain age, shortener detection, TLS
+        5. analyze_attachments() — MIME type, macro/VBA, double extension, PDF/JS scanning
+        6. compute_risk_score() — normalizzazione adattiva, floor rules, risk label assegnamento
+
+        Returns: 6-tuple (parsed, header_result, body_result, url_result, attachment_result, risk_score)
+        """
         _parsed            = parse_email_file(raw, original_filename)
         _header_result     = analyze_headers(_parsed)
         _body_result       = analyze_body(_parsed)
@@ -429,6 +442,32 @@ def _build_response_from_record(record) -> dict:
 
 
 def _build_response(job_id, parsed, header_result, body_result, url_result, attachment_result, risk, do_whois: bool = False) -> dict:
+    """
+    Prepara la risposta JSON per il client con tutti i risultati dell'analisi.
+
+    Struttura risposta:
+    - job_id, status="completed"
+    - email: metadata (filename, subject, from, to, date, message_id, file_hash, parse_errors)
+    - risk: score, label, explanation, detailed contributions per modulo
+    - header_analysis: SPF/DKIM/DMARC, injection, bulk sender, etc.
+    - body_analysis: phishing patterns, urgency, credentials, homoglyphs, forms, JS
+    - url_analysis: lista URL con risk score, IP, whois age, shortener, TLS, DNS
+    - attachment_analysis: file count, mime types, macro detection, VBA signatures
+    - reputation_results: results da servizi di reputazione (dopo fase 2 background)
+
+    Args:
+        job_id: UUID unico dell'analisi
+        parsed: ParsedEmail con metadata e content
+        header_result: HeaderAnalysisResult da analyze_headers()
+        body_result: BodyAnalysisResult da analyze_body()
+        url_result: URLAnalysisResult da analyze_urls()
+        attachment_result: AttachmentAnalysisResult da analyze_attachments()
+        risk: RiskScore con score finale e spiegazione
+        do_whois: boolean che determina se WHOIS è stato eseguito (info nella response)
+
+    Returns:
+        dict pronto per JSON serializzazione e invio al client
+    """
     return {
         "job_id": job_id,
         "status": "completed",

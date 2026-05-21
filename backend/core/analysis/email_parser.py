@@ -75,6 +75,11 @@ class ParsedEmail:
 
 
 def _compute_hashes(data: bytes) -> tuple[str, str, str]:
+    """
+    Calcola MD5, SHA-1 e SHA-256 di un file binario.
+
+    Returns: (md5_hex, sha1_hex, sha256_hex)
+    """
     return (
         hashlib.md5(data).hexdigest(),
         hashlib.sha1(data).hexdigest(),
