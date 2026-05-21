@@ -39,34 +39,13 @@ SEVERITY_COLORS = {
 
 
 def _add_heading(doc: Document, text: str, level: int = 1):
-    """
-    Aggiunge un'intestazione al documento Word con allineamento a sinistra.
-
-    Args:
-        doc: oggetto Document di python-docx
-        text: testo dell'intestazione
-        level: livello gerarchia (0=titolo, 1=heading1, 2=heading2, ...; default 1)
-
-    Returns:
-        Oggetto heading per ulteriori customizzazioni
-    """
     h = doc.add_heading(text, level=level)
     h.alignment = WD_ALIGN_PARAGRAPH.LEFT
     return h
 
 
 def _add_kv(doc: Document, key: str, value: str):
-    """
-    Aggiunge una riga chiave: valore formattata nel documento Word.
-
-    Formato: chiave in grassetto, seguita da due punti e valore.
-    Spaziatura e font size coerenti con stile report.
-
-    Args:
-        doc: oggetto Document di python-docx
-        key: etichetta della proprietà (es. "From", "SPF Result")
-        value: valore da visualizzare (se vuoto mostra "N/A")
-    """
+    """Aggiunge una riga chiave: valore."""
     p = doc.add_paragraph()
     run_key = p.add_run(f"{key}: ")
     run_key.bold = True
@@ -77,20 +56,6 @@ def _add_kv(doc: Document, key: str, value: str):
 
 
 def _add_finding_row(doc: Document, severity: str, description: str, evidence: str = ""):
-    """
-    Aggiunge una riga finding (header/body/URL/attachment) al report Word.
-
-    Formato:
-    - Badge di severity ([HIGH], [MEDIUM], ecc.) con colore corrispondente
-    - Descrizione del finding
-    - Evidence opzionale (max 300 char, in grigio e più piccolo)
-
-    Args:
-        doc: oggetto Document di python-docx
-        severity: livello severità ("info", "low", "medium", "high") per color-coding
-        description: descrizione del finding
-        evidence: dettagli tecnici/spiegazione del finding (opzionale)
-    """
     p = doc.add_paragraph(style="List Bullet")
     color = SEVERITY_COLORS.get(severity.lower(), RGBColor(0, 0, 0))
     badge = p.add_run(f"[{severity.upper()}] ")
@@ -106,37 +71,6 @@ def _add_finding_row(doc: Document, severity: str, description: str, evidence: s
 
 
 def generate_report(record, output_path: Path, campaign_clusters: list | None = None):
-    """
-    Genera un report Word (.docx) completo di analisi email.
-
-    Struttura report (8 sezioni):
-    1. Executive Summary — risk score + spiegazione sintetica
-    2. Email Metadata — From, To, Subject, headers tecnici (SPF/DKIM/DMARC, X-Mailer, ecc.)
-    3. Indicatori Tecnici — Header — findings da header analysis (mismatch, injection, auth, bulk)
-    4. Analisi del Contenuto — Body — URL offuscati, pattern phishing, NLP classification
-    5. Allegati — analisi statica (MIME, estensioni pericolose, macro, JS in PDF)
-    6. Reputazione — risultati servizi per IP/URL/hash (clean/malicious/pending/skipped)
-    7. Campagne Rilevate — cluster che includono questa email (opzionale)
-    8. Valutazione del Rischio — contributi per modulo (header/body/url/attachment)
-    9. Note dell'Analista — campo editabile per annotazioni
-
-    Formato:
-    - Font Calibri 10pt standard
-    - Severity color-coding: info/low/medium/high con colori associati
-    - Timestamp UTC nel titolo
-
-    Args:
-        record: EmailAnalysis dal database con tutti i risultati di analisi
-        output_path: Path dove salvare il file .docx
-        campaign_clusters: lista opzionale di CampaignCluster per sezione campagne
-                          (usato dal route report.py per mostrare cluster che includono l'email)
-
-    Returns:
-        None — salva il documento su disco, no valore di ritorno
-
-    Raises:
-        Eccezioni da python-docx se permessi file insufficienti o disco pieno
-    """
     doc = Document()
 
     # Stile base

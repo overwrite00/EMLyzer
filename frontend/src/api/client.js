@@ -1,21 +1,12 @@
 // src/api/client.js
 import axios from 'axios'
 
-/**
- * Axios instance for API calls.
- * Base URL: /api (resolved relative to current host)
- * Timeout: 60s (overridden for long-running operations like analysis)
- */
 const api = axios.create({
   baseURL: '/api',
   timeout: 60000,
 })
 
-/**
- * Upload email file for analysis.
- * @param {File} file - Email file (.eml or .msg)
- * @returns {Promise<{job_id: string, sha256: string, size_bytes: number}>} Analysis job ID and metadata
- */
+// Upload email file - returns { job_id, sha256, size_bytes, ... }
 export async function uploadEmail(file) {
   const form = new FormData()
   form.append('file', file)
@@ -25,13 +16,10 @@ export async function uploadEmail(file) {
   return res.data
 }
 
-/**
- * Run full analysis pipeline on uploaded email.
- * Timeout 300s: emails with 40+ URLs can take ~55s for URL analysis with WHOIS deduplication.
- * @param {string} jobId - UUID of uploaded email
- * @param {boolean} [doWhois=true] - Whether to perform WHOIS lookups for domains
- * @returns {Promise<Object>} Complete analysis result with risk score, headers, body, URLs, attachments, reputation
- */
+// Run full analysis on uploaded file
+// Timeout esteso a 300s: email con molti URL (es. 40+) possono richiedere fino a
+// ~55s per l'analisi URL anche con WHOIS deduplicato. 300s dà ampio margine su
+// tutti gli OS senza bloccare il browser per tempi eccessivi.
 export async function runAnalysis(jobId, doWhois = true) {
   const res = await api.post(`/analysis/${jobId}?do_whois=${doWhois}`, null, {
     timeout: 300000,
@@ -39,25 +27,13 @@ export async function runAnalysis(jobId, doWhois = true) {
   return res.data
 }
 
-/**
- * Retrieve previously completed analysis result.
- * @param {string} jobId - UUID of analysis
- * @returns {Promise<Object>} Complete analysis result
- */
+// Get existing analysis result
 export async function getAnalysis(jobId) {
   const res = await api.get(`/analysis/${jobId}`)
   return res.data
 }
 
-/**
- * List all analyses with optional filtering.
- * @param {Object} [options={}] - Filter options
- * @param {string} [options.q=""] - Full-text search (subject, from, filename)
- * @param {string} [options.risk=""] - Filter by risk: low, medium, high, critical
- * @param {number} [options.page=1] - Page number (1-indexed)
- * @param {number} [options.pageSize=25] - Results per page
- * @returns {Promise<Object>} Paginated list of analyses
- */
+// List all analyses
 export async function listAnalyses({ q = "", risk = "", page = 1, pageSize = 25 } = {}) {
   const params = new URLSearchParams()
   if (q)        params.set("q", q)
@@ -68,54 +44,30 @@ export async function listAnalyses({ q = "", risk = "", page = 1, pageSize = 25 
   return res.data
 }
 
-/**
- * Run reputation checks (FAST services).
- * SLOW services (VirusTotal, AbuseIPDB) execute in background.
- * Poll getAnalysis() to see when reputation_phase="complete".
- * @param {string} jobId - UUID of analysis
- * @returns {Promise<Object>} Reputation results from FAST services
- */
+// Run reputation checks
 export async function runReputation(jobId) {
   const res = await api.post(`/reputation/${jobId}`)
   return res.data
 }
 
-/**
- * Get URL to download report PDF.
- * @param {string} jobId - UUID of analysis
- * @returns {string} Report download URL (/api/report/{jobId})
- */
+// Download report (returns blob URL)
 export function getReportUrl(jobId) {
   return `/api/report/${jobId}`
 }
 
-/**
- * Health check and version info.
- * @returns {Promise<Object>} {status, version, app}
- */
+// Health check
 export async function healthCheck() {
   const res = await api.get('/health')
   return res.data
 }
 
-/**
- * Change UI language.
- * @param {string} lang - Language code: 'it' (Italian) or 'en' (English)
- * @returns {Promise<Object>} Updated settings
- */
+// Set backend language
 export async function setLanguage(lang) {
   const res = await api.post('/settings/language', { language: lang })
   return res.data
 }
 
-/**
- * Analyze manually pasted email source (RFC 2822).
- * Timeout 300s (same as runAnalysis).
- * @param {string} source - Raw RFC 2822 email source
- * @param {string} [filename='manual_input.eml'] - Display name for this email
- * @param {boolean} [doWhois=true] - Whether to perform WHOIS lookups
- * @returns {Promise<Object>} Complete analysis result (same as runAnalysis)
- */
+// Analyze manually pasted email source
 export async function analyzeManual(source, filename = 'manual_input.eml', doWhois = true) {
   const res = await api.post('/manual/', { source, filename, do_whois: doWhois }, {
     timeout: 300000,
@@ -123,10 +75,7 @@ export async function analyzeManual(source, filename = 'manual_input.eml', doWho
   return res.data
 }
 
-/**
- * Delete analysis (DB record + email file + report .docx).
- * @param {string} jobId - UUID of analysis to delete
- */
+// Delete an analysis (DB record + email file + report .docx)
 export async function deleteAnalysis(jobId) {
   const res = await api.delete(`/analysis/${jobId}`)
   return res.data

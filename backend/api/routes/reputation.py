@@ -23,7 +23,8 @@ Campi DB usati:
 import re
 import asyncio
 import ipaddress
-import logging
+import threading
+import logging as _logging
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,8 +41,7 @@ from dataclasses import asdict
 import json
 
 router = APIRouter()
-_logger = logging.getLogger(__name__)
-_bg_logger = logging.getLogger("emlyzer.reputation.background")
+_logger = _logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # INTELLIGENT FILTERING — CDN/Hosting Providers da escludere dalle ricerche
@@ -179,7 +179,7 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
         try:
             from urllib.parse import urlparse
             hostname = urlparse(url).netloc.split(":")[0].lstrip("www.")
-        except Exception:
+        except:
             hostname = ""
 
         # Se è URL sospetta (shortener, IP diretto, nuovo dominio, punycode)
@@ -217,7 +217,7 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
                     seen_domains.add(hostname)
                     domains.append(hostname)
                     _logger.debug(f"[DOMAIN] {hostname} - estratto da URL")
-        except Exception:
+        except:
             pass
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -370,7 +370,7 @@ def _extract_priority_indicators(
         try:
             from urllib.parse import urlparse
             hostname = urlparse(url_str).netloc.split(":")[0].lstrip("www.")
-        except Exception:
+        except:
             hostname = ""
 
         if _is_trusted_cdn(hostname):
@@ -462,22 +462,13 @@ def _extract_priority_indicators(
                         seen_domains.add(hostname)
                         domains.append(hostname)
                         _logger.debug(f"[FILTRO SLOW] Domain {hostname} - estratto da URL sospetta")
-            except Exception:
+            except:
                 pass
 
     return ips, urls, hashes, domains
 
 
 def _summary_to_dict(summary: ReputationSummary) -> dict:
-    """
-    Converte ReputationSummary dataclass a dict JSON-serializable.
-
-    Utilizzata per serializzare i risultati di run_fast_checks e run_slow_checks
-    in formato JSON pronto per il database e l'API response.
-
-    Nota: asdict() + json.dumps(..., default=str) gestisce tipi non-serializable
-    come datetime, ipaddress.ip_network, ecc. convertendoli a string.
-    """
     return json.loads(json.dumps(asdict(summary), default=str))
 
 
@@ -509,7 +500,13 @@ async def run_reputation_fast(
     ips, urls, hashes, domains = _extract_indicators(record)
 
     # DEBUG LOGGING: Mostra esattamente cosa viene estratto
-    _logger.debug(f"[REPUTATION] Extracted indicators for job {job_id}: IPs={len(ips)}, URLs={len(urls)}, Hashes={len(hashes)}, Domains={len(domains)}, received_hops={len(record.header_indicators.get('received_hops', []) if record.header_indicators else [])}, x_originating_ip={record.x_originating_ip}")
+    _logger.info(f"[REPUTATION DEBUG] Extracted indicators for job {job_id}:")
+    _logger.info(f"  IPs: {ips}")
+    _logger.info(f"  URLs: {urls}")
+    _logger.info(f"  Hashes: {hashes}")
+    _logger.info(f"  Domains: {domains}")
+    _logger.info(f"  Header received_hops count: {len(record.header_indicators.get('received_hops', []) if record.header_indicators else [])}")
+    _logger.info(f"  X-Originating-IP: {record.x_originating_ip}")
 
     # Fase 1: servizi fast, timeout generoso 25s
     loop = asyncio.get_event_loop()
@@ -535,7 +532,17 @@ async def run_reputation_fast(
     slow_indicators = {"ips": slow_ips, "urls": slow_urls, "hashes": slow_hashes, "domains": slow_domains}
 
     # DEBUG LOGGING: Mostra indicatori selettivi per SLOW services
-    _logger.debug(f"[REPUTATION] Slow indicators for job {job_id}: IPs={len(slow_ips)}, URLs={len(slow_urls)}, Hashes={len(slow_hashes)}, Domains={len(slow_domains)}")
+    _logger.info(f"[REPUTATION DEBUG] Slow indicators for job {job_id}:")
+    _logger.info(f"  SLOW IPs: {slow_ips}")
+    _logger.info(f"  SLOW URLs: {slow_urls}")
+    _logger.info(f"  SLOW Hashes: {slow_hashes}")
+    _logger.info(f"  SLOW Domains: {slow_domains}")
+
+    # DEBUG LOGGING: Mostra indicatori selettivi per SLOW services
+    _logger.info(f"[REPUTATION DEBUG] Slow indicators for job {job_id}:")
+    _logger.info(f"  SLOW IPs: {slow_ips}")
+    _logger.info(f"  SLOW URLs: {slow_urls}")
+    _logger.info(f"  SLOW Hashes: {slow_hashes}")
 
     if has_slow:
         rep_dict["slow_indicators"] = slow_indicators
@@ -574,6 +581,9 @@ async def run_reputation_fast(
 # ---------------------------------------------------------------------------
 # Fase 2 — background task (non ha timeout di sessione)
 # ---------------------------------------------------------------------------
+
+import logging as _logging
+_bg_logger = _logging.getLogger("emlyzer.reputation.background")
 
 
 async def _run_slow_background(
