@@ -205,7 +205,20 @@ def detect_campaigns(emails: list[EmailSummary],
                 ))
 
     # ── 4. Clustering per subject simile (Jaccard) ────────────────────────────
+    # PERFORMANCE NOTE: O(n²) algorithm — pairwise comparison of all emails
+    # For ~1000 emails: ~1M comparisons (~2-3s)
+    # For ~5000 emails: ~25M comparisons (~30-60s)
+    # For >10000 emails: may timeout or cause performance degradation
+    # Future optimization: use locality-sensitive hashing (MinHash) for O(n log n)
     email_tokens = [(e, _subject_tokens(e.subject)) for e in emails if e.subject]
+
+    if len(email_tokens) > 10000:
+        _logger.warning(
+            "Large email set for Jaccard clustering: %d emails. Performance may degrade. "
+            "Consider filtering by date range or processing in batches.",
+            len(email_tokens)
+        )
+
     visited = set()
 
     for i, (email_i, tokens_i) in enumerate(email_tokens):

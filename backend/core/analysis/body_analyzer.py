@@ -180,6 +180,39 @@ class BodyAnalysisResult:
     score_contribution: float = 0.0
 
 
+def _count_pattern_matches(pattern_list: list[str], text: str, result: BodyAnalysisResult, attr_name: str, max_match_len: int = 150) -> list[tuple[str, int]]:
+    """
+    Consolida logica pattern matching — evita duplicazione.
+
+    Args:
+        pattern_list: lista di regex pattern da matchare
+        text: testo normalizzato lowercase
+        result: BodyAnalysisResult object (attributo incrementato in-place)
+        attr_name: nome dell'attributo su result da incrementare (es. 'urgency_count')
+        max_match_len: ignora match > questo valore (probabili falsi positivi)
+
+    Returns:
+        list[tuple(pattern_text, count)] ordinato per frequenza descrescente
+    """
+    pattern_hits = {}  # {pattern_matched: count}
+
+    for pattern in pattern_list:
+        matches = re.findall(pattern, text)
+        for match_text in matches:
+            # Ignora match troppo lunghi — probabili errori di capturing
+            if len(match_text) > max_match_len:
+                continue
+            # Incrementa il contatore nel result object
+            setattr(result, attr_name, getattr(result, attr_name) + 1)
+            # Track pattern hit
+            if match_text not in pattern_hits:
+                pattern_hits[match_text] = 0
+            pattern_hits[match_text] += 1
+
+    # Ritorna lista di tuple ordinata per frequenza (pattern più comuni prima)
+    return sorted(pattern_hits.items(), key=lambda x: x[1], reverse=True)
+
+
 def _analyze_text(body_text: str, result: BodyAnalysisResult):
     """Analisi pattern su testo plain."""
     if not body_text:
@@ -190,50 +223,10 @@ def _analyze_text(body_text: str, result: BodyAnalysisResult):
     text_lower = text_normalized.lower()
 
     # P1: Deduplica pattern per categoria — mantiene SOLO i pattern unici trovati
-    # MAX_MATCH_LEN: ignora match > 150 char (probabili falsi positivi da regex troppo generico)
-    MAX_MATCH_LEN = 150
-    urgency_pattern_hits = {}  # {pattern_matched: count}
-    cta_pattern_hits = {}
-    credential_pattern_hits = {}
-
-    # Urgency patterns
-    for pattern in URGENCY_PATTERNS:
-        matches = re.findall(pattern, text_lower)
-        for match_text in matches:
-            # Ignora match troppo lunghi — probabili errori di capturing
-            if len(match_text) > MAX_MATCH_LEN:
-                continue
-            result.urgency_count += 1
-            if match_text not in urgency_pattern_hits:
-                urgency_pattern_hits[match_text] = 0
-            urgency_pattern_hits[match_text] += 1
-
-    # CTA patterns
-    for pattern in PHISHING_CTAS:
-        matches = re.findall(pattern, text_lower)
-        for match_text in matches:
-            if len(match_text) > MAX_MATCH_LEN:
-                continue
-            result.phishing_cta_count += 1
-            if match_text not in cta_pattern_hits:
-                cta_pattern_hits[match_text] = 0
-            cta_pattern_hits[match_text] += 1
-
-    # Credential patterns
-    for pattern in CREDENTIAL_KEYWORDS:
-        matches = re.findall(pattern, text_lower)
-        for match_text in matches:
-            if len(match_text) > MAX_MATCH_LEN:
-                continue
-            result.credential_keyword_count += 1
-            if match_text not in credential_pattern_hits:
-                credential_pattern_hits[match_text] = 0
-            credential_pattern_hits[match_text] += 1
-
-    # Ordina per frequenza (pattern più comuni prima)
-    urgency_matches = sorted(urgency_pattern_hits.items(), key=lambda x: x[1], reverse=True)
-    cta_matches = sorted(cta_pattern_hits.items(), key=lambda x: x[1], reverse=True)
-    credential_matches = sorted(credential_pattern_hits.items(), key=lambda x: x[1], reverse=True)
+    # Usa helper function per evitare duplicazione di logica
+    urgency_matches = _count_pattern_matches(URGENCY_PATTERNS, text_lower, result, 'urgency_count')
+    cta_matches = _count_pattern_matches(PHISHING_CTAS, text_lower, result, 'phishing_cta_count')
+    credential_matches = _count_pattern_matches(CREDENTIAL_KEYWORDS, text_lower, result, 'credential_keyword_count')
 
     # P1: Estrai solo i testi dei pattern (senza conteggi)
     urgency_unique = [m[0] for m in urgency_matches[:5]]

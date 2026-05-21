@@ -236,17 +236,17 @@ async def run_analysis(
     )
 
     # Upsert: se già esiste (riesecuzione analisi), aggiorna
+    # IMPORTANT: atomic transaction — delete + add in single commit to avoid race conditions
     existing = await db.get(EmailAnalysis, job_id)
     if existing:
         _logger.info("[%s] [DB DELETE] Existing analysis found, deleting for upsert", job_id)
         await db.delete(existing)
-        await db.flush()
-        _logger.info("[%s] [DB DELETE] Existing record deleted", job_id)
+        _logger.info("[%s] [DB DELETE] Existing record marked for deletion", job_id)
 
     _logger.info("[%s] [DB ADD] Adding new EmailAnalysis record to session", job_id)
     try:
         db.add(record)
-        _logger.info("[%s] [DB COMMIT] Committing transaction to database", job_id)
+        _logger.info("[%s] [DB COMMIT] Committing transaction to database (includes delete if applicable)", job_id)
         await db.commit()
         _logger.info("[%s] [DB SUCCESS] Analysis persisted successfully, record_id=%s", job_id, record.id)
     except Exception as e:
