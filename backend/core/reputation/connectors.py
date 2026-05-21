@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 REQUEST_TIMEOUT      = 8    # servizi di sicurezza (AbuseIPDB, VirusTotal, ecc.)
 REQUEST_TIMEOUT_ASN  = 4    # ASN lookup
 REQUEST_TIMEOUT_INFO = 5    # servizi informativi (crt.sh, redirect chain)
-REQUEST_TIMEOUT_PULSEDIVE = 12  # Pulsedive può essere lento (free tier con 10 req/day quota)
+REQUEST_TIMEOUT_PULSEDIVE = 15  # Pulsedive può essere lento (free tier: 10 req/day, rate limit aggressivo)
 
 # ---------------------------------------------------------------------------
 # Disk cache per feed locali (Spamhaus DROP, OpenPhish)
@@ -103,7 +103,7 @@ _RATE_INTERVALS: dict[str, float] = {
     "circl":            0.5,    # CIRCL Passive DNS — nessun limite ufficiale, conservativo
     "greynoise":        1.1,    # GreyNoise Community — ~50 ricerche/settimana free
     "urlscan":          1.0,    # URLScan.io — 1000 ricerche/g con chiave
-    "pulsedive":        2.5,    # Pulsedive — 10 req/g free (da mar 2024)
+    "pulsedive":        5.0,    # Pulsedive — 10 req/g free; rate limit aggressivo (429 se troppo veloce)
     "criminalip":       1.1,    # Criminal IP — free con crediti limitati
     "securitytrails":   3.0,    # SecurityTrails — SOLO trial/a pagamento; rate conservativo
     "hybridanalysis":   1.0,    # Hybrid Analysis — free con registrazione
@@ -1121,10 +1121,18 @@ def _check_pulsedive(entity: str, entity_type: str) -> ReputationResult:
             detail=detail,
         )
     except requests.HTTPError as e:
-        return ReputationResult(
-            source="Pulsedive", entity=entity, entity_type=entity_type,
-            error=f"Pulsedive HTTP {e.response.status_code if e.response is not None else '?'}",
-        )
+        status_code = e.response.status_code if e.response is not None else None
+        if status_code == 429:
+            # Pulsedive rate limit — potrebbe essere limite giornaliero o per-minute
+            return ReputationResult(
+                source="Pulsedive", entity=entity, entity_type=entity_type,
+                skipped=True, skip_reason="Pulsedive rate limit superato (quota giornaliera o temporanea). Riprova tra qualche minuto. Quota free: 10 req/giorno",
+            )
+        else:
+            return ReputationResult(
+                source="Pulsedive", entity=entity, entity_type=entity_type,
+                error=f"Pulsedive HTTP {status_code if status_code else '?'}",
+            )
     except (requests.ConnectionError, requests.Timeout) as exc:
         # Pulsedive connectivity issue — mark as skipped with helpful message
         return ReputationResult(
