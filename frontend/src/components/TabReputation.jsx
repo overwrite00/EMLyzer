@@ -294,7 +294,7 @@ function DetailRow({ r, lang }) {
           {/* Errore */}
           {r.error && (
             <div style={{ color: 'var(--risk-medium)', fontSize: 11 }}>
-              ⚠ {r.error}
+              ⚠ {r.error_type ? `${r.error_type.replace(/_/g, ' ')} — ` : ''}{r.error}
             </div>
           )}
           {/* Confidence bar */}
@@ -428,7 +428,7 @@ function RawResults({ results, lang }) {
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)', wordBreak: 'break-all' }}>{r.entity}</div>
                 {r.detail && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{r.detail}</div>}
-                {r.error  && <div style={{ fontSize: 10, color: 'var(--risk-medium)', marginTop: 1 }}>⚠ {r.error}</div>}
+                {r.error  && <div style={{ fontSize: 10, color: 'var(--risk-medium)', marginTop: 1 }}>⚠ {r.error_type ? `[${r.error_type.replace(/_/g, ' ')}] ` : ''}{r.error}</div>}
               </div>
               {r.is_malicious && (
                 <span style={{ color: 'var(--risk-high)', fontWeight: 700, fontSize: 10, flexShrink: 0 }}>
