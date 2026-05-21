@@ -112,7 +112,7 @@ export function KeyValue({ label, value, mono = false }) {
 }
 
 export function FindingRow({ finding }) {
-  const { severity, description, evidence, category } = finding
+  const { severity, description, evidence, category, matched_patterns } = finding
   return (
     <div style={{
       display: 'flex',
@@ -127,6 +127,40 @@ export function FindingRow({ finding }) {
       <SeverityBadge severity={severity} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: 'var(--text-primary)', fontSize: 13 }}>{description}</div>
+        {/* P1: Mostra i pattern specifici trovati come chip visibili */}
+        {matched_patterns && matched_patterns.length > 0 && (
+          <div style={{
+            display: 'flex',
+            gap: 5,
+            flexWrap: 'wrap',
+            marginTop: 6,
+            marginBottom: evidence ? 3 : 0,
+          }}>
+            {matched_patterns.map((pattern, i) => (
+              <span
+                key={i}
+                style={{
+                  display: 'inline-block',
+                  background: 'var(--accent-yellow, #fbbf24)',
+                  color: '#000',
+                  padding: '2px 8px',
+                  borderRadius: 3,
+                  fontSize: 11,
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: 500,
+                  maxWidth: '200px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  borderLeft: '2px solid var(--severity-high)',
+                }}
+                title={pattern}
+              >
+                "{pattern}"
+              </span>
+            ))}
+          </div>
+        )}
         {evidence && (
           <div style={{
             color: 'var(--text-muted)',
