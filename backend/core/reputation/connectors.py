@@ -224,14 +224,74 @@ def _http_post_with_retry(
 class ReputationResult:
     source: str
     entity: str
-    entity_type: str       # "ip" / "url" / "hash"
+    entity_type: str       # "ip" / "url" / "hash" / "domain"
     queried: bool = False  # True = chiamata API effettivamente eseguita
     is_malicious: bool = False
     confidence: float = 0.0
     detail: str = ""
-    error: str = ""
+    error: str = ""        # Human-readable error message
+    error_type: str = ""   # Structured error category: timeout, rate_limit_exceeded, invalid_api_key, malformed_response, service_unavailable, connection_error, unknown_error, not_configured
     skipped: bool = False
     skip_reason: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Error categorization helper
+# ---------------------------------------------------------------------------
+
+def _categorize_error(exc: Exception | None, http_code: int | None = None, has_api_key: bool = False) -> tuple[str, str]:
+    """
+    Categorizes an error into a structured type with a human-readable message.
+
+    Returns: (error_type, error_message)
+
+    Error types:
+    - timeout: Request timeout
+    - rate_limit_exceeded: HTTP 429 or service rate limit
+    - invalid_api_key: HTTP 401/403 with API key configured
+    - not_configured: API key not configured
+    - malformed_response: JSON decode error
+    - service_unavailable: HTTP 5xx
+    - connection_error: Network error
+    - unknown_error: Other errors
+    """
+    # HTTP errors
+    if http_code == 401:
+        if has_api_key:
+            return ("invalid_api_key", "API key invalid or revoked (HTTP 401)")
+        else:
+            return ("not_configured", "API key not configured in .env")
+
+    if http_code == 403:
+        if has_api_key:
+            return ("rate_limit_exceeded", "Quota exceeded or access forbidden (HTTP 403)")
+        else:
+            return ("not_configured", "API key not configured in .env")
+
+    if http_code == 429:
+        return ("rate_limit_exceeded", "Rate limit exceeded (HTTP 429)")
+
+    if http_code in (500, 502, 503, 504):
+        return ("service_unavailable", f"Service temporarily unavailable (HTTP {http_code})")
+
+    # Exception-based errors
+    if isinstance(exc, requests.exceptions.Timeout):
+        return ("timeout", "Request timeout: service is slow")
+
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        return ("connection_error", "Network connection error: cannot reach service")
+
+    if isinstance(exc, json.JSONDecodeError):
+        return ("malformed_response", "Service returned malformed JSON")
+
+    if exc is not None:
+        exc_name = type(exc).__name__
+        if "Timeout" in exc_name:
+            return ("timeout", f"Request timeout ({exc_name})")
+        if "Connection" in exc_name or "Network" in exc_name:
+            return ("connection_error", f"Network error ({exc_name})")
+
+    return ("unknown_error", f"Unknown error" + (f": {type(exc).__name__}" if exc else ""))
 
 
 # ---------------------------------------------------------------------------
@@ -274,11 +334,23 @@ def check_ip_abuseipdb(ip: str) -> ReputationResult:
             f"Tipo: {data.get('usageType', 'N/A')}"
         )
     except requests.HTTPError as e:
-        r.error = f"HTTP {e.response.status_code}: {e.response.text[:150]}"
+        code = e.response.status_code if e.response is not None else None
+        error_type, error_msg = _categorize_error(e, code, has_api_key=True)
+        r.error_type = error_type
+        if code == 401:
+            r.error = "AbuseIPDB API key invalid. Verify on abuseipdb.com/register"
+        elif code == 429:
+            r.error = "AbuseIPDB rate limit exceeded (4 req/min). Wait before retrying."
+        else:
+            r.error = f"AbuseIPDB: {error_msg}"
     except requests.RequestException as e:
-        r.error = f"Errore di rete: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"AbuseIPDB: {error_msg}"
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"AbuseIPDB: {error_msg}"
     return r
 
 
@@ -352,11 +424,18 @@ def check_ip_virustotal(ip: str) -> ReputationResult:
         stats = resp.json().get("data", {}).get("attributes", {}).get("last_analysis_stats", {})
         r.is_malicious, r.confidence, r.detail = _vt_stats_detail(stats)
     except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else None
+        error_type, _ = _categorize_error(e, code, has_api_key=True)
+        r.error_type = error_type
         r.error = _vt_http_error(e)
     except requests.RequestException as e:
-        r.error = f"Errore di rete: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"VirusTotal: {error_msg}"
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"VirusTotal: {error_msg}"
     return r
 
 
@@ -397,11 +476,18 @@ def check_url_virustotal(url: str) -> ReputationResult:
         stats = resp.json().get("data", {}).get("attributes", {}).get("last_analysis_stats", {})
         r.is_malicious, r.confidence, r.detail = _vt_stats_detail(stats)
     except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else None
+        error_type, _ = _categorize_error(e, code, has_api_key=True)
+        r.error_type = error_type
         r.error = _vt_http_error(e)
     except requests.RequestException as e:
-        r.error = f"Errore di rete: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"VirusTotal: {error_msg}"
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"VirusTotal: {error_msg}"
     return r
 
 
@@ -433,11 +519,18 @@ def check_hash_virustotal(sha256: str) -> ReputationResult:
         stats = attrs.get("last_analysis_stats", {})
         r.is_malicious, r.confidence, r.detail = _vt_stats_detail(stats, name)
     except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else None
+        error_type, _ = _categorize_error(e, code, has_api_key=True)
+        r.error_type = error_type
         r.error = _vt_http_error(e)
     except requests.RequestException as e:
-        r.error = f"Errore di rete: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"VirusTotal: {error_msg}"
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"VirusTotal: {error_msg}"
     return r
 
 
@@ -509,7 +602,9 @@ def check_url_openphish(url: str) -> ReputationResult:
                     if r.is_malicious
                     else f"URL non nel feed ({len(_openphish_cache):,} voci caricate)")
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"OpenPhish: {error_msg}"
     return r
 
 
@@ -550,11 +645,21 @@ def check_url_phishtank(url: str) -> ReputationResult:
         r.confidence = 100.0 if (in_db and verified) else (50.0 if in_db else 0.0)
         r.detail = f"In database: {in_db} | Verificato: {verified} | Phish: {is_phish}"
     except requests.HTTPError as e:
-        r.error = f"HTTP {e.response.status_code}: {e.response.text[:150]}"
+        code = e.response.status_code if e.response is not None else None
+        error_type, error_msg = _categorize_error(e, code, has_api_key=True)
+        r.error_type = error_type
+        if code == 429:
+            r.error = "PhishTank rate limit exceeded. Wait before retrying."
+        else:
+            r.error = f"PhishTank: {error_msg}"
     except requests.RequestException as e:
-        r.error = f"Errore di rete: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"PhishTank: {error_msg}"
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"PhishTank: {error_msg}"
     return r
 
 
@@ -600,10 +705,19 @@ def check_hash_malwarebazaar(sha256: str) -> ReputationResult:
             r.detail = "Hash non trovato in MalwareBazaar"
         else:
             r.detail = f"Status: {st}"
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else None
+        error_type, error_msg = _categorize_error(e, code, has_api_key=bool(_key))
+        r.error_type = error_type
+        r.error = f"MalwareBazaar: {error_msg}"
     except requests.RequestException as e:
-        r.error = f"Errore di rete: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"MalwareBazaar: {error_msg}"
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"MalwareBazaar: {error_msg}"
     return r
 
 
@@ -691,7 +805,9 @@ def check_ip_spamhaus(ip: str) -> ReputationResult:
                 return r
         r.detail = f"IP non in Spamhaus DROP ({len(_spamhaus_cache)} reti caricate)"
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"Spamhaus: {error_msg}"
     return r
 
 
@@ -727,7 +843,9 @@ def check_ip_asn(ip: str) -> ReputationResult:
             parts.append(f"hostname: {hostname}")
         r.detail = " | ".join(parts) if parts else "Nessun dato ASN"
     except Exception as e:
-        r.error = f"Errore lookup ASN: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"ASN Lookup: {error_msg}"
     return r
 
 
@@ -1129,7 +1247,7 @@ def check_url_urlscan(url: str) -> ReputationResult:
             detail=detail,
         )
     except requests.HTTPError as e:
-        code = e.response.status_code if e.response is not None else "?"
+        code = e.response.status_code if e.response is not None else None
         body = ""
         try:
             if e.response is not None:
@@ -1137,28 +1255,33 @@ def check_url_urlscan(url: str) -> ReputationResult:
         except Exception:
             pass
 
-        # Fallback: mark as skipped instead of error on HTTP failures
         logger.warning(f"URLScan.io HTTP {code} for {url}. Response: {body}")
+
+        # Categorize error and provide service-specific message
+        error_type, error_msg = _categorize_error(e, code, has_api_key=has_api_key)
 
         # Phase 2D: Improved error messages (v0.14.3+)
         if code == 403:
             if has_api_key:
-                skip_reason = "URLScan.io HTTP 403 Forbidden con API key. Verifica: 1) API key valida, 2) Rate limit (1000 req/giorno), 3) IP non blacklisted. Vai a urlscan.io/user/settings per controllare lo stato dell'account"
+                error_msg = "HTTP 403 Forbidden con API key. Verifica: 1) API key valida, 2) Rate limit (1000 req/giorno), 3) IP non blacklisted. Vai a urlscan.io/user/settings"
             else:
-                skip_reason = "URLScan.io ricerca pubblica non disponibile. Configura URLSCAN_API_KEY in .env per aumentare il limite (1000 req/giorno)"
-        else:
-            skip_reason = f"URLScan.io indisponibile (HTTP {code})"
+                error_msg = "Ricerca pubblica non disponibile. Configura URLSCAN_API_KEY in .env per aumentare il limite (1000 req/giorno)"
+        elif code == 429:
+            error_msg = "Rate limit exceeded (1000 req/day). Wait before retrying."
 
         return ReputationResult(
             source="URLScan.io", entity=url, entity_type="url",
-            skipped=True, skip_reason=skip_reason,
+            error_type=error_type,
+            error=f"URLScan.io: {error_msg}",
         )
     except Exception as exc:
-        # Fallback: mark as skipped on other errors
+        # Categorize error type
+        error_type, error_msg = _categorize_error(exc)
         logger.exception(f"URLScan.io error for {url}: {type(exc).__name__}")
         return ReputationResult(
             source="URLScan.io", entity=url, entity_type="url",
-            skipped=True, skip_reason=f"URLScan.io errore: {type(exc).__name__}",
+            error_type=error_type,
+            error=f"URLScan.io: {error_msg}",
         )
 
 
@@ -1502,11 +1625,15 @@ def check_url_redirect_chain(url: str) -> ReputationResult:
             if final != url:
                 r.confidence = 50.0  # neutro ma merita attenzione
     except requests.exceptions.SSLError as e:
-        r.error = f"Errore SSL: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = error_msg
     except requests.exceptions.ConnectionError as e:
         r.error = f"Connessione fallita: {e}"
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = error_msg
     return r
 
 
@@ -1570,7 +1697,9 @@ def check_ip_shodan_internetdb(ip: str) -> ReputationResult:
     except requests.exceptions.ConnectionError:
         r.error = "Shodan InternetDB non raggiungibile"
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = error_msg
     return r
 
 
@@ -1631,9 +1760,13 @@ def check_url_urlhaus(url: str) -> ReputationResult:
             r.detail = f"Status: {status}"
 
     except requests.RequestException as e:
-        r.error = f"Errore di rete: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = error_msg
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = error_msg
     return r
 
 
@@ -1707,9 +1840,13 @@ def check_ip_threatfox(ip: str) -> ReputationResult:
     try:
         _parse_threatfox_result(r, _query_threatfox(ip))
     except requests.RequestException as e:
-        r.error = f"Errore di rete: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = error_msg
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = error_msg
     return r
 
 
@@ -1721,9 +1858,13 @@ def check_url_threatfox(url: str) -> ReputationResult:
     try:
         _parse_threatfox_result(r, _query_threatfox(url))
     except requests.RequestException as e:
-        r.error = f"Errore di rete: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = error_msg
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = error_msg
     return r
 
 
@@ -1735,9 +1876,13 @@ def check_hash_threatfox(sha256: str) -> ReputationResult:
     try:
         _parse_threatfox_result(r, _query_threatfox(sha256))
     except requests.RequestException as e:
-        r.error = f"Errore di rete: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = error_msg
     except Exception as e:
-        r.error = f"Errore: {e}"
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = error_msg
     return r
 
 
