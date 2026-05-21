@@ -548,7 +548,32 @@ def _compute_score(result: BodyAnalysisResult) -> float:
 
 
 def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
-    """Entry point analisi body. Analizza sia testo plain che HTML."""
+    """
+    Analizza il corpo email per rilevare pattern phishing, urgenza e credenziali.
+
+    Checks eseguiti (su testo plain e HTML):
+    - Urgenza (URGENT ACTION, scadenza, verifica account, ecc.)
+    - CTA (Call-To-Action) sospette (Click now, verify identity, confirm payment)
+    - Credenziali (username, password, OTP, card, SSN, ecc.)
+    - Omoglifi Unicode (Cirillico/Greco come Latin spoofing)
+    - Link offuscati (testo visibile ≠ URL reale)
+    - Form HTML nascosti
+    - JavaScript sospetto
+    - Elementi HTML invisibili (colore testo=sfondo)
+    - Base64 inline (embedding di malware/phishing page)
+    - Grammatica (via LanguageTool se configurato)
+
+    NLP Classification:
+    - LogisticRegression + TF-IDF per classificare legittima vs phishing
+    - Confidence: low/medium/high based on probability
+    - Contribuisce al body score finale
+
+    Args:
+        parsed: ParsedEmail con body_text (plain) e body_html (HTML)
+
+    Returns:
+        BodyAnalysisResult con findings, conteggi pattern, URLs estratte, NLP result, score
+    """
     result = BodyAnalysisResult()
 
     _logger.info("[BODY START] text_len=%d, html_len=%d", len(parsed.body_text or ''), len(parsed.body_html or ''))

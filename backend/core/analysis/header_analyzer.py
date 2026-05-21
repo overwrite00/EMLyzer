@@ -848,7 +848,27 @@ def _compute_score(result: HeaderAnalysisResult) -> float:
 
 
 def analyze_headers(parsed: ParsedEmail) -> HeaderAnalysisResult:
-    """Entry point: esegue tutte le analisi header e restituisce HeaderAnalysisResult."""
+    """
+    Esegue analisi completa degli header email per rilevare phishing e spoofing.
+
+    Checks eseguiti:
+    - Mismatch di identità (From, Return-Path, Reply-To, X-Originating-IP)
+    - Validazione SPF/DKIM/DMARC + estrazione dettagli autenticazione
+    - Bulk sender (liste di distribuzione, notifiche automatiche)
+    - Header injection / manipolazione
+    - Catena SMTP (Received hops, analisi percorso email)
+    - IP originante sospetto
+    - Campi header mancanti (Date, From obbligatori)
+    - List-Unsubscribe header
+    - Campaign-ID (tracker campagne)
+    - ARC chain (authenticated received chain)
+
+    Args:
+        parsed: ParsedEmail con tutti i campi estratti dal parser
+
+    Returns:
+        HeaderAnalysisResult con lista findings, score parziale e meta-info auth
+    """
     result = HeaderAnalysisResult()
 
     _logger.info("[HEADER START] From=%s, SPF=%s, DKIM=%s, DMARC=%s", parsed.mail_from, parsed.spf_result, parsed.dkim_result, parsed.dmarc_result)

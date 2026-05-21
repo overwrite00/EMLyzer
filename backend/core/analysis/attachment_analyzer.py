@@ -64,6 +64,12 @@ PDF_SUSPICIOUS_STREAMS = [
     rb"/XFA",           # XML Forms Architecture (spesso usato in exploit)
 ]
 
+# Binary analysis limits
+OLE2_HEADER_LIMIT = 32768           # 32 KB — OLE2 header size for macro detection in Word/Excel
+PDF_SCAN_LIMIT = 2097152            # 2 MB — max PDF size to scan for malicious patterns (JS, suspicious streams)
+# Rationale: OLE2 headers are typically < 8 KB but we read 32 KB for safety
+#            PDF scanning is expensive; limit to first 2 MB to avoid memory issues on huge files
+
 
 @dataclass
 class AttachmentFinding:
@@ -125,7 +131,7 @@ def _analyze_ooxml(data: bytes) -> tuple[bool, list[str]]:
     File OOXML sono ZIP: cerca 'vbaProject.bin' nel TOC dello ZIP
     senza estrarlo (evita zip bomb: leggiamo solo i primi 32KB).
     """
-    chunk = data[:32768]
+    chunk = data[:OLE2_HEADER_LIMIT]
     has_macro = b"vbaProject.bin" in chunk
     evidences = ["vbaProject.bin trovato nel file OOXML"] if has_macro else []
     return has_macro, evidences
@@ -142,7 +148,7 @@ def _analyze_pdf(data: bytes) -> tuple[bool, bool, list[str], list[str]]:
     stream_evidences = []
 
     # Leggiamo al massimo i primi 2MB per sicurezza
-    chunk = data[:2097152]
+    chunk = data[:PDF_SCAN_LIMIT]
 
     for pattern in PDF_JS_PATTERNS:
         if re.search(pattern, chunk):
@@ -254,7 +260,27 @@ def analyze_attachment(att: dict, raw_data: Optional[bytes] = None) -> Attachmen
 
 
 def analyze_attachments(attachments: list[dict]) -> AttachmentAnalysisResult:
-    """Analizza tutti gli allegati (solo metadati, no raw_data in questa fase)."""
+    """
+    Esegue analisi statica di tutti gli allegati email.
+
+    Checks eseguiti per ogni allegato:
+    - Hash (MD5, SHA1, SHA256) per reputation checks e deduplication
+    - MIME mismatch (Content-Type dichiarato ≠ tipo reale)
+    - Estensione pericolosa (exe, dll, zip, scr, vbs, ecc.)
+    - Doppia estensione (invoice.pdf.exe)
+    - Macro in Office (OLE2 in Word/Excel e OOXML vbaProject.bin)
+    - JavaScript embedded in PDF (/JS, /JavaScript, eval, app.alert)
+    - Stream sospetti in PDF (/AA, /Launch, /EmbeddedFile, /RichMedia, /XFA)
+
+    IMPORTANTE: Analisi statica SOLTANTO (zero esecuzione).
+    Raw file bytes vengono scansionati solo per primi 2 MB (PDF_SCAN_LIMIT).
+
+    Args:
+        attachments: Lista di dict da email_parser con filename, size_bytes, mime, hashes
+
+    Returns:
+        AttachmentAnalysisResult con lista analisi, conteggi, score parziale
+    """
     result = AttachmentAnalysisResult()
     result.total_attachments = len(attachments)
 
