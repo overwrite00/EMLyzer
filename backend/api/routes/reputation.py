@@ -373,3 +373,77 @@ def _dict_to_summary(d: dict) -> ReputationSummary:
         malicious_count=d.get("malicious_count", 0),
         reputation_score=d.get("reputation_score", 0.0),
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2C: Health Check Endpoint per URLScan.io (v0.14.3+)
+# ---------------------------------------------------------------------------
+
+@router.get("/test-urlscan")
+async def test_urlscan_health():
+    """
+    Testa la connessione a URLScan.io e verifica la configurazione dell'API key.
+    Utile per diagnosticare problemi di autenticazione o rate limiting.
+
+    Ritorna:
+      {
+        "connectivity": bool,          # Riesce a raggiungere urlscan.io?
+        "api_key_configured": bool,    # URLSCAN_API_KEY è configurato?
+        "api_key_valid": bool,         # La chiave è valida? (test con query semplice)
+        "system_info": {...},          # Sistema operativo, Python version, etc.
+        "suggestions": [...]           # Consigli di configurazione
+      }
+    """
+    import sys
+    import platform
+    import requests
+    from utils.config import settings
+
+    result = {
+        "connectivity": False,
+        "api_key_configured": False,
+        "api_key_valid": False,
+        "system_info": {
+            "os": platform.system(),
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            "requests_version": requests.__version__,
+        },
+        "suggestions": [],
+    }
+
+    # Test 1: Connessione a URLScan.io
+    try:
+        resp = requests.head("https://urlscan.io/api/v1/search/", timeout=5)
+        result["connectivity"] = True
+    except Exception as e:
+        result["suggestions"].append(f"URLScan.io non raggiungibile: {type(e).__name__}")
+        return result
+
+    # Test 2: API key configurato?
+    api_key = settings.URLSCAN_API_KEY
+    if api_key and api_key.strip():
+        result["api_key_configured"] = True
+
+        # Test 3: API key valido?
+        try:
+            headers = {"API-Key": api_key.strip()}
+            resp = requests.get(
+                "https://urlscan.io/api/v1/search/",
+                params={"q": "page.domain:example.com", "size": "1"},
+                headers=headers,
+                timeout=5,
+            )
+            if resp.status_code == 200:
+                result["api_key_valid"] = True
+            elif resp.status_code == 401:
+                result["suggestions"].append("API key invalida o scaduta. Verifica urlscan.io/user/settings")
+            elif resp.status_code == 403:
+                result["suggestions"].append("HTTP 403 Forbidden. Possibili cause: 1) Rate limit superato (1000 req/giorno), 2) IP blacklisted, 3) API key non valida. Verifica urlscan.io/user/settings")
+            else:
+                result["suggestions"].append(f"URLScan.io HTTP {resp.status_code}. Risposta: {resp.text[:100]}")
+        except Exception as e:
+            result["suggestions"].append(f"Errore test API key: {type(e).__name__}: {str(e)[:100]}")
+    else:
+        result["suggestions"].append("URLSCAN_API_KEY non configurato in .env. Registrati su https://urlscan.io/user/signup e configura la chiave per aumentare il limite a 1000 req/giorno")
+
+    return result

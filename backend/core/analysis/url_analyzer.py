@@ -10,6 +10,7 @@ Analisi URL estratti dal corpo email:
 """
 
 import re
+import html
 import urllib.parse
 import concurrent.futures
 import logging as _logging
@@ -282,6 +283,10 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
     valid_urls: list[str] = []
     for url in urls:
         url = url.strip().rstrip(".,;)'\"")
+        # Decode HTML entities (e.g., &amp; → &, &quot; → ", etc.)
+        # This prevents issues with URLScan.io and other reputation services
+        # that receive invalid URLs with encoded entities (e.g., &amp;display=swap)
+        url = html.unescape(url)
         if url and url not in seen and re.match(r"https?://", url):
             seen.add(url)
             valid_urls.append(url)

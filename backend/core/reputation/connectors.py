@@ -956,6 +956,9 @@ def check_url_urlscan(url: str) -> ReputationResult:
     if has_api_key:
         headers["API-Key"] = settings.URLSCAN_API_KEY.strip()
 
+    # Diagnostic logging (v0.14.3+): Log request details
+    logger.debug(f"URLScan.io request: url={url}, query={query}, has_api_key={has_api_key}, auth_method=header")
+
     try:
         resp = _http_get_with_retry(
             "https://urlscan.io/api/v1/search/",
@@ -978,6 +981,27 @@ def check_url_urlscan(url: str) -> ReputationResult:
                     source="URLScan.io", entity=url, entity_type="url",
                     skipped=True, skip_reason="URLScan.io ricerca pubblica non disponibile",
                 )
+
+        # Phase 2B: Fallback retry con query param se HTTP 403 con API key (v0.14.3+)
+        if resp.status_code == 403 and has_api_key:
+            logger.debug(f"URLScan.io HTTP 403 con API-Key header, ritentando con query param per {url}")
+            resp = _http_get_with_retry(
+                "https://urlscan.io/api/v1/search/",
+                params={
+                    "q": f"page.domain:{query}",
+                    "key": settings.URLSCAN_API_KEY.strip(),
+                    "size": "3",
+                    "sort": "date"
+                },
+                headers={"Content-Type": "application/json"},  # Senza API-Key header
+                timeout=REQUEST_TIMEOUT,
+                rate_key="urlscan",
+            )
+            if resp.status_code == 200:
+                logger.debug(f"URLScan.io: retry con query param riuscito per {url}")
+            else:
+                logger.debug(f"URLScan.io: retry con query param fallito (HTTP {resp.status_code}) per {url}")
+
         resp.raise_for_status()
         data = resp.json()
         results = data.get("results", [])
@@ -1012,11 +1036,28 @@ def check_url_urlscan(url: str) -> ReputationResult:
         )
     except requests.HTTPError as e:
         code = e.response.status_code if e.response is not None else "?"
+        body = ""
+        try:
+            if e.response is not None:
+                body = e.response.text[:200]  # Log first 200 chars of error response
+        except Exception:
+            pass
+
         # Fallback: mark as skipped instead of error on HTTP failures
-        logger.warning(f"URLScan.io HTTP {code} for {url}")
+        logger.warning(f"URLScan.io HTTP {code} for {url}. Response: {body}")
+
+        # Phase 2D: Improved error messages (v0.14.3+)
+        if code == 403:
+            if has_api_key:
+                skip_reason = "URLScan.io HTTP 403 Forbidden con API key. Verifica: 1) API key valida, 2) Rate limit (1000 req/giorno), 3) IP non blacklisted. Vai a urlscan.io/user/settings per controllare lo stato dell'account"
+            else:
+                skip_reason = "URLScan.io ricerca pubblica non disponibile. Configura URLSCAN_API_KEY in .env per aumentare il limite (1000 req/giorno)"
+        else:
+            skip_reason = f"URLScan.io indisponibile (HTTP {code})"
+
         return ReputationResult(
             source="URLScan.io", entity=url, entity_type="url",
-            skipped=True, skip_reason=f"URLScan.io indisponibile (HTTP {code})",
+            skipped=True, skip_reason=skip_reason,
         )
     except Exception as exc:
         # Fallback: mark as skipped on other errors
