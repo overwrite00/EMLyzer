@@ -231,13 +231,12 @@ async def run_reputation_fast(
     ips, urls, hashes = _extract_indicators(record)
 
     # DEBUG LOGGING: Mostra esattamente cosa viene estratto
-    print(f"\n[REPUTATION DEBUG] Extracted indicators for job {job_id}:")
-    print(f"  IPs: {ips}")
-    print(f"  URLs: {urls}")
-    print(f"  Hashes: {hashes}")
-    print(f"  Header received_hops: {record.header_indicators.get('received_hops', []) if record.header_indicators else []}")
-    print(f"  X-Originating-IP: {record.x_originating_ip}")
-    _logger.info(f"[REPUTATION DEBUG] Extracted indicators for job {job_id}: IPs={ips}, URLs={urls}, Hashes={hashes}")
+    _logger.info(f"[REPUTATION DEBUG] Extracted indicators for job {job_id}:")
+    _logger.info(f"  IPs: {ips}")
+    _logger.info(f"  URLs: {urls}")
+    _logger.info(f"  Hashes: {hashes}")
+    _logger.info(f"  Header received_hops count: {len(record.header_indicators.get('received_hops', []) if record.header_indicators else [])}")
+    _logger.info(f"  X-Originating-IP: {record.x_originating_ip}")
 
     # Fase 1: servizi fast, timeout generoso 25s
     loop = asyncio.get_event_loop()
@@ -263,11 +262,10 @@ async def run_reputation_fast(
     slow_indicators = {"ips": slow_ips, "urls": slow_urls, "hashes": slow_hashes}
 
     # DEBUG LOGGING: Mostra indicatori selettivi per SLOW services
-    print(f"[REPUTATION DEBUG] Slow indicators for job {job_id}:")
-    print(f"  SLOW IPs: {slow_ips}")
-    print(f"  SLOW URLs: {slow_urls}")
-    print(f"  SLOW Hashes: {slow_hashes}")
-    _logger.info(f"[REPUTATION DEBUG] Slow indicators: IPs={slow_ips}, URLs={slow_urls}, Hashes={slow_hashes}")
+    _logger.info(f"[REPUTATION DEBUG] Slow indicators for job {job_id}:")
+    _logger.info(f"  SLOW IPs: {slow_ips}")
+    _logger.info(f"  SLOW URLs: {slow_urls}")
+    _logger.info(f"  SLOW Hashes: {slow_hashes}")
 
     if has_slow:
         rep_dict["slow_indicators"] = slow_indicators
