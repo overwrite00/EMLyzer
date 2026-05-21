@@ -246,7 +246,7 @@ def _analyze_text(body_text: str, result: BodyAnalysisResult):
         result.findings.append(BodyFinding(
             category="text",
             severity="high",
-            description=t("body.urgency_high", count=result.urgency_count),
+            description=t("body.urgency_high", occurrences=result.urgency_count, unique_patterns=len(urgency_unique)),
             evidence=evidence,
             matched_patterns=urgency_unique,
             count=result.urgency_count,
@@ -256,7 +256,7 @@ def _analyze_text(body_text: str, result: BodyAnalysisResult):
         result.findings.append(BodyFinding(
             category="text",
             severity="medium",
-            description=t("body.urgency_medium", count=result.urgency_count),
+            description=t("body.urgency_medium", occurrences=result.urgency_count, unique_patterns=len(urgency_unique)),
             evidence=evidence,
             matched_patterns=urgency_unique,
             count=result.urgency_count,
@@ -268,7 +268,7 @@ def _analyze_text(body_text: str, result: BodyAnalysisResult):
         result.findings.append(BodyFinding(
             category="text",
             severity="high",
-            description=t("body.cta_high", count=result.phishing_cta_count),
+            description=t("body.cta_high", occurrences=result.phishing_cta_count, unique_patterns=len(cta_unique)),
             evidence=evidence,
             matched_patterns=cta_unique,
             count=result.phishing_cta_count,
@@ -290,7 +290,7 @@ def _analyze_text(body_text: str, result: BodyAnalysisResult):
         result.findings.append(BodyFinding(
             category="text",
             severity="high",
-            description=t("body.credentials", count=result.credential_keyword_count),
+            description=t("body.credentials", occurrences=result.credential_keyword_count, unique_patterns=len(credential_unique)),
             evidence=evidence,
             matched_patterns=credential_unique,
             count=result.credential_keyword_count,
@@ -301,7 +301,7 @@ def _analyze_text(body_text: str, result: BodyAnalysisResult):
         result.findings.append(BodyFinding(
             category="text",
             severity="medium",
-            description=t("body.credentials", count=result.credential_keyword_count),
+            description=t("body.credentials", occurrences=result.credential_keyword_count, unique_patterns=len(credential_unique)),
             evidence=evidence,
             matched_patterns=credential_unique,
             count=result.credential_keyword_count,

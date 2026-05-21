@@ -183,24 +183,24 @@ TRANSLATIONS = {
 
     # ── Body analysis findings ────────────────────────────────────────────────
     "body.urgency_high": {
-        "it": "Linguaggio di urgenza artificiale rilevato ({count} pattern)",
-        "en": "Artificial urgency language detected ({count} patterns)",
+        "it": "Linguaggio di urgenza artificiale rilevato ({unique_patterns} pattern, {occurrences} occorrenze)",
+        "en": "Artificial urgency language detected ({unique_patterns} patterns, {occurrences} occurrences)",
     },
     "body.urgency_medium": {
-        "it": "Possibile linguaggio urgente ({count} pattern)",
-        "en": "Possible urgent language ({count} patterns)",
+        "it": "Possibile linguaggio urgente ({unique_patterns} pattern, {occurrences} occorrenze)",
+        "en": "Possible urgent language ({unique_patterns} patterns, {occurrences} occurrences)",
     },
     "body.cta_high": {
-        "it": "Molteplici call-to-action sospette ({count})",
-        "en": "Multiple suspicious call-to-action ({count})",
+        "it": "Molteplici call-to-action sospette ({unique_patterns} pattern, {occurrences} occorrenze)",
+        "en": "Multiple suspicious call-to-action ({unique_patterns} patterns, {occurrences} occurrences)",
     },
     "body.cta_medium": {
         "it": "Call-to-action sospetta rilevata",
         "en": "Suspicious call-to-action detected",
     },
     "body.credentials": {
-        "it": "Richiesta di credenziali/dati sensibili ({count} keyword)",
-        "en": "Request for credentials/sensitive data ({count} keywords)",
+        "it": "Richiesta di credenziali/dati sensibili ({unique_patterns} keyword, {occurrences} occorrenze)",
+        "en": "Request for credentials/sensitive data ({unique_patterns} keywords, {occurrences} occurrences)",
     },
     "body.obfuscated_links": {
         "it": "Link offuscati: testo visibile ≠ destinazione reale ({count} link)",
