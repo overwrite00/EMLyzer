@@ -20,8 +20,10 @@ export default defineConfig({
         // Nomi fissi senza hash: index.js e index.css
         // Vantaggio: start.sh/bat non devono eliminare i vecchi file prima di copiare
         entryFileNames: 'assets/index.js',
-        chunkFileNames:  'assets/index.js',
-        assetFileNames:  'assets/index.css',
+        // BUGFIX: chunks devono avere nome diverso da entry file per evitare conflitti
+        // Usa pattern '[name]-[hash]' per distinguere chunk dal main bundle
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/index.css',
       },
     },
   },

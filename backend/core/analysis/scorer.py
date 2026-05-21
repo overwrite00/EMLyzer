@@ -68,6 +68,11 @@ class RiskScore:
 
 
 def _label_for_score(score: float) -> tuple[str, str]:
+    """
+    Mappa risk score (0-100) a label e spiegazione tradotta.
+
+    Returns: (label, label_text) dove label in ('low', 'medium', 'high', 'critical')
+    """
     for (lo, hi), (label, text) in RISK_LABELS.items():
         if lo <= score < hi:
             return label, text
@@ -75,6 +80,11 @@ def _label_for_score(score: float) -> tuple[str, str]:
 
 
 def _top_reasons_header(result: HeaderAnalysisResult) -> list[str]:
+    """
+    Estrae i 3 top finding dal header analysis, ordinati per severity (high > medium > low).
+
+    Formato: "[Header/HIGH] description"
+    """
     reasons = []
     for f in sorted(result.findings,
                     key=lambda x: {"high": 0, "medium": 1, "low": 2, "info": 3}.get(x.severity, 4)):
@@ -85,6 +95,11 @@ def _top_reasons_header(result: HeaderAnalysisResult) -> list[str]:
 
 
 def _top_reasons_body(result: BodyAnalysisResult) -> list[str]:
+    """
+    Estrae i 3 top finding dal body analysis, ordinati per severity.
+
+    Formato: "[Body/HIGH] description"
+    """
     reasons = []
     for f in sorted(result.findings,
                     key=lambda x: {"high": 0, "medium": 1, "low": 2, "info": 3}.get(x.severity, 4)):
@@ -95,6 +110,11 @@ def _top_reasons_body(result: BodyAnalysisResult) -> list[str]:
 
 
 def _top_reasons_url(result: URLAnalysisResult) -> list[str]:
+    """
+    Estrae i 3 top URL per risk_score, con il loro principale finding.
+
+    Formato: "[URL/HIGH] description: hostname"
+    """
     reasons = []
     for url_analysis in sorted(result.urls, key=lambda x: -x.risk_score)[:3]:
         for f in url_analysis.findings[:1]:
@@ -103,6 +123,11 @@ def _top_reasons_url(result: URLAnalysisResult) -> list[str]:
 
 
 def _top_reasons_attachment(result: AttachmentAnalysisResult) -> list[str]:
+    """
+    Estrae i 3 top allegati per risk_score, con il loro principale finding.
+
+    Formato: "[Allegato/CRITICAL] description: filename"
+    """
     reasons = []
     for att in sorted(result.attachments, key=lambda x: -x.risk_score)[:3]:
         for f in sorted(att.findings,
@@ -117,6 +142,18 @@ def _compute_floors(
     url_result: Optional[URLAnalysisResult],
     attachment_result: Optional[AttachmentAnalysisResult] = None,
 ) -> float:
+    """
+    Applica floor deterministici basati su indicatori critici.
+
+    Garantisce punteggi minimi quando ci sono indicatori ad alta confidenza:
+    - Multipli header findings ad alta severità
+    - NLP confidence alta (≥50% phishing probability)
+    - URL con risk score molto alto (≥75)
+    - Allegati pericolosi (macro, JS, double extension)
+
+    Returns:
+        Punteggio minimo garantito (0-100) basato su floor rules
+    """
     """
     Calcola il floor deterministico basato su indicatori ad alta confidenza.
     Garantisce che email con segnali critici non vengano sotto-classificate
@@ -197,7 +234,43 @@ def compute_risk_score(
     reputation_boost: float = 0.0,
 ) -> RiskScore:
     """
-    Calcola il punteggio di rischio finale con normalizzazione adattiva.
+    Calcola il punteggio di rischio finale (0-100) con normalizzazione adattiva.
+
+    Algoritmo (v2):
+    1. Normalizzazione adattiva: pesi distribuiti solo su moduli con contenuto rilevante
+       - Header e body sempre attivi (sempre presenti)
+       - URL attivo solo se email ha URL
+       - Attachment attivo solo se email ha allegati
+
+    2. Pesi base (ridistribuiti proporzionalmente sui moduli attivi):
+       - header: 35% (mismatch, auth, injection sono molto affidabili)
+       - body: 35% (NLP + pattern = forti indicatori phishing)
+       - url: 20% (IP diretto, shortener, nuovi domini = sospetti)
+       - attachment: 10% (macro, macro JS, doppia estensione)
+
+    3. Floor deterministico (soglie minime garantite):
+       - 1 header HIGH → score ≥ 20 (MEDIUM)
+       - 1 header HIGH + NLP ≥50% → score ≥ 35
+       - 3+ header HIGH → score ≥ 45 (HIGH)
+       - URL risk_score ≥75 → score ≥ 20
+       - Allegato HIGH → score ≥ 25
+       - Allegato CRITICAL → score ≥ 40
+
+    4. Risk label mapping:
+       - 0-20: LOW (safe)
+       - 20-45: MEDIUM (suspicious)
+       - 45-70: HIGH (likely phishing)
+       - 70-100: CRITICAL (definitely phishing)
+
+    Args:
+        header_result: Risultati analisi header
+        body_result: Risultati analisi body (incluso NLP)
+        url_result: Risultati analisi URL
+        attachment_result: Risultati analisi allegati
+        reputation_boost: Bonus/penalità da reputation checks (0.0 = no boost)
+
+    Returns:
+        RiskScore con score finale, label, spiegazione, contributi per modulo, top reasons
     """
     # Determina quali moduli hanno contenuto rilevante
     has_urls        = bool(url_result and url_result.total_urls > 0)
