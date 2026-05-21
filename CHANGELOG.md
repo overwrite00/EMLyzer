@@ -20,6 +20,30 @@ Le funzionalità sono ordinate per priorità di implementazione.
 
 ---
 
+## [0.14.5] — 2026-05-21
+
+### Corretto
+- **IP extraction from Received headers**: Aggiornato regex `_IP_IN_RECEIVED_RE` per estrarre IP da parentheses `(137.184.34.4)` oltre che da square brackets `[137.184.34.4]`. Ora cattura correttamente sender IP da Received headers in formato email standard.
+- **X-Sender-IP fallback**: Aggiunto fallback a header `X-Sender-IP` quando `X-Originating-IP` è assente. Risolve problema dove sample-1.eml (Bradesco phishing) aveva solo X-Sender-IP.
+- **URLScan.io HTTP 403 "custom sort value" error**: Rimosso parametro `sort` dal request quando si ritenta dopo HTTP 403. URLScan.io non consente custom sort values senza API key valida. Fallback ora usa ricerca pubblica base.
+
+### Debugging
+- **Comprehensive indicator logging**: Aggiunto debug logging completo in reputation.py per tracciare extraction di IPs, URLs, hashes per FAST services e SLOW services. Mostra:
+  - IPs estratti da header_indicators (received_hops) e x_originating_ip
+  - URLs estratti da url_indicators
+  - Indicatori selettivi per rate-limited services
+  - Valori effettivi passati ai servizi di reputazione
+- **Logging implementazione**: Aggiunta logger import e debug print statements per visibility completa del flusso.
+
+### Testing
+- ✅ Sender IP 137.184.34.4 now extracted e checked da reputation services
+- ✅ IPv6 addresses from Received headers now properly extracted
+- ✅ URLScan.io no longer returns HTTP 400/403 errors — querying 3 URLs correctly
+- ✅ X-Originating-IP now populated from X-Sender-IP fallback
+- ✅ All 19 reputation services working with correct indicators
+
+---
+
 ## [0.14.4] — 2026-05-21
 
 ### Corretto
