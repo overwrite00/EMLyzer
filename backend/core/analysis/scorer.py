@@ -118,6 +118,18 @@ def _compute_floors(
     attachment_result: Optional[AttachmentAnalysisResult] = None,
 ) -> float:
     """
+    Applica floor deterministici basati su indicatori critici.
+
+    Garantisce punteggi minimi quando ci sono indicatori ad alta confidenza:
+    - Multipli header findings ad alta severità
+    - NLP confidence alta (≥50% phishing probability)
+    - URL con risk score molto alto (≥75)
+    - Allegati pericolosi (macro, JS, double extension)
+
+    Returns:
+        Punteggio minimo garantito (0-100) basato su floor rules
+    """
+    """
     Calcola il floor deterministico basato su indicatori ad alta confidenza.
     Garantisce che email con segnali critici non vengano sotto-classificate
     indipendentemente dalla presenza o assenza degli altri moduli.
@@ -197,7 +209,43 @@ def compute_risk_score(
     reputation_boost: float = 0.0,
 ) -> RiskScore:
     """
-    Calcola il punteggio di rischio finale con normalizzazione adattiva.
+    Calcola il punteggio di rischio finale (0-100) con normalizzazione adattiva.
+
+    Algoritmo (v2):
+    1. Normalizzazione adattiva: pesi distribuiti solo su moduli con contenuto rilevante
+       - Header e body sempre attivi (sempre presenti)
+       - URL attivo solo se email ha URL
+       - Attachment attivo solo se email ha allegati
+
+    2. Pesi base (ridistribuiti proporzionalmente sui moduli attivi):
+       - header: 35% (mismatch, auth, injection sono molto affidabili)
+       - body: 35% (NLP + pattern = forti indicatori phishing)
+       - url: 20% (IP diretto, shortener, nuovi domini = sospetti)
+       - attachment: 10% (macro, macro JS, doppia estensione)
+
+    3. Floor deterministico (soglie minime garantite):
+       - 1 header HIGH → score ≥ 20 (MEDIUM)
+       - 1 header HIGH + NLP ≥50% → score ≥ 35
+       - 3+ header HIGH → score ≥ 45 (HIGH)
+       - URL risk_score ≥75 → score ≥ 20
+       - Allegato HIGH → score ≥ 25
+       - Allegato CRITICAL → score ≥ 40
+
+    4. Risk label mapping:
+       - 0-20: LOW (safe)
+       - 20-45: MEDIUM (suspicious)
+       - 45-70: HIGH (likely phishing)
+       - 70-100: CRITICAL (definitely phishing)
+
+    Args:
+        header_result: Risultati analisi header
+        body_result: Risultati analisi body (incluso NLP)
+        url_result: Risultati analisi URL
+        attachment_result: Risultati analisi allegati
+        reputation_boost: Bonus/penalità da reputation checks (0.0 = no boost)
+
+    Returns:
+        RiskScore con score finale, label, spiegazione, contributi per modulo, top reasons
     """
     # Determina quali moduli hanno contenuto rilevante
     has_urls        = bool(url_result and url_result.total_urls > 0)
