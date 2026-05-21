@@ -5,6 +5,21 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
 ---
 
+## [Unreleased] — Roadmap
+
+Questa sezione raccoglie tutto ciò che è pianificato ma non ancora implementato.
+Le funzionalità sono ordinate per priorità di implementazione.
+
+### Infrastruttura (priorità bassa)
+
+- [ ] **PostgreSQL** — supporto database alternativo a SQLite per deployment multi-utente
+- [ ] **Sistema plugin** — architettura modulare per aggiungere connettori e analizzatori senza modificare il core
+- [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
+- [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
+- [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
+
+---
+
 ## [0.14.4] — 2026-05-21
 
 ### Corretto
@@ -21,21 +36,6 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 - ✅ 3 sample email analizzate: risk score 75.0, 70.6, 45.3
 - ✅ Tutti 19 servizi reputazione verificati e funzionanti
 - ✅ URLScan.io: No more HTTP 400/403 errors (stato: not_applicable per email non sospette, clean per email legittime)
-
----
-
-## [Unreleased] — Roadmap
-
-Questa sezione raccoglie tutto ciò che è pianificato ma non ancora implementato.
-Le funzionalità sono ordinate per priorità di implementazione.
-
-### Infrastruttura (priorità bassa)
-
-- [ ] **PostgreSQL** — supporto database alternativo a SQLite per deployment multi-utente
-- [ ] **Sistema plugin** — architettura modulare per aggiungere connettori e analizzatori senza modificare il core
-- [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
-- [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
-- [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
 
 ---
 
