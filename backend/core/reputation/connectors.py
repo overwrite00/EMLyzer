@@ -961,9 +961,8 @@ def check_url_urlscan(url: str) -> ReputationResult:
     headers: dict = {"Content-Type": "application/json"}
     has_api_key = bool(settings.URLSCAN_API_KEY)
 
-    # Diagnostic logging (v0.14.3+): Log request details (NO API key exposed)
-    logger.info(f"[URLScan.io DEBUG] Processing URL: {url}")
-    logger.info(f"[URLScan.io DEBUG] Extracted host: {host}, is_ip: {is_ip}, query: {query}, has_api_key: {has_api_key}")
+    # Diagnostic logging (v0.14.3+): Log request details (NO sensitive data exposed)
+    logger.debug(f"[URLScan.io] Processing URL: {url}, host: {host}, is_ip: {is_ip}, query: {query}")
 
     try:
         resp = _http_get_with_retry(
