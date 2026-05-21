@@ -28,7 +28,8 @@ logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT      = 8    # servizi di sicurezza (AbuseIPDB, VirusTotal, ecc.)
 REQUEST_TIMEOUT_ASN  = 4    # ASN lookup
-REQUEST_TIMEOUT_INFO = 5    # servizi informativi (crt.sh, redirect chain)
+REQUEST_TIMEOUT_INFO = 8    # servizi informativi (crt.sh, redirect chain) — crt.sh può essere molto lento
+REQUEST_TIMEOUT_PULSEDIVE = 15  # Pulsedive può essere lento (free tier: 10 req/day, rate limit aggressivo)
 
 # ---------------------------------------------------------------------------
 # Disk cache per feed locali (Spamhaus DROP, OpenPhish)
@@ -102,7 +103,7 @@ _RATE_INTERVALS: dict[str, float] = {
     "circl":            0.5,    # CIRCL Passive DNS — nessun limite ufficiale, conservativo
     "greynoise":        1.1,    # GreyNoise Community — ~50 ricerche/settimana free
     "urlscan":          1.0,    # URLScan.io — 1000 ricerche/g con chiave
-    "pulsedive":        2.5,    # Pulsedive — 10 req/g free (da mar 2024)
+    "pulsedive":        5.0,    # Pulsedive — 10 req/g free; rate limit aggressivo (429 se troppo veloce)
     "criminalip":       1.1,    # Criminal IP — free con crediti limitati
     "securitytrails":   3.0,    # SecurityTrails — SOLO trial/a pagamento; rate conservativo
     "hybridanalysis":   1.0,    # Hybrid Analysis — free con registrazione
@@ -134,6 +135,7 @@ def _http_get_with_retry(
     params: dict | None = None,
     headers: dict | None = None,
     auth: tuple | None = None,
+    api_key: str = "",
     timeout: float = REQUEST_TIMEOUT,
     max_retries: int = 2,
     rate_key: str = "",
@@ -142,6 +144,7 @@ def _http_get_with_retry(
     Esegue una GET con retry su errori temporanei (429, 502, 503, 504).
     Backoff esponenziale: 2s, 4s. Su 429 usa Retry-After se presente.
     auth: tupla (user, password) per HTTP Basic Auth (opzionale).
+    api_key: chiave API per header "API-Key" (non esposta in variabili globali).
     """
     last_exc: Exception | None = None
     for attempt in range(max_retries + 1):
@@ -152,7 +155,11 @@ def _http_get_with_retry(
         try:
             if rate_key:
                 _rate_limit(rate_key)
-            resp = requests.get(url, params=params, headers=headers, auth=auth, timeout=timeout)
+            # Aggiunge API key ai headers DENTRO la funzione (non espone la chiave al codice che chiama)
+            req_headers = dict(headers or {})
+            if api_key:
+                req_headers["API-Key"] = api_key
+            resp = requests.get(url, params=params, headers=req_headers, auth=auth, timeout=timeout)
             if resp.status_code == 429:
                 retry_after = float(resp.headers.get("Retry-After", 5))
                 logger.debug("429 da %s — attesa %.1fs", url, retry_after)
@@ -646,7 +653,7 @@ def check_domain_crtsh(domain: str) -> ReputationResult:
     Utile per capire l'età reale del sito e i suoi sottodomini.
     502/503/504 sono errori temporanei di crt.sh — non vengono mostrati come errori bloccanti.
     """
-    r = ReputationResult(source="crt.sh", entity=domain, entity_type="url", queried=True)
+    r = ReputationResult(source="crt.sh", entity=domain, entity_type="domain", queried=True)
 
     try:
         # _http_get_with_retry gestisce 429 (con Retry-After), 502/503/504 (retry 2x)
@@ -953,14 +960,16 @@ def check_url_urlscan(url: str) -> ReputationResult:
     query = host if not is_ip else url
     headers: dict = {"Content-Type": "application/json"}
     has_api_key = bool(settings.URLSCAN_API_KEY)
-    if has_api_key:
-        headers["API-Key"] = settings.URLSCAN_API_KEY.strip()
+
+    # Diagnostic logging (v0.14.3+): Log request details (NO sensitive data exposed)
+    logger.debug(f"[URLScan.io] Processing URL: {url}, host: {host}, is_ip: {is_ip}, query: {query}")
 
     try:
         resp = _http_get_with_retry(
             "https://urlscan.io/api/v1/search/",
             params={"q": f"page.domain:{query}", "size": "3", "sort": "date"},
             headers=headers,
+            api_key=settings.URLSCAN_API_KEY.strip() if has_api_key else "",
             timeout=REQUEST_TIMEOUT,
             rate_key="urlscan",
         )
@@ -978,6 +987,27 @@ def check_url_urlscan(url: str) -> ReputationResult:
                     source="URLScan.io", entity=url, entity_type="url",
                     skipped=True, skip_reason="URLScan.io ricerca pubblica non disponibile",
                 )
+
+        # Phase 2B: Fallback retry senza API-Key header se HTTP 403 con API key (v0.14.3+)
+        # URLScan.io rifiuta custom sort values senza auth. Rimuovi sort per retry pubblico
+        if resp.status_code == 403 and has_api_key:
+            logger.debug(f"URLScan.io HTTP 403 con API-Key header, ritentando senza sort param per {url}")
+            resp = _http_get_with_retry(
+                "https://urlscan.io/api/v1/search/",
+                params={
+                    "q": f"page.domain:{query}",
+                    "size": "3"
+                    # Nota: 'sort' rimosso perché non è consentito senza auth
+                },
+                headers={"Content-Type": "application/json"},  # Senza API-Key header
+                timeout=REQUEST_TIMEOUT,
+                rate_key="urlscan",
+            )
+            if resp.status_code == 200:
+                logger.debug(f"URLScan.io: retry senza sort riuscito per {url}")
+            else:
+                logger.debug(f"URLScan.io: retry senza sort fallito (HTTP {resp.status_code}) per {url}")
+
         resp.raise_for_status()
         data = resp.json()
         results = data.get("results", [])
@@ -1012,11 +1042,28 @@ def check_url_urlscan(url: str) -> ReputationResult:
         )
     except requests.HTTPError as e:
         code = e.response.status_code if e.response is not None else "?"
+        body = ""
+        try:
+            if e.response is not None:
+                body = e.response.text[:200]  # Log first 200 chars of error response
+        except Exception:
+            pass
+
         # Fallback: mark as skipped instead of error on HTTP failures
-        logger.warning(f"URLScan.io HTTP {code} for {url}")
+        logger.warning(f"URLScan.io HTTP {code} for {url}. Response: {body}")
+
+        # Phase 2D: Improved error messages (v0.14.3+)
+        if code == 403:
+            if has_api_key:
+                skip_reason = "URLScan.io HTTP 403 Forbidden con API key. Verifica: 1) API key valida, 2) Rate limit (1000 req/giorno), 3) IP non blacklisted. Vai a urlscan.io/user/settings per controllare lo stato dell'account"
+            else:
+                skip_reason = "URLScan.io ricerca pubblica non disponibile. Configura URLSCAN_API_KEY in .env per aumentare il limite (1000 req/giorno)"
+        else:
+            skip_reason = f"URLScan.io indisponibile (HTTP {code})"
+
         return ReputationResult(
             source="URLScan.io", entity=url, entity_type="url",
-            skipped=True, skip_reason=f"URLScan.io indisponibile (HTTP {code})",
+            skipped=True, skip_reason=skip_reason,
         )
     except Exception as exc:
         # Fallback: mark as skipped on other errors
@@ -1043,7 +1090,7 @@ def _check_pulsedive(entity: str, entity_type: str) -> ReputationResult:
         resp = _http_get_with_retry(
             "https://pulsedive.com/api/info.php",
             params={"indicator": entity, "pretty": "1", "key": api_key},
-            timeout=REQUEST_TIMEOUT,
+            timeout=REQUEST_TIMEOUT_PULSEDIVE,
             rate_key="pulsedive",
         )
         if resp.status_code == 404:
@@ -1078,14 +1125,29 @@ def _check_pulsedive(entity: str, entity_type: str) -> ReputationResult:
             detail=detail,
         )
     except requests.HTTPError as e:
+        status_code = e.response.status_code if e.response is not None else None
+        if status_code == 429:
+            # Pulsedive rate limit — potrebbe essere limite giornaliero o per-minute
+            return ReputationResult(
+                source="Pulsedive", entity=entity, entity_type=entity_type,
+                skipped=True, skip_reason="Pulsedive rate limit superato (quota giornaliera o temporanea). Riprova tra qualche minuto. Quota free: 10 req/giorno",
+            )
+        else:
+            return ReputationResult(
+                source="Pulsedive", entity=entity, entity_type=entity_type,
+                error=f"Pulsedive HTTP {status_code if status_code else '?'}",
+            )
+    except (requests.ConnectionError, requests.Timeout) as exc:
+        # Pulsedive connectivity issue — mark as skipped with helpful message
         return ReputationResult(
             source="Pulsedive", entity=entity, entity_type=entity_type,
-            error=f"Pulsedive HTTP {e.response.status_code if e.response is not None else '?'}",
+            skipped=True, skip_reason=f"Pulsedive indisponibile (connessione fallita). Quota free: 10 req/giorno — verifica su pulsedive.com/dashboard",
         )
     except Exception as exc:
+        # Other errors
         return ReputationResult(
             source="Pulsedive", entity=entity, entity_type=entity_type,
-            error=f"Pulsedive: {type(exc).__name__}",
+            skipped=True, skip_reason=f"Pulsedive errore: {type(exc).__name__}",
         )
 
 
@@ -1740,6 +1802,7 @@ class ReputationSummary:
     ip_results:       list[ReputationResult] = field(default_factory=list)
     url_results:      list[ReputationResult] = field(default_factory=list)
     hash_results:     list[ReputationResult] = field(default_factory=list)
+    domain_results:   list[ReputationResult] = field(default_factory=list)
     service_registry: list[dict]             = field(default_factory=list)
     malicious_count:  int   = 0
     reputation_score: float = 0.0
@@ -1753,56 +1816,97 @@ class ReputationSummary:
 #       → eseguiti in background, il frontend fa polling
 
 _FAST_SERVICES = frozenset({
-    # Feed locali e chiamate HTTP singole leggere — completano in < 5s
-    # indipendentemente dal numero di entità
+    # Feed locali e chiamate HTTP singole con rate limit moderato
+    # → completano in < 15s indipendentemente dal numero di entità
+    # Esclusi servizi con quota bassa o rate limit stringente (vedi _SLOW_SERVICES)
+
+    # IP services (no quota limit)
     "check_ip_spamhaus",           # feed locale, 0s
-    "check_ip_asn",                # 1 HTTP, 0.3s rate
-    "check_ip_shodan_internetdb",  # 1 HTTP, 0.3s rate — InternetDB gratuito
-    "check_ip_circl_pdns",         # 1 HTTP, 0.5s rate — CIRCL Passive DNS
-    "check_ip_greynoise",          # 1 HTTP, 1.1s rate — GreyNoise Community
-    "check_ip_pulsedive",          # 1 HTTP, 2.5s rate — Pulsedive
-    "check_ip_criminalip",         # 1 HTTP, 1.1s rate — Criminal IP
-    "check_ip_threatfox",          # 1 HTTP, 0.3s rate
+    "check_ip_asn",                # 1 HTTP, 0.3s rate, quota 50k/month OK
+    "check_ip_shodan_internetdb",  # 1 HTTP, 0.3s rate, unlimited
+    "check_ip_circl_pdns",         # 1 HTTP, 0.5s rate, unlimited free
+    "check_ip_criminalip",         # 1 HTTP, 1.1s rate, unlimited
+    "check_ip_threatfox",          # 1 HTTP, 0.3s rate, unlimited (abuse.ch)
+
+    # URL services
     "check_url_openphish",         # feed locale, 0s
-    "check_url_redirect_chain",    # 1 HTTP per URL, 0.2s rate
-    "check_url_phishtank",         # 1 HTTP, 0.5s rate
-    "check_url_urlhaus",           # 1 HTTP, 0.3s rate
-    "check_url_threatfox",         # 1 HTTP, 0.3s rate
-    "check_domain_circl_pdns",     # 1 HTTP, 0.5s rate — CIRCL Passive DNS
-    "check_url_urlscan",           # 1 HTTP, 1.0s rate — URLScan.io
-    "check_url_pulsedive",         # 1 HTTP, 2.5s rate — Pulsedive
-    "check_domain_securitytrails", # 1 HTTP, 3.0s rate — SecurityTrails
-    "check_hash_malwarebazaar",    # 1 HTTP, 0.7s rate
-    "check_hash_threatfox",        # 1 HTTP, 0.3s rate
-    "check_hash_hybrid_analysis",  # 1 HTTP, 1.0s rate — Hybrid Analysis
+    "check_url_redirect_chain",    # 1 HTTP per URL, 0.2s rate, unlimited
+    "check_url_phishtank",         # 1 HTTP, 0.5s rate, unlimited
+    "check_url_urlhaus",           # 1 HTTP, 0.3s rate, unlimited (abuse.ch)
+    "check_url_threatfox",         # 1 HTTP, 0.3s rate, unlimited (abuse.ch)
+    "check_url_urlscan",           # 1 HTTP, 1.0s rate, quota 1000/day OK
+
+    # Domain services (passive DNS lookup)
+    "check_domain_circl_pdns",     # 1 HTTP, 0.5s rate, unlimited free
+
+    # Hash services
+    "check_hash_malwarebazaar",    # 1 HTTP, 0.7s rate, unlimited (abuse.ch)
+    "check_hash_threatfox",        # 1 HTTP, 0.3s rate, unlimited (abuse.ch)
+    "check_hash_hybrid_analysis",  # 1 HTTP, 1.0s rate, unlimited free
 })
 
 _SLOW_SERVICES = frozenset({
-    # Servizi con rate limit stringente o timeout alto per molte entità
-    # → eseguiti in background dopo la risposta al browser
-    "check_ip_abuseipdb",   # 1.1s rate
-    "check_ip_virustotal",  # 15.5s rate
-    "check_url_virustotal", # 15.5s rate
-    "check_hash_virustotal",# 15.5s rate
-    "check_domain_crtsh",   # 2.5s rate × N domini = troppo per risposta sincrona
+    # Servizi con rate limit stringente, quota molto limitata, o timeout alto
+    # per molte entità → eseguiti in background dopo la risposta al browser
+    "check_ip_abuseipdb",           # 1.1s rate, quota 1000/day
+    "check_ip_virustotal",          # 15.5s rate, quota 4 req/min
+    "check_url_virustotal",         # 15.5s rate, quota 4 req/min
+    "check_hash_virustotal",        # 15.5s rate, quota 4 req/min
+    "check_domain_crtsh",           # 2.5s rate × N domini = cumulativo troppo
+    "check_ip_greynoise",           # 1.1s rate, quota ~50/week (bassa)
+    "check_ip_pulsedive",           # 2.5s rate, quota 10/day (molto bassa)
+    "check_url_pulsedive",          # 2.5s rate, quota 10/day (molto bassa)
+    "check_domain_securitytrails",  # 3.0s rate, quota 50/month (molto bassa)
 })
 
 # Mappa fn.__name__ → nome servizio corretto per _build_service_registry
 # IMPORTANTE: senza questa mappa i placeholder "in elaborazione" usano nomi sbagliati
 # (es. "check_ip_abuseipdb" → "Ip Abuseipdb" invece di "AbuseIPDB")
 _FN_TO_SOURCE: dict[str, str] = {
-    "check_ip_abuseipdb":    "AbuseIPDB",
-    "check_ip_virustotal":   "VirusTotal",
-    "check_url_virustotal":  "VirusTotal",
-    "check_hash_virustotal": "VirusTotal",
-    "check_hash_virustotal": "VirusTotal",
-    "check_domain_crtsh":    "crt.sh",
+    # FAST IP services
+    "check_ip_spamhaus":           "Spamhaus DROP",
+    "check_ip_asn":                "ASN Lookup",
+    "check_ip_shodan_internetdb":  "Shodan InternetDB",
+    "check_ip_circl_pdns":         "CIRCL Passive DNS",
+    "check_ip_criminalip":         "Criminal IP",
+    "check_ip_threatfox":          "ThreatFox",
+
+    # FAST URL services
+    "check_url_openphish":         "OpenPhish",
+    "check_url_redirect_chain":    "Redirect Chain",
+    "check_url_phishtank":         "PhishTank",
+    "check_url_urlhaus":           "URLhaus",
+    "check_url_threatfox":         "ThreatFox",
+    "check_url_urlscan":           "URLScan.io",
+
+    # FAST Domain services
+    "check_domain_circl_pdns":     "CIRCL Passive DNS",
+
+    # FAST Hash services
+    "check_hash_malwarebazaar":    "MalwareBazaar",
+    "check_hash_hybrid_analysis":  "Hybrid Analysis",
+
+    # SLOW IP services
+    "check_ip_abuseipdb":          "AbuseIPDB",
+    "check_ip_virustotal":         "VirusTotal",
+    "check_ip_greynoise":          "GreyNoise Community",
+    "check_ip_pulsedive":          "Pulsedive",
+
+    # SLOW URL services
+    "check_url_virustotal":        "VirusTotal",
+    "check_url_pulsedive":         "Pulsedive",
+
+    # SLOW Hash services
+    "check_hash_virustotal":       "VirusTotal",
+
+    # SLOW Domain services
+    "check_domain_crtsh":          "crt.sh",
+    "check_domain_securitytrails": "SecurityTrails",
 }
 
 
 def _build_flat_tasks(
-
-    ips: list[str], urls: list[str], hashes: list[str]
+    ips: list[str], urls: list[str], hashes: list[str], domains: list[str] | None = None
 ) -> tuple[list[tuple], list[ReputationResult]]:
     """
     Costruisce la lista piatta di tutti i task da eseguire e le risposte immediate (skip).
@@ -1810,6 +1914,7 @@ def _build_flat_tasks(
       call_tasks = [(fn, entity, kind), ...]  — da eseguire in parallelo
       skip_results = [ReputationResult, ...]  — skipped perché manca API key
     """
+    domains = domains or []
     call_tasks: list[tuple] = []
     skip_results: list[ReputationResult] = []
 
@@ -1888,18 +1993,18 @@ def _build_flat_tasks(
         except ValueError:
             domain = host.lstrip("www.")
             if domain:
-                _c(check_domain_crtsh, domain, "url")
+                _c(check_domain_crtsh, domain, "domain")
                 if settings.CIRCL_API_KEY:
-                    _c(check_domain_circl_pdns, domain, "url")
+                    _c(check_domain_circl_pdns, domain, "domain")
                 _c(check_url_urlscan, url, "url")
                 if settings.PULSEDIVE_API_KEY:
                     _c(check_url_pulsedive, url, "url")
                 else:
                     _s("Pulsedive", url, "url", "PULSEDIVE_API_KEY non configurata — registrati su pulsedive.com")
                 if settings.SECURITYTRAILS_API_KEY:
-                    _c(check_domain_securitytrails, domain, "url")
+                    _c(check_domain_securitytrails, domain, "domain")
                 else:
-                    _s("SecurityTrails", url, "url", "SECURITYTRAILS_API_KEY non configurata — registrati su securitytrails.com")
+                    _s("SecurityTrails", domain, "domain", "SECURITYTRAILS_API_KEY non configurata — registrati su securitytrails.com")
         except Exception:
             pass
 
@@ -1921,6 +2026,18 @@ def _build_flat_tasks(
             _c(check_hash_hybrid_analysis, h, "hash")
         else:
             _s("Hybrid Analysis", h, "hash", "HYBRID_ANALYSIS_API_KEY non configurata — registrati su hybrid-analysis.com")
+
+    # ── Domain ──────────────────────────────────────────────────────────────
+    # Processa domini PASSATI da reputation.py (non estratti da URL)
+    # Questo è più efficiente e previene duplicazione
+    for domain in domains[:2]:  # Hard cap: crt.sh (max 2 domini)
+        _c(check_domain_crtsh, domain, "domain")
+        if settings.CIRCL_API_KEY:
+            _c(check_domain_circl_pdns, domain, "domain")
+        if settings.SECURITYTRAILS_API_KEY:
+            _c(check_domain_securitytrails, domain, "domain")
+        else:
+            _s("SecurityTrails", domain, "domain", "SECURITYTRAILS_API_KEY non configurata — registrati su securitytrails.com")
 
     return call_tasks, skip_results
 
@@ -1951,6 +2068,8 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
             summary.ip_results.append(r)
         elif r.entity_type == "url":
             summary.url_results.append(r)
+        elif r.entity_type == "domain":
+            summary.domain_results.append(r)
         else:
             summary.hash_results.append(r)
 
@@ -1988,6 +2107,8 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
                     summary.ip_results.append(r)
                 elif kind == "url":
                     summary.url_results.append(r)
+                elif kind == "domain":
+                    summary.domain_results.append(r)
                 else:
                     summary.hash_results.append(r)
 
@@ -2002,12 +2123,14 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
                     summary.ip_results.append(r)
                 elif kind == "url":
                     summary.url_results.append(r)
+                elif kind == "domain":
+                    summary.domain_results.append(r)
                 else:
                     summary.hash_results.append(r)
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
 
-    all_results = summary.ip_results + summary.url_results + summary.hash_results
+    all_results = summary.ip_results + summary.url_results + summary.hash_results + summary.domain_results
     summary.service_registry = _build_service_registry(all_results)
 
     malicious = [r for r in all_results if r.is_malicious and not r.skipped and not r.error]
@@ -2023,7 +2146,7 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
 # Interfaccia a due fasi — FAST e SLOW
 # ---------------------------------------------------------------------------
 
-def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str]) -> "ReputationSummary":
+def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str], domains: list[str] | None = None) -> "ReputationSummary":
     """
     Fase 1 — servizi senza rate limit stringente.
     Risposta garantita in < 15s indipendentemente dal numero di entità.
@@ -2033,7 +2156,7 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str]) -> "Repu
     _load_spamhaus()
     _load_openphish()
 
-    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes)
+    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes, domains)
 
     # Filtra solo i servizi fast
     fast_calls = [(fn, entity, kind) for fn, entity, kind in call_tasks
@@ -2046,9 +2169,10 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str]) -> "Repu
 
     summary = ReputationSummary()
     for r in skip_results + slow_skips:
-        if r.entity_type == "ip":    summary.ip_results.append(r)
-        elif r.entity_type == "url": summary.url_results.append(r)
-        else:                        summary.hash_results.append(r)
+        if r.entity_type == "ip":      summary.ip_results.append(r)
+        elif r.entity_type == "url":   summary.url_results.append(r)
+        elif r.entity_type == "domain": summary.domain_results.append(r)
+        else:                          summary.hash_results.append(r)
 
     if fast_calls:
         n_workers = min(len(fast_calls), 16)
@@ -2069,23 +2193,25 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str]) -> "Repu
                 except Exception as e:
                     r = ReputationResult(source=fn_name, entity=entity,
                                          entity_type=kind, error=f"Errore: {e}")
-                if kind == "ip":    summary.ip_results.append(r)
-                elif kind == "url": summary.url_results.append(r)
-                else:               summary.hash_results.append(r)
+                if kind == "ip":      summary.ip_results.append(r)
+                elif kind == "url":   summary.url_results.append(r)
+                elif kind == "domain": summary.domain_results.append(r)
+                else:                 summary.hash_results.append(r)
             for future in not_done:
                 future.cancel()
                 kind, entity, fn_name = future_map[future]
                 r = ReputationResult(source=fn_name, entity=entity,
                                      entity_type=kind, error="Timeout")
-                if kind == "ip":    summary.ip_results.append(r)
-                elif kind == "url": summary.url_results.append(r)
-                else:               summary.hash_results.append(r)
+                if kind == "ip":      summary.ip_results.append(r)
+                elif kind == "url":   summary.url_results.append(r)
+                elif kind == "domain": summary.domain_results.append(r)
+                else:                 summary.hash_results.append(r)
         finally:
             # shutdown(wait=False, cancel_futures=True): non blocca
             # threading._shutdown() alla chiusura → nessun KeyboardInterrupt su CTRL+C
             pool.shutdown(wait=False, cancel_futures=True)
 
-    all_results = summary.ip_results + summary.url_results + summary.hash_results
+    all_results = summary.ip_results + summary.url_results + summary.hash_results + summary.domain_results
     summary.service_registry = _build_service_registry(all_results)
     malicious = [r for r in all_results if r.is_malicious and not r.skipped and not r.error]
     summary.malicious_count = len(malicious)
@@ -2103,24 +2229,24 @@ def finalize_fast_only(summary: "ReputationSummary") -> "ReputationSummary":
     Ricalcola service_registry dopo la pulizia: i servizi SLOW appaiono
     come 'not_applicable' anziché 'pending'.
     """
-    for lst in (summary.ip_results, summary.url_results, summary.hash_results):
+    for lst in (summary.ip_results, summary.url_results, summary.hash_results, summary.domain_results):
         to_remove = [r for r in lst if r.skipped
                      and "in elaborazione" in (r.skip_reason or "")]
         for r in to_remove:
             lst.remove(r)
-    all_results = summary.ip_results + summary.url_results + summary.hash_results
+    all_results = summary.ip_results + summary.url_results + summary.hash_results + summary.domain_results
     summary.service_registry = _build_service_registry(all_results)
     return summary
 
 
 def run_slow_checks(ips: list[str], urls: list[str], hashes: list[str],
-                    existing: "ReputationSummary") -> "ReputationSummary":
+                    existing: "ReputationSummary", domains: list[str] | None = None) -> "ReputationSummary":
     """
     Fase 2 — servizi con rate limit stringente (VirusTotal, AbuseIPDB).
     Eseguita in background; i risultati vengono mergiati con quelli della fase 1.
     Il rate limiter thread-safe garantisce max 4 req/min per VirusTotal.
     """
-    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes)
+    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes, domains)
 
     slow_calls = [(fn, entity, kind) for fn, entity, kind in call_tasks
                   if fn.__name__ in _SLOW_SERVICES]
@@ -2152,26 +2278,27 @@ def run_slow_checks(ips: list[str], urls: list[str], hashes: list[str],
             except Exception as e:
                 r = ReputationResult(source=fn_name, entity=entity,
                                      entity_type=kind, error=f"Errore: {e}")
-            if kind == "ip":    existing.ip_results.append(r)
-            elif kind == "url": existing.url_results.append(r)
-            else:               existing.hash_results.append(r)
+            if kind == "ip":      existing.ip_results.append(r)
+            elif kind == "url":   existing.url_results.append(r)
+            elif kind == "domain": existing.domain_results.append(r)
+            else:                 existing.hash_results.append(r)
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 
     # Ricalcola registry e score dopo merge
-    all_results = existing.ip_results + existing.url_results + existing.hash_results
+    all_results = existing.ip_results + existing.url_results + existing.hash_results + existing.domain_results
     # Rimuovi i placeholder "in elaborazione" per i servizi ora completati
     # Usa _FN_TO_SOURCE per i nomi corretti (stessa mappa usata per crearli)
     slow_names = {_FN_TO_SOURCE.get(fn.__name__, fn.__name__)
                   for fn, _, _ in slow_calls}
-    for lst in (existing.ip_results, existing.url_results, existing.hash_results):
+    for lst in (existing.ip_results, existing.url_results, existing.hash_results, existing.domain_results):
         to_remove = [r for r in lst if r.skipped
                      and r.source in slow_names
                      and "in elaborazione" in (r.skip_reason or "")]
         for r in to_remove:
             lst.remove(r)
 
-    all_results = existing.ip_results + existing.url_results + existing.hash_results
+    all_results = existing.ip_results + existing.url_results + existing.hash_results + existing.domain_results
     existing.service_registry = _build_service_registry(all_results)
     malicious = [r for r in all_results if r.is_malicious and not r.skipped and not r.error]
     existing.malicious_count = len(malicious)

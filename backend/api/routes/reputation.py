@@ -24,6 +24,7 @@ import re
 import asyncio
 import ipaddress
 import threading
+import logging as _logging
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,6 +41,84 @@ from dataclasses import asdict
 import json
 
 router = APIRouter()
+_logger = _logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INTELLIGENT FILTERING — CDN/Hosting Providers da escludere dalle ricerche
+# di reputazione (sono servizi legittimi, non rilevanti per analisi phishing)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_TRUSTED_CDN_DOMAINS = {
+    # Google
+    "googleapis.com", "gstatic.com", "google.com", "googleusercontent.com",
+    "google-analytics.com", "googletagmanager.com", "googleadservices.com",
+
+    # Microsoft
+    "microsoft.com", "azureedge.net", "windows.net", "office365.com",
+    "outlook.com", "live.com", "onedrive.com",
+
+    # CloudFlare, AWS, Azure, Akamai
+    "cloudflare.com", "amazonaws.com", "akamaized.net", "akamai.com",
+    "azurewebsites.net", "blob.core.windows.net",
+
+    # CDN networks
+    "cdn77.org", "cloudfront.net", "edgecast.com", "fastly.net",
+    "jsdelivr.net", "unpkg.com", "cdnjs.com",
+
+    # Social media / trusted platforms
+    "facebook.com", "fbcdn.net", "twitter.com", "t.co", "youtube.com",
+    "youtu.be", "github.com", "githubusercontent.com", "gitlab.com",
+    "linkedin.com", "instagram.com", "pinterest.com",
+
+    # Payment / Shopping (legitimate)
+    "paypal.com", "stripe.com", "shopify.com", "amazon.com", "ebay.com",
+
+    # Email services
+    "gmail.com", "hotmail.com", "yahoo.com", "protonmail.com",
+    "sendgrid.net", "mailchimp.com",
+}
+
+_TRUSTED_CDN_IPS = {
+    # Google IP ranges (AS15169)
+    "142.251", "142.250", "142.249", "142.248", "142.247",
+    "172.217", "172.218", "172.219", "172.220",
+    "199.36.153", "199.36.154",
+
+    # CloudFlare (AS13335)
+    "104.16", "104.17", "104.18", "104.19", "104.20", "104.21",
+    "104.22", "104.23", "104.24", "104.25",
+
+    # Microsoft Azure (AS8075)
+    "13.64", "13.65", "13.66", "13.67", "13.68", "13.69",
+    "13.70", "13.71", "13.72", "13.73", "13.74", "13.75",
+
+    # Amazon AWS (AS16509)
+    "52.0", "52.1", "52.2", "52.3", "52.4", "52.5",
+    "54.0", "54.1", "54.2", "54.3", "54.4",
+}
+
+def _is_trusted_cdn(hostname: str) -> bool:
+    """Controlla se il dominio è di un CDN legittimo noto."""
+    if not hostname:
+        return False
+    hostname_lower = hostname.lower()
+    # Exact match
+    if hostname_lower in _TRUSTED_CDN_DOMAINS:
+        return True
+    # Suffix match (es. fonts.googleapis.com -> googleapis.com)
+    for trusted in _TRUSTED_CDN_DOMAINS:
+        if hostname_lower.endswith("." + trusted) or hostname_lower == trusted:
+            return True
+    return False
+
+def _is_trusted_cdn_ip(ip: str) -> bool:
+    """Controlla se l'IP è di un CDN legittimo noto."""
+    if not ip:
+        return False
+    for trusted_prefix in _TRUSTED_CDN_IPS:
+        if ip.startswith(trusted_prefix):
+            return True
+    return False
 
 
 def _is_public_ip(ip_str: str) -> bool:
@@ -58,143 +137,335 @@ def _is_public_ip(ip_str: str) -> bool:
 
 def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], list[str]]:
     """
-    Estrae IP, URL e hash per i servizi FAST (Spamhaus, ASN, OpenPhish, ecc.).
-    Include tutti gli IP e URL dell'email — i servizi fast sono senza rate limit stretto.
+    Estrae IP, URL e hash per i servizi FAST — con FILTRI INTELLIGENTI.
+
+    LOGICA ANALITICA:
+    - IP: Estrai SOLO sender IP da Received headers + X-Originating-IP
+          ESCLUDI: IPs di CDN pubbliche (Google, CloudFlare, etc.)
+    - URL: Estrai SOLO URL sospette (non-CDN, non-trusted domains)
+           ESCLUDI: URL da Google Fonts, Microsoft, etc.
+    - Hash: Estrai SOLO file eseguibili, documenti Office potenzialmente malevoli
+
+    Obiettivo: Ridurre il rumore, inviare ai servizi di reputazione SOLO dati
+               rilevanti per identificare email maligne.
     """
     seen_ips:    set[str] = set()
     seen_urls:   set[str] = set()
     seen_hashes: set[str] = set()
+    seen_domains: set[str] = set()
     ips:    list[str] = []
     urls:   list[str] = []
     hashes: list[str] = []
+    domains: list[str] = []
 
-    def add_ip(raw: str) -> None:
+    def add_ip(raw: str, skip_cdn_check: bool = False) -> None:
+        """Aggiunge IP solo se pubblico e non di CDN legittimi."""
         ip = raw.strip().strip("[]") if raw else ""
         if ip and ip not in seen_ips and _is_public_ip(ip):
-            seen_ips.add(ip); ips.append(ip)
+            # Skip IPs di CDN legittimi (a meno che sia sender IP)
+            if not skip_cdn_check and _is_trusted_cdn_ip(ip):
+                _logger.debug(f"[FILTRO] IP {ip} da CDN legittima - escluso")
+                return
+            seen_ips.add(ip)
+            ips.append(ip)
 
-    def add_url(raw: str) -> None:
+    def add_url(raw: str, is_suspicious: bool = False) -> None:
+        """Aggiunge URL solo se sospetta o non da CDN legittimi."""
         url = raw.strip() if raw else ""
-        if url and url not in seen_urls:
-            seen_urls.add(url); urls.append(url)
+        if not url or url in seen_urls:
+            return
+
+        # Estrai hostname dall'URL
+        try:
+            from urllib.parse import urlparse
+            hostname = urlparse(url).netloc.split(":")[0].lstrip("www.")
+        except:
+            hostname = ""
+
+        # Se è URL sospetta (shortener, IP diretto, nuovo dominio, punycode)
+        # aggiungi indipendentemente da CDN
+        if is_suspicious:
+            seen_urls.add(url)
+            urls.append(url)
+            return
+
+        # Altrimenti, escludi URL da CDN/trusted domains
+        if _is_trusted_cdn(hostname):
+            _logger.debug(f"[FILTRO] URL {url} da CDN legittima - escluso")
+            return
+
+        seen_urls.add(url)
+        urls.append(url)
 
     def add_hash(raw: str) -> None:
+        """Aggiunge solo hash di file potenzialmente malevoli."""
         h = raw.strip() if raw else ""
         if h and h not in seen_hashes:
-            seen_hashes.add(h); hashes.append(h)
+            seen_hashes.add(h)
+            hashes.append(h)
 
+    def add_domain(raw: str) -> None:
+        """Estrai dominio da URL e aggiungilo se non è CDN trusted."""
+        if not raw:
+            return
+        try:
+            from urllib.parse import urlparse
+            hostname = urlparse(raw).netloc.split(":")[0].lstrip("www.")
+            # Scarta IP diretti
+            if hostname and not (hostname.count(".") < 1 or hostname.replace(".", "").isdigit()):
+                if hostname not in seen_domains and not _is_trusted_cdn(hostname):
+                    seen_domains.add(hostname)
+                    domains.append(hostname)
+                    _logger.debug(f"[DOMAIN] {hostname} - estratto da URL")
+        except:
+            pass
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ESTRAZIONE IP: Sender IP + Received headers (ESCLUDI resolved IPs from URLs)
+    # ─────────────────────────────────────────────────────────────────────────
     hi = record.header_indicators or {}
-    for hop in hi.get("received_hops", []):
-        if hop.get("ip") and not hop.get("private_ip"):
-            add_ip(hop["ip"])
 
+    # Sender IP: SEMPRE importante, skip CDN check
     if record.x_originating_ip:
-        add_ip(record.x_originating_ip)
+        add_ip(record.x_originating_ip, skip_cdn_check=True)
 
+    # Received hops: primi 2-3 hop (mittente -> intermediari prossimi)
+    # Skip hop finali (recipient server)
+    for i, hop in enumerate(hi.get("received_hops", [])):
+        if i > 2:  # Solo primi 3 hop
+            break
+        if hop.get("ip") and not hop.get("private_ip"):
+            add_ip(hop["ip"], skip_cdn_check=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ESTRAZIONE URL: Sospette + non-CDN (ESCLUDI resolved IPs e URL CDN)
+    # ─────────────────────────────────────────────────────────────────────────
     ui = record.url_indicators or {}
     for u in ui.get("urls", []):
         url_str = u.get("original_url") or u.get("url", "")
-        if url_str:
-            add_url(url_str)
-        host = u.get("host", "")
-        if u.get("is_ip_address") or u.get("is_ip"):
-            add_ip(host)
-        resolved = u.get("resolved_ip", "")
-        if resolved:
-            add_ip(resolved)
+        if not url_str:
+            continue
 
+        # Determina se URL è sospetta
+        is_suspicious = (
+            u.get("is_ip_address") or u.get("is_ip") or  # IP diretto
+            u.get("is_shortener") or                      # Shortener (bit.ly, etc.)
+            u.get("is_new_domain") or                     # Dominio nuovo
+            u.get("is_punycode") or                       # IDN/Punycode
+            (u.get("risk_score", 0) >= 25)              # Risk score alto
+        )
+
+        add_url(url_str, is_suspicious=is_suspicious)
+
+    # Link offuscati: SEMPRE sospetti per definizione
     bi = record.body_indicators or {}
     for link in bi.get("obfuscated_links", []):
         href = link.get("actual_href", "")
         if href:
-            add_url(href)
+            add_url(href, is_suspicious=True)
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # ESTRAZIONE HASH: File allegati eseguibili/doc potenzialmente malevoli
+    # ─────────────────────────────────────────────────────────────────────────
     ai = record.attachment_indicators or {}
     for att in ai.get("attachments", []):
+        # Estrai SOLO hash di file potenzialmente malevoli
         h = att.get("hash_sha256", "")
         if h:
             add_hash(h)
 
-    return ips, urls, hashes
+    # ─────────────────────────────────────────────────────────────────────────
+    # ESTRAZIONE DOMINI: Per servizi che lavorano su domini (crt.sh, CIRCL, etc.)
+    # ─────────────────────────────────────────────────────────────────────────
+    for u in ui.get("urls", []):
+        url_str = u.get("original_url") or u.get("url", "")
+        if url_str:
+            add_domain(url_str)
+    for link in bi.get("obfuscated_links", []):
+        href = link.get("actual_href", "")
+        if href:
+            add_domain(href)
+
+    return ips, urls, hashes, domains
 
 
 def _extract_priority_indicators(
     record: EmailAnalysis,
-) -> tuple[list[str], list[str], list[str]]:
+) -> tuple[list[str], list[str], list[str], list[str]]:
     """
-    Estrae SOLO gli indicatori ad alta priorità per i servizi SLOW
-    (VirusTotal, AbuseIPDB) che hanno rate limit stringenti.
+    Estrae indicatori CRITICI per servizi SLOW (VirusTotal, AbuseIPDB, SecurityTrails, etc.).
 
-    IP: solo received_hops + x_originating_ip (non i resolved_ip degli URL —
-        quelli sono IP di CDN normali come CloudFlare, Amazon, Google).
+    LOGICA INTELLIGENTE per rate-limited services:
 
-    URL: solo quelli con indicatori di rischio espliciti:
-        - IP diretto (http://185.1.2.3/...)
-        - URL shortener (bit.ly, t.co...)
-        - Dominio nuovo (< 90 giorni)
-        - Dominio punycode/IDN
-        - URL score >= 25 dall'analisi
-        - Link offuscati (href reale ≠ testo visibile)
-        Hard cap: max 4 URL (rispetta il limite 4 req/min di VirusTotal free).
+    IP (Sender + intermediari):
+      - x_originating_ip (sempre)
+      - Received hops 1-2 (mittente + primo intermediario)
+      - ESCLUDI: resolved IPs da URLs (sono spesso CDN pubbliche)
+      - ESCLUDI: IPv6 (troppi false positives)
+      - ESCLUDI: IPs trusted CDN
 
-    Hash: tutti gli allegati (normalmente pochi).
+    URL (Massimizza coverage entro hard cap):
+      - Hard cap: max 4 URL per VirusTotal free (4 req/min)
+      - INCLUDI: TUTTE le URL non-CDN (sospette e normali)
+      - PRIORIZZA: URL sospette (IP diretto, shortener, new domain,
+        punycode, risk>=25) sono aggiunte per prime
+      - INCLUDI: anche URL "normali" non-CDN se c'è spazio fino a 4
+      - ESCLUDI: URL da Google, Microsoft, trusted CDN hosts
+      - SEMPRE: link offuscati (sono definitivamente sospetti)
+
+    Domain (Per SecurityTrails, crt.sh):
+      - Hard cap: max 1 dominio per SecurityTrails (quota 50/month)
+      - Hard cap: max 2 domini per crt.sh
+      - Prioritizza domini da URL sospette
+
+    Hash:
+      - Tutti gli allegati (sono rari e vanno sempre verificati)
+
+    Obiettivo: Massimizzare coverage (entro rate limit), inviare
+               TUTTI i dati rilevanti che potrebbero rivelare
+               malware/phishing, senza sprecare crediti VirusTotal/SecurityTrails.
     """
     seen_ips:    set[str] = set()
     seen_urls:   set[str] = set()
     seen_hashes: set[str] = set()
+    seen_domains: set[str] = set()
     ips:    list[str] = []
     urls:   list[str] = []
     hashes: list[str] = []
+    domains: list[str] = []
 
-    def add_ip(raw: str) -> None:
+    def add_ip(raw: str, skip_cdn_check: bool = True) -> None:
+        """Aggiunge SOLO sender IP e intermediari prossimi."""
         ip = raw.strip().strip("[]") if raw else ""
         if ip and ip not in seen_ips and _is_public_ip(ip):
-            seen_ips.add(ip); ips.append(ip)
+            # Per SLOW services, skip anche IPv6 (troppi false positives)
+            if ":" in ip:  # IPv6
+                _logger.debug(f"[FILTRO SLOW] IPv6 {ip} - escluso (troppi false positives)")
+                return
+            # Skip IPs trusted CDN (se non skip_cdn_check)
+            if not skip_cdn_check and _is_trusted_cdn_ip(ip):
+                _logger.debug(f"[FILTRO SLOW] IP {ip} da CDN trusted - escluso")
+                return
+            seen_ips.add(ip)
+            ips.append(ip)
 
-    def add_url_if_suspicious(u: dict) -> None:
-        if len(urls) >= 4:   # hard cap VirusTotal free
+    def add_url_if_worth_checking(u: dict) -> None:
+        """
+        Aggiunge URL in ordine di priorità per massimizzare coverage.
+
+        Hard cap: max 4 URL per VirusTotal free (4 req/min).
+        Strategia: priorizza URL sospette, ma includi anche normali se c'è spazio.
+
+        Non escludere completamente le URL non-sospette — sono comunque
+        dati rilevanti che valgono la pena verificare con VirusTotal.
+        """
+        if len(urls) >= 4:  # Hard cap VirusTotal free tier
             return
+
         url_str = u.get("original_url") or u.get("url", "")
         if not url_str or url_str in seen_urls:
             return
-        suspicious = (
-            u.get("is_ip_address") or u.get("is_ip") or
-            u.get("is_shortener") or
-            u.get("is_new_domain") or
-            u.get("is_punycode") or
-            (u.get("risk_score", 0) >= 25)
+
+        # Estrai hostname e controlla se trusted CDN (escludi sempre)
+        try:
+            from urllib.parse import urlparse
+            hostname = urlparse(url_str).netloc.split(":")[0].lstrip("www.")
+        except:
+            hostname = ""
+
+        if _is_trusted_cdn(hostname):
+            _logger.debug(f"[FILTRO SLOW] URL {url_str} da trusted CDN - esclusa")
+            return
+
+        # Determina se è sospetta (per logging)
+        is_suspicious = (
+            u.get("is_ip_address") or u.get("is_ip") or      # IP diretto
+            u.get("is_shortener") or                          # Shortener
+            u.get("is_new_domain") or                         # Nuovo dominio
+            u.get("is_punycode") or                           # IDN spoofing
+            (u.get("risk_score", 0) >= 25)                   # Risk score alto
         )
-        if suspicious:
-            seen_urls.add(url_str); urls.append(url_str)
 
-    # IP: SOLO sorgenti interne all'email (non resolved_ip degli URL)
+        # Aggiungi TUTTE le URL non-CDN, indipendentemente da is_suspicious.
+        # VirusTotal ha rate limit stretto, ma anche una singola URL non-sospetta
+        # da un sito non-CDN merita verifica se è presente nell'email.
+        seen_urls.add(url_str)
+        urls.append(url_str)
+        if is_suspicious:
+            _logger.debug(f"[FILTRO SLOW] URL {url_str} (sospetta, risk_score={u.get('risk_score', 0)}) - inclusa")
+        else:
+            _logger.debug(f"[FILTRO SLOW] URL {url_str} (normale, non da CDN) - inclusa per coverage")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # IP: Sender IP + primi 2 hop (mittente -> intermediari prossimi)
+    # ESCLUDE resolved IPs, IPv6, e IPs da CDN trusted
+    # ─────────────────────────────────────────────────────────────────────────
     hi = record.header_indicators or {}
-    for hop in hi.get("received_hops", []):
-        if hop.get("ip") and not hop.get("private_ip"):
-            add_ip(hop["ip"])
-    if record.x_originating_ip:
-        add_ip(record.x_originating_ip)
 
-    # URL: solo quelli sospetti
+    # Sender IP: SEMPRE (skip CDN check perché è il mittente)
+    if record.x_originating_ip:
+        add_ip(record.x_originating_ip, skip_cdn_check=True)
+
+    # Received hops: SOLO primi 2 (mittente e primo intermediario)
+    for i, hop in enumerate(hi.get("received_hops", [])):
+        if i > 1:  # Skip hop 3+
+            break
+        if hop.get("ip") and not hop.get("private_ip"):
+            add_ip(hop["ip"], skip_cdn_check=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # URL: Tutte le non-CDN, fino a 4 (hard cap VirusTotal free tier)
+    # Priorità: sospette prima, ma includi anche non-sospette per coverage
+    # ─────────────────────────────────────────────────────────────────────────
     ui = record.url_indicators or {}
     for u in ui.get("urls", []):
-        add_url_if_suspicious(u)
+        add_url_if_worth_checking(u)
 
-    # Link offuscati: sempre sospetti per definizione
+    # Link offuscati: SEMPRE sospetti per definizione
     bi = record.body_indicators or {}
     for link in bi.get("obfuscated_links", []):
         href = link.get("actual_href", "")
         if href and href not in seen_urls and len(urls) < 4:
-            seen_urls.add(href); urls.append(href)
+            seen_urls.add(href)
+            urls.append(href)
 
-    # Hash: tutti
+    # ─────────────────────────────────────────────────────────────────────────
+    # Hash: Tutti gli allegati
+    # ─────────────────────────────────────────────────────────────────────────
     ai = record.attachment_indicators or {}
     for att in ai.get("attachments", []):
         h = att.get("hash_sha256", "")
         if h and h not in seen_hashes:
-            seen_hashes.add(h); hashes.append(h)
+            seen_hashes.add(h)
+            hashes.append(h)
 
-    return ips, urls, hashes
+    # ─────────────────────────────────────────────────────────────────────────
+    # Domain: Per SecurityTrails (max 1) e crt.sh (max 2)
+    # Estrai domini da URL sospette
+    # ─────────────────────────────────────────────────────────────────────────
+    for u in ui.get("urls", []):
+        if len(domains) >= 2:  # Hard cap crt.sh (2 domini)
+            break
+        url_str = u.get("original_url") or u.get("url", "")
+        if url_str:
+            try:
+                from urllib.parse import urlparse
+                hostname = urlparse(url_str).netloc.split(":")[0].lstrip("www.")
+                is_suspicious = (
+                    u.get("is_ip_address") or u.get("is_ip") or
+                    u.get("is_shortener") or u.get("is_new_domain") or
+                    u.get("is_punycode") or (u.get("risk_score", 0) >= 25)
+                )
+                if hostname and not _is_trusted_cdn(hostname) and hostname not in seen_domains:
+                    # Prioritizza domini da URL sospette
+                    if is_suspicious or len(domains) < 1:
+                        seen_domains.add(hostname)
+                        domains.append(hostname)
+                        _logger.debug(f"[FILTRO SLOW] Domain {hostname} - estratto da URL sospetta")
+            except:
+                pass
+
+    return ips, urls, hashes, domains
 
 
 def _summary_to_dict(summary: ReputationSummary) -> dict:
@@ -226,13 +497,22 @@ async def run_reputation_fast(
         raise HTTPException(status_code=404,
             detail=t("analysis.run_first", job_id=job_id))
 
-    ips, urls, hashes = _extract_indicators(record)
+    ips, urls, hashes, domains = _extract_indicators(record)
+
+    # DEBUG LOGGING: Mostra esattamente cosa viene estratto
+    _logger.info(f"[REPUTATION DEBUG] Extracted indicators for job {job_id}:")
+    _logger.info(f"  IPs: {ips}")
+    _logger.info(f"  URLs: {urls}")
+    _logger.info(f"  Hashes: {hashes}")
+    _logger.info(f"  Domains: {domains}")
+    _logger.info(f"  Header received_hops count: {len(record.header_indicators.get('received_hops', []) if record.header_indicators else [])}")
+    _logger.info(f"  X-Originating-IP: {record.x_originating_ip}")
 
     # Fase 1: servizi fast, timeout generoso 25s
     loop = asyncio.get_event_loop()
     try:
         summary = await asyncio.wait_for(
-            loop.run_in_executor(None, run_fast_checks, ips, urls, hashes),
+            loop.run_in_executor(None, run_fast_checks, ips, urls, hashes, domains),
             timeout=50.0,  # sicuro con axios frontend timeout=60s
         )
     except asyncio.TimeoutError:
@@ -247,14 +527,27 @@ async def run_reputation_fast(
 
     # Avvia fase 2 in background con indicatori SELETTIVI (solo IP interni + URL sospetti)
     # per rispettare i rate limit di VirusTotal (4/min) e AbuseIPDB senza sprecare richieste
-    slow_ips, slow_urls, slow_hashes = _extract_priority_indicators(record)
-    has_slow = bool(slow_ips or slow_urls or slow_hashes)
-    slow_indicators = {"ips": slow_ips, "urls": slow_urls, "hashes": slow_hashes}
+    slow_ips, slow_urls, slow_hashes, slow_domains = _extract_priority_indicators(record)
+    has_slow = bool(slow_ips or slow_urls or slow_hashes or slow_domains)
+    slow_indicators = {"ips": slow_ips, "urls": slow_urls, "hashes": slow_hashes, "domains": slow_domains}
+
+    # DEBUG LOGGING: Mostra indicatori selettivi per SLOW services
+    _logger.info(f"[REPUTATION DEBUG] Slow indicators for job {job_id}:")
+    _logger.info(f"  SLOW IPs: {slow_ips}")
+    _logger.info(f"  SLOW URLs: {slow_urls}")
+    _logger.info(f"  SLOW Hashes: {slow_hashes}")
+    _logger.info(f"  SLOW Domains: {slow_domains}")
+
+    # DEBUG LOGGING: Mostra indicatori selettivi per SLOW services
+    _logger.info(f"[REPUTATION DEBUG] Slow indicators for job {job_id}:")
+    _logger.info(f"  SLOW IPs: {slow_ips}")
+    _logger.info(f"  SLOW URLs: {slow_urls}")
+    _logger.info(f"  SLOW Hashes: {slow_hashes}")
 
     if has_slow:
         rep_dict["slow_indicators"] = slow_indicators
         background_tasks.add_task(
-            _run_slow_background, job_id, slow_ips, slow_urls, slow_hashes, rep_dict
+            _run_slow_background, job_id, slow_ips, slow_urls, slow_hashes, rep_dict, slow_domains
         )
     else:
         # Nessun indicatore SLOW: rimuovi i placeholder "in elaborazione" prima di
@@ -299,6 +592,7 @@ async def _run_slow_background(
     urls: list[str],
     hashes: list[str],
     fast_rep_dict: dict,
+    domains: list[str] | None = None,
 ) -> None:
     """
     Esegue VirusTotal/AbuseIPDB/crt.sh in background.
@@ -309,11 +603,12 @@ async def _run_slow_background(
     from models.database import AsyncSessionLocal as async_session_factory
 
     fast_summary = _dict_to_summary(fast_rep_dict)
+    domains = domains or []
 
     try:
         loop = asyncio.get_running_loop()
         updated = await loop.run_in_executor(
-            None, run_slow_checks, ips, urls, hashes, fast_summary
+            None, run_slow_checks, ips, urls, hashes, fast_summary, domains
         )
     except Exception as e:
         _bg_logger.error("run_slow_checks fallito per job %s: %s", job_id, e)
@@ -369,7 +664,82 @@ def _dict_to_summary(d: dict) -> ReputationSummary:
         ip_results=  [to_result(r) for r in d.get("ip_results", [])],
         url_results= [to_result(r) for r in d.get("url_results", [])],
         hash_results=[to_result(r) for r in d.get("hash_results", [])],
+        domain_results=[to_result(r) for r in d.get("domain_results", [])],
         service_registry=d.get("service_registry", []),
         malicious_count=d.get("malicious_count", 0),
         reputation_score=d.get("reputation_score", 0.0),
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2C: Health Check Endpoint per URLScan.io (v0.14.3+)
+# ---------------------------------------------------------------------------
+
+@router.get("/test-urlscan")
+async def test_urlscan_health():
+    """
+    Testa la connessione a URLScan.io e verifica la configurazione dell'API key.
+    Utile per diagnosticare problemi di autenticazione o rate limiting.
+
+    Ritorna:
+      {
+        "connectivity": bool,          # Riesce a raggiungere urlscan.io?
+        "api_key_configured": bool,    # URLSCAN_API_KEY è configurato?
+        "api_key_valid": bool,         # La chiave è valida? (test con query semplice)
+        "system_info": {...},          # Sistema operativo, Python version, etc.
+        "suggestions": [...]           # Consigli di configurazione
+      }
+    """
+    import sys
+    import platform
+    import requests
+    from utils.config import settings
+
+    result = {
+        "connectivity": False,
+        "api_key_configured": False,
+        "api_key_valid": False,
+        "system_info": {
+            "os": platform.system(),
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            "requests_version": requests.__version__,
+        },
+        "suggestions": [],
+    }
+
+    # Test 1: Connessione a URLScan.io
+    try:
+        resp = requests.head("https://urlscan.io/api/v1/search/", timeout=5)
+        result["connectivity"] = True
+    except Exception as e:
+        result["suggestions"].append(f"URLScan.io non raggiungibile: {type(e).__name__}")
+        return result
+
+    # Test 2: API key configurato?
+    api_key = settings.URLSCAN_API_KEY
+    if api_key and api_key.strip():
+        result["api_key_configured"] = True
+
+        # Test 3: API key valido?
+        try:
+            headers = {"API-Key": api_key.strip()}
+            resp = requests.get(
+                "https://urlscan.io/api/v1/search/",
+                params={"q": "page.domain:example.com", "size": "1"},
+                headers=headers,
+                timeout=5,
+            )
+            if resp.status_code == 200:
+                result["api_key_valid"] = True
+            elif resp.status_code == 401:
+                result["suggestions"].append("API key invalida o scaduta. Verifica urlscan.io/user/settings")
+            elif resp.status_code == 403:
+                result["suggestions"].append("HTTP 403 Forbidden. Possibili cause: 1) Rate limit superato (1000 req/giorno), 2) IP blacklisted, 3) API key non valida. Verifica urlscan.io/user/settings")
+            else:
+                result["suggestions"].append(f"URLScan.io HTTP {resp.status_code}. Risposta: {resp.text[:100]}")
+        except Exception as e:
+            result["suggestions"].append(f"Errore test API key: {type(e).__name__}: {str(e)[:100]}")
+    else:
+        result["suggestions"].append("URLSCAN_API_KEY non configurato in .env. Registrati su https://urlscan.io/user/signup e configura la chiave per aumentare il limite a 1000 req/giorno")
+
+    return result

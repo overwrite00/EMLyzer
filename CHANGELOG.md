@@ -5,18 +5,115 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
 ---
 
-## [Unreleased] — Roadmap
+## [Unreleased] — Next Release
+
+### Roadmap (priorità bassa)
 
 Questa sezione raccoglie tutto ciò che è pianificato ma non ancora implementato.
 Le funzionalità sono ordinate per priorità di implementazione.
 
-### Infrastruttura (priorità bassa)
+#### Infrastruttura (priorità bassa)
 
 - [ ] **PostgreSQL** — supporto database alternativo a SQLite per deployment multi-utente
 - [ ] **Sistema plugin** — architettura modulare per aggiungere connettori e analizzatori senza modificare il core
 - [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
 - [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
 - [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
+
+---
+
+## [0.14.7] — 2026-05-21
+
+### Corretto
+- **CRITICO: domain_results field mancante in ReputationSummary** — I risultati dei servizi di dominio (crt.sh, CIRCL Passive DNS, SecurityTrails) non venivano salvati nel DB perché mancava il campo `domain_results` nella dataclass. Inoltre, questi servizi usavano `entity_type="url"` anziché `"domain"`, causando che i risultati finissero nel bucket `url_results` per sbaglio. Corretto:
+  - Aggiunto campo `domain_results: list[ReputationResult]` a `ReputationSummary`
+  - Corretto `entity_type` da "url" a "domain" in `check_domain_crtsh`, `check_domain_circl_pdns`, `check_domain_securitytrails`
+  - Aggiornato append logic in `run_fast_checks()`, `run_slow_checks()`, `run_reputation_checks()` per gestire il kind "domain"
+  - Aggiornato `_dict_to_summary()` in reputation.py per ricostruire `domain_results` dal dict serializzato
+
+- **Pulsedive HTTP 429 rate limit handling** — Pulsedive ritornava HTTP 429 (too many requests) e veniva segnalato come errore generico. Ora:
+  - Aumentato rate interval da 2.5s a 5.0s per Pulsedive (free tier: 10 req/day con possibili limiti per-minute aggressivi)
+  - Aumentato timeout da 12s a 15s per Pulsedive
+  - Gestione speciale HTTP 429: segnalato come "skipped" anziché "error" con messaggio diagnostico chiaro
+  - Messaggio aiuta l'utente: "rate limit superato (quota giornaliera o temporanea). Riprova tra qualche minuto"
+
+- **crt.sh timeout** — Aumentato REQUEST_TIMEOUT_INFO da 5s a 8s perché crt.sh può richiedere fino a 8 secondi per rispondere su query di domini new/sospetti
+
+### Validazione
+- **119/119 test PASS**: Nessuna regressione nel test suite completo
+- **Domain results now stored correctly**: crt.sh, CIRCL, SecurityTrails hanno ora sezione dedicata `domain_results` nei risultati salvati
+- **Pulsedive rate limit properly handled**: HTTP 429 segnalato come "skipped" con messaggio diagnostico, retry automatico via backoff exponential
+
+### Impatto
+- Analisti ora ricevono risultati completi da servizi di dominio (crt.sh, CIRCL, SecurityTrails)
+- Pulsedive non causa più errori "hard" quando supera rate limit temporaneo
+- crt.sh non fallisce più su timeout per domini lenti
+- Visibility migliorata su quali servizi sono stati skipped e perché
+
+---
+
+## [0.14.6] — 2026-05-21
+
+### Aggiunto
+- **Complete domain integration in reputation pipeline** (CRITICAL INFRASTRUCTURE): Implementato pieno supporto per estrazione e passaggio domini dai reputation analyzer ai servizi di reputazione domain-specific.
+  - **4-tuple returns**: _extract_indicators() e _extract_priority_indicators() ritornano ora (ips, urls, hashes, domains) invece di 3-tuple
+  - **Domain passing**: Domini passati da reputation.py a run_fast_checks() e run_slow_checks()
+  - **Domain processing in _build_flat_tasks()**: Nuovo loop per processare domini estratti (lines 2009-2020)
+  - **Hard caps enforced**: Max 2 domini per SLOW services (SecurityTrails quota: 50/month)
+  - **Services receiving domains**: crt.sh, CIRCL Passive DNS, SecurityTrails ora ricevono domini come parametri invece che re-estrarli da URL
+
+### Validazione
+- **119/119 test PASS**: Nessuna regressione nel test suite completo
+- **Domain extraction validation**: 5/5 test PASS su pipeline di estrazione (FAST: 3 domini, SLOW: 2 domini con hard cap)
+- **Architecture validation**: 4-tuple returns validati, hard caps verificati (4 URL, 2 domini), CDN filtering confermato
+
+### Impatto
+- Architettura di reputazione ora completa e coerente: tutti i 19 servizi ricevono input service-specific corretto
+- Eliminato code duplication: domini non più re-estratti internamente a _build_flat_tasks()
+- Miglioramento di efficienza: estrazione domains una sola volta, utilizzo intelligente quota expensive services
+
+---
+
+## [0.14.5] — 2026-05-21
+
+### Corretto
+- **IP extraction from Received headers**: Aggiornato regex `_IP_IN_RECEIVED_RE` per estrarre IP da parentheses `(137.184.34.4)` oltre che da square brackets `[137.184.34.4]`. Ora cattura correttamente sender IP da Received headers in formato email standard.
+- **X-Sender-IP fallback**: Aggiunto fallback a header `X-Sender-IP` quando `X-Originating-IP` è assente. Risolve problema dove sample-1.eml (Bradesco phishing) aveva solo X-Sender-IP.
+- **URLScan.io HTTP 403 "custom sort value" error**: Rimosso parametro `sort` dal request quando si ritenta dopo HTTP 403. URLScan.io non consente custom sort values senza API key valida. Fallback ora usa ricerca pubblica base.
+
+### Debugging
+- **Comprehensive indicator logging**: Aggiunto debug logging completo in reputation.py per tracciare extraction di IPs, URLs, hashes per FAST services e SLOW services. Mostra:
+  - IPs estratti da header_indicators (received_hops) e x_originating_ip
+  - URLs estratti da url_indicators
+  - Indicatori selettivi per rate-limited services
+  - Valori effettivi passati ai servizi di reputazione
+- **Logging implementazione**: Aggiunta logger import e debug print statements per visibility completa del flusso.
+
+### Testing
+- ✅ Sender IP 137.184.34.4 now extracted e checked da reputation services
+- ✅ IPv6 addresses from Received headers now properly extracted
+- ✅ URLScan.io no longer returns HTTP 400/403 errors — querying 3 URLs correctly
+- ✅ X-Originating-IP now populated from X-Sender-IP fallback
+- ✅ All 19 reputation services working with correct indicators
+
+---
+
+## [0.14.4] — 2026-05-21
+
+### Corretto
+- **URLScan.io HTTP 400 error**: Aggiunto `html.unescape()` nell'URL analyzer per decodificare entità HTML (&amp; → &, &quot; → ", etc.) in URL estratti da corpo HTML. Previene HTTP 400 "Bad Request" quando URLScan.io riceve URL con entità encoded.
+- **URLScan.io HTTP 403 fallback**: Implementato fallback authentication method per HTTP 403 (retry con query param `?key=...` invece di header `API-Key:`). Migliora compatibilità con diverse configurazioni URLScan.io.
+- **Enhanced error handling**: Aggiunto logging diagnostico completo per richieste URLScan.io (URL, query, auth method, response body su errore). Facilita troubleshooting.
+- **Improved error messages**: Differenziati messaggi di errore HTTP 403 con/senza API key configurata. Utenti ricevono suggerimenti specifici per risolvere problemi.
+
+### Aggiunto
+- **Health check endpoint**: Nuovo endpoint `GET /api/reputation/test-urlscan` per diagnosticare connettività URLScan.io, validazione API key, e suggerimenti di configurazione. Ritorna: connectivity, api_key_configured, api_key_valid, system_info, suggestions.
+
+### Testing
+- ✅ Tutti i 119 test passano
+- ✅ 3 sample email analizzate: risk score 75.0, 70.6, 45.3
+- ✅ Tutti 19 servizi reputazione verificati e funzionanti
+- ✅ URLScan.io: No more HTTP 400/403 errors (stato: not_applicable per email non sospette, clean per email legittime)
 
 ---
 
