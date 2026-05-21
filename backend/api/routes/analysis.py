@@ -31,8 +31,8 @@ from core.analysis.scorer import compute_risk_score
 
 router = APIRouter()
 
-import logging
-_logger = logging.getLogger(__name__)
+import logging as _logging
+_logger = _logging.getLogger(__name__)
 
 
 async def _vacuum_db() -> None:
@@ -118,19 +118,14 @@ async def bulk_delete_analyses(
     if not valid_ids:
         raise HTTPException(status_code=400, detail=t("analysis.no_valid_ids"))
 
-    # CRITICAL: Batch delete instead of N+1 queries
-    # Old approach (N+1): for each job_id, await db.get() → 100 jobs = 100 queries
-    # New approach (batch): single query with .where(id.in_(valid_ids)) → 1 query
-    stmt = select(EmailAnalysis).where(EmailAnalysis.id.in_(valid_ids))
-    result = await db.execute(stmt)
-    records_to_delete = result.scalars().all()
-
     deleted_count = 0
     files_removed = 0
-    for record in records_to_delete:
-        await db.delete(record)
-        deleted_count += 1
-        files_removed += _cleanup_files(record.id)
+    for jid in valid_ids:
+        record = await db.get(EmailAnalysis, jid)
+        if record:
+            await db.delete(record)
+            deleted_count += 1
+            files_removed += _cleanup_files(jid)
 
     await db.commit()
     # VACUUM dopo eliminazioni massive per recuperare spazio su disco
@@ -168,19 +163,6 @@ async def run_analysis(
     # (CPU-bound + I/O bloccante) che su Linux possono saturare il loop
     # e causare timeout del client se eseguite direttamente nell'async handler.
     def _pipeline():
-        """
-        Esegue la full analysis pipeline per un'email.
-
-        Ordine di esecuzione (sequenziale):
-        1. parse_email_file() — parsing RFC 2822/MSG, estrazioni header, body, allegati
-        2. analyze_headers() — SPF/DKIM/DMARC, auth injection, bulk sender, originatingIP
-        3. analyze_body() — urgency patterns, phishing CTA, credentials, homoglyphs, LanguageTool
-        4. analyze_urls() — resolving, whois, domain age, shortener detection, TLS
-        5. analyze_attachments() — MIME type, macro/VBA, double extension, PDF/JS scanning
-        6. compute_risk_score() — normalizzazione adattiva, floor rules, risk label assegnamento
-
-        Returns: 6-tuple (parsed, header_result, body_result, url_result, attachment_result, risk_score)
-        """
         _parsed            = parse_email_file(raw, original_filename)
         _header_result     = analyze_headers(_parsed)
         _body_result       = analyze_body(_parsed)
@@ -254,17 +236,17 @@ async def run_analysis(
     )
 
     # Upsert: se già esiste (riesecuzione analisi), aggiorna
-    # IMPORTANT: atomic transaction — delete + add in single commit to avoid race conditions
     existing = await db.get(EmailAnalysis, job_id)
     if existing:
         _logger.info("[%s] [DB DELETE] Existing analysis found, deleting for upsert", job_id)
         await db.delete(existing)
-        _logger.info("[%s] [DB DELETE] Existing record marked for deletion", job_id)
+        await db.flush()
+        _logger.info("[%s] [DB DELETE] Existing record deleted", job_id)
 
     _logger.info("[%s] [DB ADD] Adding new EmailAnalysis record to session", job_id)
     try:
         db.add(record)
-        _logger.info("[%s] [DB COMMIT] Committing transaction to database (includes delete if applicable)", job_id)
+        _logger.info("[%s] [DB COMMIT] Committing transaction to database", job_id)
         await db.commit()
         _logger.info("[%s] [DB SUCCESS] Analysis persisted successfully, record_id=%s", job_id, record.id)
     except Exception as e:
@@ -442,32 +424,6 @@ def _build_response_from_record(record) -> dict:
 
 
 def _build_response(job_id, parsed, header_result, body_result, url_result, attachment_result, risk, do_whois: bool = False) -> dict:
-    """
-    Prepara la risposta JSON per il client con tutti i risultati dell'analisi.
-
-    Struttura risposta:
-    - job_id, status="completed"
-    - email: metadata (filename, subject, from, to, date, message_id, file_hash, parse_errors)
-    - risk: score, label, explanation, detailed contributions per modulo
-    - header_analysis: SPF/DKIM/DMARC, injection, bulk sender, etc.
-    - body_analysis: phishing patterns, urgency, credentials, homoglyphs, forms, JS
-    - url_analysis: lista URL con risk score, IP, whois age, shortener, TLS, DNS
-    - attachment_analysis: file count, mime types, macro detection, VBA signatures
-    - reputation_results: results da servizi di reputazione (dopo fase 2 background)
-
-    Args:
-        job_id: UUID unico dell'analisi
-        parsed: ParsedEmail con metadata e content
-        header_result: HeaderAnalysisResult da analyze_headers()
-        body_result: BodyAnalysisResult da analyze_body()
-        url_result: URLAnalysisResult da analyze_urls()
-        attachment_result: AttachmentAnalysisResult da analyze_attachments()
-        risk: RiskScore con score finale e spiegazione
-        do_whois: boolean che determina se WHOIS è stato eseguito (info nella response)
-
-    Returns:
-        dict pronto per JSON serializzazione e invio al client
-    """
     return {
         "job_id": job_id,
         "status": "completed",

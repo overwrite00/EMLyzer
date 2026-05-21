@@ -92,14 +92,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
-    # Init database — if this fails, the application cannot start
-    try:
-        await init_db()
-        logging.info("[STARTUP] Database initialized successfully")
-    except Exception as e:
-        logging.error("[STARTUP] FATAL: Failed to initialize database: %s", e, exc_info=True)
-        raise RuntimeError(f"Cannot start application: database initialization failed: {e}") from e
-
+    await init_db()
     # Re-installa i filtri DOPO che uvicorn ha configurato i suoi handler
     _install_noise_filters()
 

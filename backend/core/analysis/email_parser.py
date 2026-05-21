@@ -13,6 +13,7 @@ import email.header
 import email.policy
 from email import message_from_bytes
 from pathlib import Path
+from typing import Optional
 from dataclasses import dataclass, field
 
 import filetype
@@ -74,11 +75,6 @@ class ParsedEmail:
 
 
 def _compute_hashes(data: bytes) -> tuple[str, str, str]:
-    """
-    Calcola MD5, SHA-1 e SHA-256 di un file binario.
-
-    Returns: (md5_hex, sha1_hex, sha256_hex)
-    """
     return (
         hashlib.md5(data).hexdigest(),
         hashlib.sha1(data).hexdigest(),
@@ -381,34 +377,8 @@ def _parse_msg(raw: bytes, filename: str) -> ParsedEmail:
 
 def parse_email_file(file_bytes: bytes, filename: str) -> ParsedEmail:
     """
-    Parsing entry point: detects email format and extracts all relevant fields.
-
-    Supported formats:
-    - .eml (RFC 2822, plain text SMTP format) → via mail-parser library
-    - .msg (Microsoft Outlook binary format) → via extract-msg library
-    - Auto-detection: if extension unknown, attempts EML parsing
-
-    Extracts:
-    - Basic metadata: From, To, CC, BCC, Subject, Date, Message-ID
-    - Authentication headers: SPF/DKIM/DMARC results, ARC chain
-    - Email identity: Return-Path, Reply-To, X-Mailer, X-Originating-IP, X-Campaign-ID
-    - Body: Plain text + HTML (both extracted)
-    - Received chain: SMTP hops for path analysis
-    - Attachments: Full metadata (MIME type, hashes, size)
-    - RFC 2047 decoding: Automatic decode of encoded header values
-    - Surrogate escape recovery: Handles UTF-8 corruption in headers (Windows-1252 fallback)
-
-    Returns:
-        ParsedEmail dataclass with all fields (None if empty or missing)
-        parse_errors list tracks any non-fatal extraction issues
-
-    Args:
-        file_bytes: Raw email file content (EML or MSG binary)
-        filename: Original filename (for extension detection and logging only,
-                  never used for path operations)
-
-    Raises:
-        ValueError: If file format unrecognized or parsing fails
+    Main entry point. Detects format from extension and dispatches parser.
+    filename is used only for logging/metadata, never for path operations.
     """
     ext = Path(filename).suffix.lower()
 

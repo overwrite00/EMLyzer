@@ -239,14 +239,6 @@ class ReputationResult:
 # ---------------------------------------------------------------------------
 
 def check_ip_abuseipdb(ip: str) -> ReputationResult:
-    """
-    Verifica reputazione IP tramite AbuseIPDB (SLOW service, 1.1s rate limit).
-
-    Score: 0-100% confidence che IP sia malevolo.
-    Threshold: score >= 50 → malicious.
-
-    Richiede ABUSEIPDB_API_KEY configurata in .env.
-    """
     r = ReputationResult(source="AbuseIPDB", entity=ip, entity_type="ip")
     if not settings.ABUSEIPDB_API_KEY:
         r.skipped = True
@@ -287,19 +279,9 @@ def check_ip_abuseipdb(ip: str) -> ReputationResult:
 # ---------------------------------------------------------------------------
 
 def _vt_headers():
-    """Headers HTTP per autenticazione VirusTotal v3."""
     return {"x-apikey": settings.VIRUSTOTAL_API_KEY}
 
 def _vt_stats_detail(stats: dict, name: str = "") -> tuple[bool, float, str]:
-    """
-    Interpreta le statistiche di detection VirusTotal v3.
-
-    Stats dict contiene: {'malicious': N, 'suspicious': N, 'harmless': N, 'undetected': N}
-    Ritorna: (is_malicious, confidence%, detail_string)
-
-    Nota: is_malicious=True se ALMENO 1 vendor riporta come malevolo.
-    Confidence = (malicious_count / total_vendors) * 100
-    """
     malicious  = stats.get("malicious", 0)
     suspicious = stats.get("suspicious", 0)
     harmless   = stats.get("harmless", 0)
@@ -315,11 +297,6 @@ def _vt_stats_detail(stats: dict, name: str = "") -> tuple[bool, float, str]:
     return is_mal, confidence, detail
 
 def _vt_http_error(e: requests.HTTPError) -> str:
-    """
-    Converte HTTP error VirusTotal a messaggio diagnostico user-friendly.
-
-    Gestisce: 429 (quota), 401 (auth), 404 (not found), altri errori.
-    """
     code = e.response.status_code
     if code == 429: return "Quota VirusTotal esaurita (4 req/min piano gratuito — riprova tra poco)"
     if code == 401: return "Chiave API VirusTotal non valida"
@@ -328,15 +305,6 @@ def _vt_http_error(e: requests.HTTPError) -> str:
 
 
 def check_ip_virustotal(ip: str) -> ReputationResult:
-    """
-    Verifica reputazione IP tramite VirusTotal (SLOW service, 15.5s rate limit).
-
-    Aggregato: numero di vendor che riportano IP come malevolo.
-    Threshold: >= 3 vendor malicious → is_malicious=True.
-
-    Richiede VIRUSTOTAL_API_KEY configurata in .env.
-    Rate limit: 4 req/min piano gratuito.
-    """
     r = ReputationResult(source="VirusTotal", entity=ip, entity_type="ip")
     if not settings.VIRUSTOTAL_API_KEY:
         r.skipped = True; r.skip_reason = "VIRUSTOTAL_API_KEY non configurata nel file .env"; return r
@@ -361,15 +329,6 @@ def check_ip_virustotal(ip: str) -> ReputationResult:
 
 
 def check_url_virustotal(url: str) -> ReputationResult:
-    """
-    Verifica reputazione URL tramite VirusTotal (SLOW service, 15.5s rate limit).
-
-    Nota: URL viene codificato con base64 URL-safe per compatibilità API.
-    Threshold: >= 3 vendor malicious → is_malicious=True.
-
-    Richiede VIRUSTOTAL_API_KEY configurata in .env.
-    Rate limit: 4 req/min piano gratuito.
-    """
     r = ReputationResult(source="VirusTotal", entity=url, entity_type="url")
     if not settings.VIRUSTOTAL_API_KEY:
         r.skipped = True; r.skip_reason = "VIRUSTOTAL_API_KEY non configurata nel file .env"; return r
@@ -406,14 +365,6 @@ def check_url_virustotal(url: str) -> ReputationResult:
 
 
 def check_hash_virustotal(sha256: str) -> ReputationResult:
-    """
-    Verifica reputazione hash SHA256 tramite VirusTotal (SLOW service, 15.5s rate limit).
-
-    Database: file già scansionati e catalogati da VirusTotal.
-    Threshold: >= 3 vendor malicious → is_malicious=True.
-
-    Richiede VIRUSTOTAL_API_KEY configurata in .env.
-    """
     r = ReputationResult(source="VirusTotal", entity=sha256, entity_type="hash")
     if not settings.VIRUSTOTAL_API_KEY:
         r.skipped = True; r.skip_reason = "VIRUSTOTAL_API_KEY non configurata nel file .env"; return r
@@ -450,17 +401,6 @@ _openphish_loaded = False
 _openphish_error: str = ""
 
 def _load_openphish():
-    """
-    Carica il feed OpenPhish di URL phishing confermati.
-
-    Strategie:
-    1. Memoria: ritorna subito se già caricato (_openphish_loaded=True)
-    2. Disco: carica da cache locale se presente e TTL<12h
-    3. Rete: scarica da https://openphish.com/feed.txt (feed pubblico)
-    4. Fallback: usa cache scaduta se il download fallisce
-
-    Cache formato: file JSON su disco, una URL per riga.
-    """
     global _openphish_cache, _openphish_loaded, _openphish_error
     if _openphish_loaded:
         return
@@ -489,15 +429,6 @@ def _load_openphish():
         _openphish_loaded = True
 
 def check_url_openphish(url: str) -> ReputationResult:
-    """
-    Verifica URL nel feed locale OpenPhish (FAST service, 0s rate limit).
-
-    Feed: lista di URL phishing confermati, aggiornata periodicamente.
-    Lookup: semplice membership test su set (O(1)).
-    Confidence: 90% se trovato, 0% altrimenti.
-
-    No API key richiesta — feed è pubblico e cachato localmente.
-    """
     r = ReputationResult(source="OpenPhish", entity=url, entity_type="url", queried=True)
     try:
         _load_openphish()
@@ -518,13 +449,6 @@ def check_url_openphish(url: str) -> ReputationResult:
 # ---------------------------------------------------------------------------
 
 def check_url_phishtank(url: str) -> ReputationResult:
-    """
-    Verifica URL nel database PhishTank (FAST service, 0.5s rate limit).
-
-    Database: segnalazioni crowdsourced di phishing da comunità.
-    Richiede PHISHTANK_API_KEY configurata in .env.
-    Confidence: 100% se verificato, <100% se sospetto.
-    """
     r = ReputationResult(source="PhishTank", entity=url, entity_type="url")
     if not settings.PHISHTANK_API_KEY:
         r.skipped = True; r.skip_reason = "PHISHTANK_API_KEY non configurata nel file .env"; return r
@@ -564,12 +488,6 @@ def check_url_phishtank(url: str) -> ReputationResult:
 # ---------------------------------------------------------------------------
 
 def check_hash_malwarebazaar(sha256: str) -> ReputationResult:
-    """
-    MalwareBazaar (abuse.ch) — ricerca hash nel database campioni malware.
-    Database: malware confermato raccolto da honeypot e segnalazioni.
-    Richiede ABUSECH_API_KEY o MALWAREBAZAAR_API_KEY (legacy) registrata su auth.abuse.ch.
-    Confidence: 100% se trovato come malware, 0% se non trovato.
-    """
     r = ReputationResult(source="MalwareBazaar", entity=sha256, entity_type="hash")
     _key = settings.ABUSECH_API_KEY or settings.MALWAREBAZAAR_API_KEY
 
@@ -611,7 +529,7 @@ def check_hash_malwarebazaar(sha256: str) -> ReputationResult:
 # Spamhaus DROP — blocklist IP pubblica, no API key
 # ---------------------------------------------------------------------------
 
-_spamhaus_cache: list[ipaddress.ip_network] = []
+_spamhaus_cache: set[str] = set()
 _spamhaus_loaded = False
 _spamhaus_error: str = ""
 
@@ -666,12 +584,6 @@ def _load_spamhaus():
         _spamhaus_loaded = True
 
 def check_ip_spamhaus(ip: str) -> ReputationResult:
-    """
-    Spamhaus DROP — controlla se l'IP è in una blocklist malevola di alto profilo.
-    DROP è la lista gestita manualmente (alta precisione, pochi falsi positivi).
-    Feed cachato localmente con TTL 24h, si aggiorna al riavvio.
-    Nessuna API key richiesta — servizio gratuito.
-    """
     r = ReputationResult(source="Spamhaus DROP", entity=ip, entity_type="ip", queried=True)
     try:
         _load_spamhaus()
@@ -875,7 +787,7 @@ def check_domain_circl_pdns(domain: str) -> ReputationResult:
     api_key = settings.CIRCL_API_KEY.strip()
     if not api_key:
         return ReputationResult(
-            source="CIRCL Passive DNS", entity=domain, entity_type="domain",
+            source="CIRCL Passive DNS", entity=domain, entity_type="url",
             skipped=True, skip_reason="CIRCL_API_KEY non configurata",
         )
     user, _, pwd = api_key.partition(":")
@@ -891,14 +803,14 @@ def check_domain_circl_pdns(domain: str) -> ReputationResult:
         )
         if resp.status_code == 404:
             return ReputationResult(
-                source="CIRCL Passive DNS", entity=domain, entity_type="domain",
+                source="CIRCL Passive DNS", entity=domain, entity_type="url",
                 queried=True, detail="Nessun record trovato.",
             )
         resp.raise_for_status()
         records = [json.loads(ln) for ln in resp.text.splitlines() if ln.strip()]
         if not records:
             return ReputationResult(
-                source="CIRCL Passive DNS", entity=domain, entity_type="domain",
+                source="CIRCL Passive DNS", entity=domain, entity_type="url",
                 queried=True, detail="Nessun record trovato.",
             )
         # Raggruppa per rrtype — mostra A/AAAA/MX/NS/CNAME
@@ -920,23 +832,23 @@ def check_domain_circl_pdns(domain: str) -> ReputationResult:
         body = " | ".join(parts) if parts else f"{len(records)} record"
         detail = f"{body} | ultimo visto: {time_last_str}"
         return ReputationResult(
-            source="CIRCL Passive DNS", entity=domain, entity_type="domain",
+            source="CIRCL Passive DNS", entity=domain, entity_type="url",
             queried=True, detail=detail,
         )
     except requests.exceptions.HTTPError as e:
         code = e.response.status_code if e.response is not None else 0
         if code == 401:
             return ReputationResult(
-                source="CIRCL Passive DNS", entity=domain, entity_type="domain",
+                source="CIRCL Passive DNS", entity=domain, entity_type="url",
                 error="Credenziali CIRCL non valide (CIRCL_API_KEY=user:password)",
             )
         return ReputationResult(
-            source="CIRCL Passive DNS", entity=domain, entity_type="domain",
+            source="CIRCL Passive DNS", entity=domain, entity_type="url",
             error=f"CIRCL HTTP {code}",
         )
     except Exception as exc:
         return ReputationResult(
-            source="CIRCL Passive DNS", entity=domain, entity_type="domain",
+            source="CIRCL Passive DNS", entity=domain, entity_type="url",
             error=f"CIRCL: {type(exc).__name__}",
         )
 
@@ -1896,18 +1808,6 @@ class ReputationSummary:
     reputation_score: float = 0.0
 
 
-def _append_result(summary: ReputationSummary, result: ReputationResult) -> None:
-    """Distribuisce un ReputationResult nella lista corretta basato su entity_type."""
-    if result.entity_type == "ip":
-        summary.ip_results.append(result)
-    elif result.entity_type == "url":
-        summary.url_results.append(result)
-    elif result.entity_type == "domain":
-        summary.domain_results.append(result)
-    else:  # hash
-        summary.hash_results.append(result)
-
-
 # ---------------------------------------------------------------------------
 # Classificazione servizi per velocità
 # ---------------------------------------------------------------------------
@@ -2062,7 +1962,7 @@ def _build_flat_tasks(
             _s("ThreatFox", ip, "ip", "ABUSECH_API_KEY non configurata — registrati su auth.abuse.ch")
 
     # ── URL ─────────────────────────────────────────────────────────────────
-    for url in urls[:20]:  # Cap at 20 to avoid overwhelming requests for spam emails with many URLs
+    for url in urls[:20]:
         _c(check_url_openphish, url, "url")
         if settings.ABUSECH_API_KEY:
             _c(check_url_urlhaus,   url, "url")
@@ -2109,7 +2009,7 @@ def _build_flat_tasks(
             pass
 
     # ── Hash ────────────────────────────────────────────────────────────────
-    for h in hashes[:10]:  # Cap at 10 to avoid excessive hash checking on emails with many attachments
+    for h in hashes[:10]:
         if settings.ABUSECH_API_KEY:
             _c(check_hash_threatfox, h, "hash")
         else:
@@ -2142,7 +2042,7 @@ def _build_flat_tasks(
     return call_tasks, skip_results
 
 
-def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str], domains: list[str] | None = None) -> ReputationSummary:
+def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) -> ReputationSummary:
     """
     Esegue TUTTI i check reputazionali in un unico ThreadPoolExecutor flat.
     Design:
@@ -2160,7 +2060,7 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str], do
     _load_spamhaus()
     _load_openphish()
 
-    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes, domains)
+    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes)
 
     # Distribuisce i risultati skip nelle liste corrette
     for r in skip_results:
@@ -2192,7 +2092,7 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str], do
                 pool.submit(fn, entity): (kind, entity, fn.__name__)
                 for fn, entity, kind in call_tasks
             }
-            done, not_done = futures_wait(future_map.keys(), timeout=single_timeout)
+            done, not_done = wait(future_map.keys(), timeout=single_timeout)
 
             for future in done:
                 kind, entity, fn_name = future_map[future]
@@ -2200,10 +2100,17 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str], do
                     r = future.result()
                 except Exception as e:
                     r = ReputationResult(
-                        source=_FN_TO_SOURCE.get(fn_name, fn_name), entity=entity, entity_type=kind,
+                        source=fn_name, entity=entity, entity_type=kind,
                         error=f"Errore: {e}",
                     )
-                _append_result(summary, r)
+                if kind == "ip":
+                    summary.ip_results.append(r)
+                elif kind == "url":
+                    summary.url_results.append(r)
+                elif kind == "domain":
+                    summary.domain_results.append(r)
+                else:
+                    summary.hash_results.append(r)
 
             for future in not_done:
                 future.cancel()
@@ -2262,7 +2169,10 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str], domains:
 
     summary = ReputationSummary()
     for r in skip_results + slow_skips:
-        _append_result(summary, r)
+        if r.entity_type == "ip":      summary.ip_results.append(r)
+        elif r.entity_type == "url":   summary.url_results.append(r)
+        elif r.entity_type == "domain": summary.domain_results.append(r)
+        else:                          summary.hash_results.append(r)
 
     if fast_calls:
         n_workers = min(len(fast_calls), 16)
@@ -2281,15 +2191,21 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str], domains:
                 try:
                     r = future.result()
                 except Exception as e:
-                    r = ReputationResult(source=_FN_TO_SOURCE.get(fn_name, fn_name), entity=entity,
+                    r = ReputationResult(source=fn_name, entity=entity,
                                          entity_type=kind, error=f"Errore: {e}")
-                _append_result(summary, r)
+                if kind == "ip":      summary.ip_results.append(r)
+                elif kind == "url":   summary.url_results.append(r)
+                elif kind == "domain": summary.domain_results.append(r)
+                else:                 summary.hash_results.append(r)
             for future in not_done:
                 future.cancel()
                 kind, entity, fn_name = future_map[future]
-                r = ReputationResult(source=_FN_TO_SOURCE.get(fn_name, fn_name), entity=entity,
+                r = ReputationResult(source=fn_name, entity=entity,
                                      entity_type=kind, error="Timeout")
-                _append_result(summary, r)
+                if kind == "ip":      summary.ip_results.append(r)
+                elif kind == "url":   summary.url_results.append(r)
+                elif kind == "domain": summary.domain_results.append(r)
+                else:                 summary.hash_results.append(r)
         finally:
             # shutdown(wait=False, cancel_futures=True): non blocca
             # threading._shutdown() alla chiusura → nessun KeyboardInterrupt su CTRL+C
@@ -2360,9 +2276,12 @@ def run_slow_checks(ips: list[str], urls: list[str], hashes: list[str],
             try:
                 r = future.result()
             except Exception as e:
-                r = ReputationResult(source=_FN_TO_SOURCE.get(fn_name, fn_name), entity=entity,
+                r = ReputationResult(source=fn_name, entity=entity,
                                      entity_type=kind, error=f"Errore: {e}")
-            _append_result(existing, r)
+            if kind == "ip":      existing.ip_results.append(r)
+            elif kind == "url":   existing.url_results.append(r)
+            elif kind == "domain": existing.domain_results.append(r)
+            else:                 existing.hash_results.append(r)
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 
