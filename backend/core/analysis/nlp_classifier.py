@@ -11,6 +11,7 @@ Non richiede download esterni: il training set è embedded nel modulo.
 
 import re
 import logging
+import threading
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
@@ -207,6 +208,38 @@ _TRAINING_SAMPLES: list[tuple[str, int]] = [
     ("bem vindo ao time ficamos felizes em te ter no projeto veja onboarding", 0),
     ("nossa newsletter mensal novidades atualizacoes artigos selecionados", 0),
 
+    # --- Email bancarie legittime italiane (IT) ---
+    ("estratto conto corrente disponibile puoi visualizzarlo nel tuo online banking", 0),
+    ("notifica transazione confermata pagamento di euro ricevuto data operazione", 0),
+    ("confermazione bonifico ricevuto importo mittente e data operazione allegata", 0),
+    ("richiesta rimborso accettata il denaro sarà accreditato entro 3 giorni", 0),
+    ("notifiche di sicurezza nuovo dispositivo collegato al tuo account alle", 0),
+    ("fattura pagata ricevuta di pagamento disponibile nel tuo portale online", 0),
+    ("mutuo rata pagata e confermata thank you for your banking with us", 0),
+    ("buone notizie il tuo prestito è stato approvato documenti allegati", 0),
+
+    # --- Email di e-commerce legittime italiane (IT) ---
+    ("spedizione in corso il tuo pacco sarà consegnato entro domani tracciamento", 0),
+    ("confermazione ordine numero ricevuta allegata grazie per lo shopping", 0),
+    ("pacco consegnato firma foto disponibile accedi al tuo account", 0),
+    ("rimborso processato il denaro è stato restituito al tuo conto origine", 0),
+    ("nuovo articolo dalla tua lista desideri disponibile con sconto speciale", 0),
+    ("cambio spedizione il tuo pacco è arrivato ritira presso punto vendita", 0),
+
+    # --- Email di servizi pubblici legittime italiane (IT) ---
+    ("bolletta agosto disponibile puoi visualizzarla nel tuo profilo cliente", 0),
+    ("prenotazione visita medica confermata martedì ore 10 preparazione richiesta", 0),
+    ("certificato disponibile puoi scaricarlo dal portale senza necessità di recarti", 0),
+    ("comunicazione importante rinnovo abbonamento anno prossimo in allegato info", 0),
+
+    # --- Email aziendali legittimi italiane (IT) ---
+    ("risultati meeting discussione risultati e action items allegati", 0),
+    ("rapporto trimestrale approvato disponibile sul sistema condiviso per review", 0),
+    ("anniversario azienda festeggiamo 10 anni con voi grazie per la fiducia", 0),
+    ("benefit dipendenti informazioni catalogo sconti partner anno prossimo", 0),
+    ("cambio policy ripensamento nuove linee guida dal primo gennaio", 0),
+    ("congratulazioni promozione siamo felici di comunicarti la tua promozione", 0),
+
     # --- Transações e-commerce brasileiras (PT-BR) ---
     ("obrigado pela compra seu pedido foi enviado numero rastreamento anexo", 0),
     ("comprovante da sua compra encontra se em anexo valor e data", 0),
@@ -229,6 +262,7 @@ _TRAINING_SAMPLES: list[tuple[str, int]] = [
 # ---------------------------------------------------------------------------
 
 _model = None
+_model_lock = threading.Lock()  # Thread-safe caching del modello
 
 
 def _preprocess(text: str) -> str:
@@ -243,40 +277,52 @@ def _preprocess(text: str) -> str:
 def _get_model():
     """Addestra e cacha il modello (thread-safe per uso sincrono)."""
     global _model
+
+    # Quick check senza lock se già addestrato
     if _model is not None:
         return _model
 
-    try:
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.preprocessing import MaxAbsScaler
-        from sklearn.pipeline import Pipeline
+    # Acquisisce lock per addestramento thread-safe
+    with _model_lock:
+        # Double-check dopo acquisizione lock
+        if _model is not None:
+            return _model
 
-        texts  = [_preprocess(t) for t, _ in _TRAINING_SAMPLES]
-        labels = [lb for _, lb in _TRAINING_SAMPLES]
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            from sklearn.linear_model import LogisticRegression
+            from sklearn.preprocessing import MaxAbsScaler
+            from sklearn.pipeline import Pipeline
 
-        pipeline = Pipeline([
-            ('tfidf', TfidfVectorizer(
-                ngram_range=(1, 2),
-                max_features=3000,
-                min_df=1,
-                sublinear_tf=True,
-            )),
-            ('scaler', MaxAbsScaler()),
-            ('clf', LogisticRegression(
-                C=1.0,
-                max_iter=1000,
-                solver='lbfgs',
-                random_state=42,
-            )),
-        ])
-        pipeline.fit(texts, labels)
-        _model = pipeline
-        logger.info("NLP classifier (LR) trained on %d samples", len(texts))
+            texts  = [_preprocess(t) for t, _ in _TRAINING_SAMPLES]
+            labels = [lb for _, lb in _TRAINING_SAMPLES]
 
-    except ImportError:
-        logger.warning("scikit-learn non installato: NLP classifier disabilitato")
-        _model = None
+            pipeline = Pipeline([
+                ('tfidf', TfidfVectorizer(
+                    ngram_range=(1, 2),
+                    max_features=3000,
+                    min_df=1,
+                    sublinear_tf=True,
+                )),
+                ('scaler', MaxAbsScaler()),
+                ('clf', LogisticRegression(
+                    C=1.0,
+                    max_iter=1000,
+                    solver='lbfgs',
+                    random_state=42,
+                    class_weight='balanced',  # P1: bilanciamento automatico classi (52% legittimi, 48% phishing)
+                )),
+            ])
+            pipeline.fit(texts, labels)
+            _model = pipeline
+            logger.info("NLP classifier (LR) trained on %d samples with balanced class weights", len(texts))
+
+        except ImportError:
+            logger.warning("scikit-learn non installato: NLP classifier disabilitato")
+            _model = None
+        except Exception as e:
+            logger.error("Failed to train NLP classifier: %s", e)
+            _model = None
 
     return _model
 
