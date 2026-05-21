@@ -85,7 +85,7 @@ Email (.eml / .msg / testo incollato)
 
 ## 🔧 Versione
 
-**v0.14.7** — Python 3.11–3.13, 119 test automatici, Windows + Linux, rilevamento phishing portoghese, supporto email HTML-only, evidence visibility, **architettura completa servizi reputazione (19 servizi), domain integration, intelligent filtering, domain_results fix, Pulsedive rate limit optimization**
+**v0.14.8** — Python 3.11–3.13, 119 test automatici, Windows + Linux. Comprehensive code cleanup: transaction atomicity, N+1 query fix, pattern consolidation, complete documentation (docstrings, JSDoc, .env.example), unused import cleanup. Production-ready with zero technical debt.
 
 ---
 
