@@ -13,7 +13,7 @@ import re
 import html
 import urllib.parse
 import concurrent.futures
-import logging as _logging
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
@@ -23,7 +23,7 @@ import dns.resolver
 import dns.exception
 from utils.i18n import t
 
-_logger = _logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 # URL shortener noti (stesso set usato in body_analyzer)
@@ -119,14 +119,14 @@ def _whois_age_blocking(domain: str) -> tuple[Optional[datetime], Optional[int],
     Funzione bloccante — deve essere sempre chiamata tramite _whois_age()
     che la avvolge in un executor con timeout wall-clock garantito.
     """
-    import logging as _logging
+    import logging
     import whois  # import lazy per performance
-    _whois_logger       = _logging.getLogger("whois")
-    _whois_whois_logger = _logging.getLogger("whois.whois")
+    _whois_logger       = logging.getLogger("whois")
+    _whois_whois_logger = logging.getLogger("whois.whois")
     _prev_level  = _whois_logger.level
     _prev_level2 = _whois_whois_logger.level
-    _whois_logger.setLevel(_logging.CRITICAL)
-    _whois_whois_logger.setLevel(_logging.CRITICAL)
+    _whois_logger.setLevel(logging.CRITICAL)
+    _whois_whois_logger.setLevel(logging.CRITICAL)
     try:
         w = whois.whois(domain)
         creation = w.creation_date

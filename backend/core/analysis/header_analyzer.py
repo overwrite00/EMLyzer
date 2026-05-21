@@ -10,14 +10,14 @@ Analisi degli header email:
 """
 
 import re
-import logging as _logging
+import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
 from core.analysis.email_parser import ParsedEmail
 from utils.i18n import t
 
-_logger = _logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 # DNS queries (dnspython già in requirements.txt)
 try:

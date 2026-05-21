@@ -13,12 +13,12 @@ IMPORTANTE: nessun file viene eseguito. Solo analisi statica dei byte.
 """
 
 import re
-import logging as _logging
+import logging
 from utils.i18n import t
 from dataclasses import dataclass, field
 from typing import Optional
 
-_logger = _logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 # Estensioni eseguibili / pericolose

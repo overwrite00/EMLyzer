@@ -9,7 +9,7 @@ Analisi del corpo email:
 
 import re
 import base64
-import logging as _logging
+import logging
 import unicodedata
 from dataclasses import dataclass, field
 from bs4 import BeautifulSoup
@@ -19,7 +19,7 @@ from core.analysis.email_parser import ParsedEmail
 from core.analysis.nlp_classifier import classify_text, NLPResult
 from utils.i18n import t
 
-_logger = _logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 # --- Pattern linguistici sospetti (case-insensitive) ---

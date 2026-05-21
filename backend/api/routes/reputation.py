@@ -23,8 +23,7 @@ Campi DB usati:
 import re
 import asyncio
 import ipaddress
-import threading
-import logging as _logging
+import logging
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,7 +40,7 @@ from dataclasses import asdict
 import json
 
 router = APIRouter()
-_logger = _logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # INTELLIGENT FILTERING — CDN/Hosting Providers da escludere dalle ricerche
@@ -566,8 +565,8 @@ async def run_reputation_fast(
 # Fase 2 — background task (non ha timeout di sessione)
 # ---------------------------------------------------------------------------
 
-import logging as _logging
-_bg_logger = _logging.getLogger("emlyzer.reputation.background")
+import logging
+_bg_logger = logging.getLogger("emlyzer.reputation.background")
 
 
 async def _run_slow_background(

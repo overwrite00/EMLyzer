@@ -31,8 +31,8 @@ from core.analysis.scorer import compute_risk_score
 
 router = APIRouter()
 
-import logging as _logging
-_logger = _logging.getLogger(__name__)
+import logging
+_logger = logging.getLogger(__name__)
 
 
 async def _vacuum_db() -> None:
