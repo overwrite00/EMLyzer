@@ -106,7 +106,21 @@ class AttachmentAnalysisResult:
 
 
 def _check_double_extension(filename: str) -> bool:
-    """Rileva doppia estensione tipo 'invoice.pdf.exe'."""
+    """
+    Rileva doppia estensione tipo 'invoice.pdf.exe' (spoofing tipo file).
+
+    Tecnica attacco: nomina file eseguibile con estensione innocua come seconda-a-ultima
+    per ingannare visualizzatori di file (alcuni mostrano solo estensione finale).
+
+    Edge cases gestiti:
+    - version.1.0.2.exe → rilevato (DANGEROUS_EXTENSIONS check)
+    - image.PNG.exe → rilevato (case-insensitive check su common_exts)
+    - document.pdf → non rilevato (no esecuzione)
+    - archive.tar.gz → non rilevato (gz non in DANGEROUS_EXTENSIONS)
+    - file...exe → rilevato (split genera parts con empty strings)
+
+    Ritorna True solo se: (penultima estensione è comune) AND (ultima è pericolosa).
+    """
     parts = filename.lower().split(".")
     if len(parts) >= 3:
         # Controlla se la penultima estensione è comune (pdf, doc, jpg, ecc.)
@@ -116,7 +130,26 @@ def _check_double_extension(filename: str) -> bool:
 
 
 def _analyze_office_ole(data: bytes) -> tuple[bool, list[str]]:
-    """Cerca firme VBA in file OLE2 (Office legacy)."""
+    """
+    Cerca firme VBA in file OLE2 (Office legacy).
+
+    OLE2 (Object Linking and Embedding) è formato binario usato da:
+    - Word doc (legacy, non docx)
+    - Excel xls (legacy, non xlsx)
+    - PowerPoint ppt (legacy, non pptx)
+
+    Rilevamento macro: cercacondizioni di firma VBA note che indicano
+    codice eseguibile presente:
+    - "VBA": stringa di identificazione
+    - "_VBA_PROJECT": directory nel file OLE2
+    - "ThisDocument" / "Workbook_Open" / "AutoOpen": entry point macro
+
+    Nota: funzione esegue una scansione lineare sul buffer (byte[]) —
+    è best-effort e non garantisce di trovare TUTTE le macro,
+    solo le presenti nel buffer letto (primi OLE2_HEADER_LIMIT bytes).
+
+    Ritorna (has_macro, lista_evidenze) dove evidenze sono le firme trovate.
+    """
     evidences = []
     has_macro = False
     for sig in VBA_SIGNATURES:
@@ -128,8 +161,25 @@ def _analyze_office_ole(data: bytes) -> tuple[bool, list[str]]:
 
 def _analyze_ooxml(data: bytes) -> tuple[bool, list[str]]:
     """
-    File OOXML sono ZIP: cerca 'vbaProject.bin' nel TOC dello ZIP
-    senza estrarlo (evita zip bomb: leggiamo solo i primi 32KB).
+    Cerca macro VBA in file OOXML (ZIP-based: docx, xlsx, pptx).
+
+    OOXML (Office Open XML) è contenitore ZIP:
+    - file di testo XML per struttura/contenuto
+    - cartella 'ppt/macros/' o 'word/macros/' per VBA
+    - file binario 'vbaProject.bin' contiene il bytecode macro
+
+    Rilevamento: cerchiamo la stringa 'vbaProject.bin' nel buffer grezzo
+    (SENZA estrarre il ZIP, per evitare zip bomb):
+    - Se presente, ZIP contiene una cartella macros eseguibile
+    - Scan limitata ai primi 32KB per sicurezza (vedi OLE2_HEADER_LIMIT)
+
+    Edge cases:
+    - Docx con macro disabilitati: vbaProject.bin assente (safe)
+    - Docx su schermo: contiene SOLO XML, no cartella macros
+    - Xlsx infetto: vbaProject.bin presente nella struttura ZIP
+    - Zip bomb: file gigante con TOC all'inizio — limitiamo lettura a 32KB
+
+    Ritorna (has_macro, lista_evidenze).
     """
     chunk = data[:OLE2_HEADER_LIMIT]
     has_macro = b"vbaProject.bin" in chunk
@@ -139,7 +189,30 @@ def _analyze_ooxml(data: bytes) -> tuple[bool, list[str]]:
 
 def _analyze_pdf(data: bytes) -> tuple[bool, bool, list[str], list[str]]:
     """
-    Cerca pattern JS e stream sospetti in PDF.
+    Cerca pattern JavaScript e stream sospetti in file PDF.
+
+    Rilevamento minacce PDF:
+    1. JavaScript embedded (/JS, /JavaScript, eval, app.alert, this.print):
+       - Sintomo di codice eseguibile; malware usa JS per exploit browser
+    2. Stream sospetti (/AA, /OpenAction, /Launch, /EmbeddedFile, /RichMedia, /XFA):
+       - /AA (Additional Actions): trigger su evento (apri, visualizza)
+       - /OpenAction: azione automatica all'apertura del PDF
+       - /Launch: lancia programma esterno (esecuzione file)
+       - /EmbeddedFile: file nascosto dentro PDF
+       - /RichMedia: Flash/multimedia (potenziale exploit)
+       - /XFA: XML Forms Architecture (usato in exploit avanzati)
+
+    Limitazione: scan ai primi 2MB (PDF_SCAN_LIMIT) per evitare lag su file giganti.
+    Questa è best-effort: malware potrebbe nascondere stream oltre 2MB,
+    ma solitamente payload malevoli sono compatti all'inizio.
+
+    Edge cases gestiti:
+    - PDF grande (>2MB): scan solo inizio, potrebbe perdere payload in coda
+    - PDF compresso/offuscato: pattern match su byte grezzi, non su stream decodificato
+    - PDF valido con stream legittimi: false positive possibile per /EmbeddedFile
+      (alcune app uses /EmbeddedFile per allegati legittimi)
+    - PDF corrotto: no eccezione, scan continua linearmente
+
     Ritorna (has_js, has_suspicious_stream, js_evidences, stream_evidences).
     """
     js_found = False
