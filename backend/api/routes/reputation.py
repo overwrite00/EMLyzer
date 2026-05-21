@@ -41,6 +41,7 @@ import json
 
 router = APIRouter()
 _logger = logging.getLogger(__name__)
+_bg_logger = logging.getLogger("emlyzer.reputation.background")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # INTELLIGENT FILTERING — CDN/Hosting Providers da escludere dalle ricerche
@@ -564,9 +565,6 @@ async def run_reputation_fast(
 # ---------------------------------------------------------------------------
 # Fase 2 — background task (non ha timeout di sessione)
 # ---------------------------------------------------------------------------
-
-import logging
-_bg_logger = logging.getLogger("emlyzer.reputation.background")
 
 
 async def _run_slow_background(
