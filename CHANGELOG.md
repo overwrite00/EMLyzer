@@ -7,35 +7,48 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
 ## [Unreleased] — Next Release
 
-### Corretto
-- **CRITICO: URL filtering logic for SLOW services**: Bug in _extract_priority_indicators escludeva completamente le URL non-sospette, sprecando il rate limit di VirusTotal. Se un'email aveva 1 URL malicious + 3 URL normali non-CDN, VirusTotal riceveva SOLO 1 URL. Ora include TUTTE le URL non-CDN (fino a 4), prioritizzando quelle sospette. Questo massimizza la coverage entro il limite di 4 req/min free tier.
-  - Renamed: add_url_if_suspicious() → add_url_if_worth_checking()
-  - Logica: INCLUDI TUTTE le URL non-CDN, NON escludere le non-sospette
-  - Priorità: URL sospette aggiunte per prime, poi altre non-CDN se c'è spazio
-  - Risultato: Analista riceve assessment più completo, rate limit VirusTotal non sprecato
-
-### Aggiunto
-- **Intelligent data filtering for reputation services** (v0.14.5+): Implementato sistema di filtraggio a livello analista per estrarre SOLO indicatori rilevanti per ogni tipo di servizio di reputazione. Riduce il rumore e previene query non necessarie che causano timeout.
-  - **CDN Domain Whitelist**: 40+ domini trusted (Google, Microsoft, CloudFlare, AWS, Akamai, CDN networks, social media, payment services, email providers)
-  - **CDN IP Whitelist**: IP prefix ranges per provider principali (Google AS15169, CloudFlare AS13335, Microsoft Azure AS8075, Amazon AWS AS16509)
-  - **Intelligent IP Extraction**: Solo sender IP + primi 2-3 received hops (SKIP trusted CDN IPs, SKIP resolved IPs da URLs)
-  - **Intelligent URL Extraction**: TUTTE le URL non-CDN dai body (non SOLO le sospette)
-  - **Priority Extraction for SLOW services**: Sender IP + primi 2 hops, max 4 URL, skip IPv6 (troppi false positives), rispetta rate limit VirusTotal 4 req/min
-  - **Debug logging**: [FILTRO] e [FILTRO SLOW] prefixes per transparency sui dati filtrati
-  - **Risultati**: Riduce query volume, previene timeout (crt.sh), rispetta rate limits, migliora precision dell'analisi
-
 ### Roadmap (priorità bassa)
 
 Questa sezione raccoglie tutto ciò che è pianificato ma non ancora implementato.
 Le funzionalità sono ordinate per priorità di implementazione.
 
-### Infrastruttura (priorità bassa)
+#### Infrastruttura (priorità bassa)
 
 - [ ] **PostgreSQL** — supporto database alternativo a SQLite per deployment multi-utente
 - [ ] **Sistema plugin** — architettura modulare per aggiungere connettori e analizzatori senza modificare il core
 - [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
 - [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
 - [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
+
+---
+
+## [0.14.7] — 2026-05-21
+
+### Corretto
+- **CRITICO: domain_results field mancante in ReputationSummary** — I risultati dei servizi di dominio (crt.sh, CIRCL Passive DNS, SecurityTrails) non venivano salvati nel DB perché mancava il campo `domain_results` nella dataclass. Inoltre, questi servizi usavano `entity_type="url"` anziché `"domain"`, causando che i risultati finissero nel bucket `url_results` per sbaglio. Corretto:
+  - Aggiunto campo `domain_results: list[ReputationResult]` a `ReputationSummary`
+  - Corretto `entity_type` da "url" a "domain" in `check_domain_crtsh`, `check_domain_circl_pdns`, `check_domain_securitytrails`
+  - Aggiornato append logic in `run_fast_checks()`, `run_slow_checks()`, `run_reputation_checks()` per gestire il kind "domain"
+  - Aggiornato `_dict_to_summary()` in reputation.py per ricostruire `domain_results` dal dict serializzato
+
+- **Pulsedive HTTP 429 rate limit handling** — Pulsedive ritornava HTTP 429 (too many requests) e veniva segnalato come errore generico. Ora:
+  - Aumentato rate interval da 2.5s a 5.0s per Pulsedive (free tier: 10 req/day con possibili limiti per-minute aggressivi)
+  - Aumentato timeout da 12s a 15s per Pulsedive
+  - Gestione speciale HTTP 429: segnalato come "skipped" anziché "error" con messaggio diagnostico chiaro
+  - Messaggio aiuta l'utente: "rate limit superato (quota giornaliera o temporanea). Riprova tra qualche minuto"
+
+- **crt.sh timeout** — Aumentato REQUEST_TIMEOUT_INFO da 5s a 8s perché crt.sh può richiedere fino a 8 secondi per rispondere su query di domini new/sospetti
+
+### Validazione
+- **119/119 test PASS**: Nessuna regressione nel test suite completo
+- **Domain results now stored correctly**: crt.sh, CIRCL, SecurityTrails hanno ora sezione dedicata `domain_results` nei risultati salvati
+- **Pulsedive rate limit properly handled**: HTTP 429 segnalato come "skipped" con messaggio diagnostico, retry automatico via backoff exponential
+
+### Impatto
+- Analisti ora ricevono risultati completi da servizi di dominio (crt.sh, CIRCL, SecurityTrails)
+- Pulsedive non causa più errori "hard" quando supera rate limit temporaneo
+- crt.sh non fallisce più su timeout per domini lenti
+- Visibility migliorata su quali servizi sono stati skipped e perché
 
 ---
 
