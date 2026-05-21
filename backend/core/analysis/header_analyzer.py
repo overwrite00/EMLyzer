@@ -61,7 +61,23 @@ _IP_IN_RECEIVED_RE = re.compile(
 def _extract_ip_from_received(received: str) -> tuple[str | None, bool]:
     """
     Estrae il primo IP (v4 o v6) da un Received header.
-    Ritorna (ip_str_normalizzato, is_private).
+
+    Regex groups (_IP_IN_RECEIVED_RE):
+    1. [IPv6:xxxx] — IPv6 con prefisso esplicito (Gmail, Postfix)
+    2. [x.x.x.x] — IPv4 classico in square brackets
+    3. [IPv6 senza prefisso] — IPv6 bare senza "IPv6:" prefix
+    4. (x.x.x.x) — IPv4 in parentheses (Outlook, alcuni mail server)
+    5. (IPv6 bare) — IPv6 in parentheses
+
+    Ritorna (ip_str_normalizzato, is_private):
+    - ip_str_normalizzato: stringa IP canonica (es. "192.0.2.1", "2001:db8::1")
+    - is_private: True se IP privato/loopback/link-local (RFC 1918, 127.0.0.0/8, fe80::/10)
+
+    Edge cases gestiti:
+    - Nessun IP trovato → (None, False)
+    - IPv4 malformato (es. "256.0.0.1") → non matcha, ritorna (None, False)
+    - IPv6 abbreviato (es. "::1") → normalizzato a "::1"
+    - IPv4-mapped IPv6 (es. "::ffff:192.0.2.1") → riconosciuto come IPv4 privato
     """
     m = _IP_IN_RECEIVED_RE.search(received)
     if not m:
@@ -608,9 +624,32 @@ def _check_header_injection(parsed: ParsedEmail, result: HeaderAnalysisResult):
 def _parse_received_chain(parsed: ParsedEmail, result: HeaderAnalysisResult):
     """
     Analizza la catena Received per ricostruire il percorso SMTP.
-    I Received header sono in ordine inverso nel messaggio (ogni server aggiunge in cima):
-    get_all() restituisce [ultimo_hop, ..., primo_hop].
-    Invertendo, hop 1 = mittente originale, hop N = server di destinazione finale.
+
+    Concetto: ogni server mail aggiunge un header Received IN CIMA al messaggio
+    quando lo riceve. Quindi:
+    - Primo header nel file = ultimo server (server di destinazione)
+    - Ultimo header nel file = primo server (mittente originale)
+
+    RFC 5321 order: hop 1 = mittente originale, hop N = destinatario finale
+
+    Esempio:
+    File contiene (da leggere dal basso):
+      Received: from mx1.destination.com ...    ← hop 3 (server destinatario)
+      Received: from relay.isp.com ...           ← hop 2 (relay intermedio)
+      Received: from client.attacker.com ...    ← hop 1 (mittente originale)
+
+    Parsing per hop:
+    - hop number: sequenza ordinata 1..N (1 = mittente, N = destinatario)
+    - IP address: estratto da [IPv6:x], [x.x.x.x], (x.x.x.x) formati
+    - is_private: True se IP è in RFC 1918 / 127.0.0.0/8 / fe80::/10
+    - "by" field: hostname del server che ha ricevuto
+    - timestamp: data/ora dell'elaborazione
+
+    Edge cases:
+    - Nessun Received header → hops vuoto (attacco: header strippato)
+    - IP privati solo → attaccante nasconde IP reale dietro NAT/proxy
+    - Timestamp mancante → no "ts" in hop dict
+    - "By" mancante → no "by" in hop dict
     """
     for i, received in enumerate(reversed(parsed.received_chain)):
         hop: dict = {"hop": i + 1, "raw": received[:300]}
