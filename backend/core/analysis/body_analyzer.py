@@ -9,7 +9,7 @@ Analisi del corpo email:
 
 import re
 import base64
-import logging as _logging
+import logging
 import unicodedata
 from dataclasses import dataclass, field
 from bs4 import BeautifulSoup
@@ -19,7 +19,7 @@ from core.analysis.email_parser import ParsedEmail
 from core.analysis.nlp_classifier import classify_text, NLPResult
 from utils.i18n import t
 
-_logger = _logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 # --- Pattern linguistici sospetti (case-insensitive) ---
@@ -180,6 +180,39 @@ class BodyAnalysisResult:
     score_contribution: float = 0.0
 
 
+def _count_pattern_matches(pattern_list: list[str], text: str, result: BodyAnalysisResult, attr_name: str, max_match_len: int = 150) -> list[tuple[str, int]]:
+    """
+    Consolida logica pattern matching — evita duplicazione.
+
+    Args:
+        pattern_list: lista di regex pattern da matchare
+        text: testo normalizzato lowercase
+        result: BodyAnalysisResult object (attributo incrementato in-place)
+        attr_name: nome dell'attributo su result da incrementare (es. 'urgency_count')
+        max_match_len: ignora match > questo valore (probabili falsi positivi)
+
+    Returns:
+        list[tuple(pattern_text, count)] ordinato per frequenza descrescente
+    """
+    pattern_hits = {}  # {pattern_matched: count}
+
+    for pattern in pattern_list:
+        matches = re.findall(pattern, text)
+        for match_text in matches:
+            # Ignora match troppo lunghi — probabili errori di capturing
+            if len(match_text) > max_match_len:
+                continue
+            # Incrementa il contatore nel result object
+            setattr(result, attr_name, getattr(result, attr_name) + 1)
+            # Track pattern hit
+            if match_text not in pattern_hits:
+                pattern_hits[match_text] = 0
+            pattern_hits[match_text] += 1
+
+    # Ritorna lista di tuple ordinata per frequenza (pattern più comuni prima)
+    return sorted(pattern_hits.items(), key=lambda x: x[1], reverse=True)
+
+
 def _analyze_text(body_text: str, result: BodyAnalysisResult):
     """Analisi pattern su testo plain."""
     if not body_text:
@@ -190,50 +223,10 @@ def _analyze_text(body_text: str, result: BodyAnalysisResult):
     text_lower = text_normalized.lower()
 
     # P1: Deduplica pattern per categoria — mantiene SOLO i pattern unici trovati
-    # MAX_MATCH_LEN: ignora match > 150 char (probabili falsi positivi da regex troppo generico)
-    MAX_MATCH_LEN = 150
-    urgency_pattern_hits = {}  # {pattern_matched: count}
-    cta_pattern_hits = {}
-    credential_pattern_hits = {}
-
-    # Urgency patterns
-    for pattern in URGENCY_PATTERNS:
-        matches = re.findall(pattern, text_lower)
-        for match_text in matches:
-            # Ignora match troppo lunghi — probabili errori di capturing
-            if len(match_text) > MAX_MATCH_LEN:
-                continue
-            result.urgency_count += 1
-            if match_text not in urgency_pattern_hits:
-                urgency_pattern_hits[match_text] = 0
-            urgency_pattern_hits[match_text] += 1
-
-    # CTA patterns
-    for pattern in PHISHING_CTAS:
-        matches = re.findall(pattern, text_lower)
-        for match_text in matches:
-            if len(match_text) > MAX_MATCH_LEN:
-                continue
-            result.phishing_cta_count += 1
-            if match_text not in cta_pattern_hits:
-                cta_pattern_hits[match_text] = 0
-            cta_pattern_hits[match_text] += 1
-
-    # Credential patterns
-    for pattern in CREDENTIAL_KEYWORDS:
-        matches = re.findall(pattern, text_lower)
-        for match_text in matches:
-            if len(match_text) > MAX_MATCH_LEN:
-                continue
-            result.credential_keyword_count += 1
-            if match_text not in credential_pattern_hits:
-                credential_pattern_hits[match_text] = 0
-            credential_pattern_hits[match_text] += 1
-
-    # Ordina per frequenza (pattern più comuni prima)
-    urgency_matches = sorted(urgency_pattern_hits.items(), key=lambda x: x[1], reverse=True)
-    cta_matches = sorted(cta_pattern_hits.items(), key=lambda x: x[1], reverse=True)
-    credential_matches = sorted(credential_pattern_hits.items(), key=lambda x: x[1], reverse=True)
+    # Usa helper function per evitare duplicazione di logica
+    urgency_matches = _count_pattern_matches(URGENCY_PATTERNS, text_lower, result, 'urgency_count')
+    cta_matches = _count_pattern_matches(PHISHING_CTAS, text_lower, result, 'phishing_cta_count')
+    credential_matches = _count_pattern_matches(CREDENTIAL_KEYWORDS, text_lower, result, 'credential_keyword_count')
 
     # P1: Estrai solo i testi dei pattern (senza conteggi)
     urgency_unique = [m[0] for m in urgency_matches[:5]]
@@ -467,10 +460,19 @@ def _analyze_html(body_html: str, result: BodyAnalysisResult):
 
 
 def _looks_like_url(text: str) -> bool:
+    """Controlla se una stringa inizia con http:// o https://."""
     return bool(re.match(r'https?://', text.strip()))
 
 
 def _extract_domain_from_url(url: str) -> str:
+    """
+    Estrae il dominio da un URL (hostname senza protocollo, porta, path).
+
+    Esempi:
+    - 'https://example.com/path' → 'example.com'
+    - 'https://sub.example.com:8080' → 'sub.example.com'
+    - 'example.com' → ''  (ritorna stringa vuota per input non-standard)
+    """
     m = re.match(r'https?://([^/?\s]+)', url.strip())
     if m:
         host = m.group(1).lower()
@@ -483,6 +485,26 @@ def _check_homoglyphs(body_text: str, result: BodyAnalysisResult):
     """
     Rileva caratteri Unicode omoglifi (cirillico/greco) visivamente identici
     a caratteri latini — tecnica usata per spoofing visivo nei link e nel testo.
+
+    Omoglifi: caratteri da alfabeti diversi che hanno forma IDENTICA ma codice Unicode
+    diverso:
+    - Cirillico 'а' (U+0430) vs Latino 'a' (U+0061) — indistinguibili a occhio
+    - Cirillico 'е' (U+0435) vs Latino 'e' (U+0065)
+    - Greco 'ο' (U+03BF) vs Latino 'o' (U+006F)
+
+    Attacco: `рауpal.com` (prima lettera cirillica) visualizza come "paypal.com"
+    ma risolve a host diverso. Browser moderni mostrano indicatori, ma email
+    ricchi di testo normalizzato non beneficiano di questi avvisi.
+
+    Parametri di rilevamento:
+    - n >= 3 occorrenze → severity HIGH (tentativo deliberato)
+    - n == 1-2 → severity LOW (potrebbe essere errore ortografico, lingua mista)
+    - Sample: mostra fino a 10 caratteri unici trovati (per debugging)
+
+    Edge cases gestiti:
+    - Testo multilingua (cirillico legittimo): falso positivo potenziale
+    - URL codificato (punycode): omoglifi già normalizzati, non rilevati
+    - Email scritte da utenti russi/greci: falso positivo (normale)
     """
     if not body_text:
         return
@@ -505,8 +527,30 @@ def _check_homoglyphs(body_text: str, result: BodyAnalysisResult):
 def _check_languagetool(body_text: str, result: BodyAnalysisResult):
     """
     Verifica errori grammaticali via LanguageTool (opzionale).
-    Abilitato solo se LANGUAGETOOL_API_URL è configurato in .env.
-    ≥5 errori → finding MEDIUM (possibile testo tradotto automaticamente).
+
+    Rilevamento testo sospetto tramite analisi grammaticale:
+    - Email scritte da attaccanti non-native speaker
+    - Testo tradotto automaticamente (Google Translate, DeepL con settori errori)
+    - Contenuto generato da template phishing non-verificato
+
+    Configurazione:
+    - Abilitato solo se LANGUAGETOOL_API_URL è configurato in .env (es. http://localhost:8081)
+    - Se non configurato: check saltato silenziosamente (non è critico)
+    - LanguageTool è servizio remoto opzionale — timeout/errori non bloccano analisi
+
+    Parametri:
+    - ≥5 errori → finding MEDIUM (linguaggio anomalo, probabilmente phishing)
+    - <5 errori → no finding (rumore tollerato per email imperfette)
+    - text[:5000] limitato a 5000 char per performance
+    - timeout 5s per singola richiesta HTTP
+
+    Edge cases gestiti:
+    - URL non configurato → skip silenzioso (log WARNING)
+    - Timeout di connessione → skip silenzioso + log
+    - Servizio offline (status != 200) → skip silenzioso
+    - JSON malformato → exception capito, skip silenzioso
+    - Testo in lingua non supportata → LanguageTool ignora, ritorna 0 errori
+    - Falsi positivi: email scritte male (non native speaker) ma legittime
     """
     from utils.config import settings
     url = settings.LANGUAGETOOL_API_URL.strip()
@@ -555,7 +599,32 @@ def _compute_score(result: BodyAnalysisResult) -> float:
 
 
 def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
-    """Entry point analisi body. Analizza sia testo plain che HTML."""
+    """
+    Analizza il corpo email per rilevare pattern phishing, urgenza e credenziali.
+
+    Checks eseguiti (su testo plain e HTML):
+    - Urgenza (URGENT ACTION, scadenza, verifica account, ecc.)
+    - CTA (Call-To-Action) sospette (Click now, verify identity, confirm payment)
+    - Credenziali (username, password, OTP, card, SSN, ecc.)
+    - Omoglifi Unicode (Cirillico/Greco come Latin spoofing)
+    - Link offuscati (testo visibile ≠ URL reale)
+    - Form HTML nascosti
+    - JavaScript sospetto
+    - Elementi HTML invisibili (colore testo=sfondo)
+    - Base64 inline (embedding di malware/phishing page)
+    - Grammatica (via LanguageTool se configurato)
+
+    NLP Classification:
+    - LogisticRegression + TF-IDF per classificare legittima vs phishing
+    - Confidence: low/medium/high based on probability
+    - Contribuisce al body score finale
+
+    Args:
+        parsed: ParsedEmail con body_text (plain) e body_html (HTML)
+
+    Returns:
+        BodyAnalysisResult con findings, conteggi pattern, URLs estratte, NLP result, score
+    """
     result = BodyAnalysisResult()
 
     _logger.info("[BODY START] text_len=%d, html_len=%d", len(parsed.body_text or ''), len(parsed.body_html or ''))
