@@ -39,6 +39,28 @@ Le funzionalità sono ordinate per priorità di implementazione.
 
 ---
 
+## [0.14.6] — 2026-05-21
+
+### Aggiunto
+- **Complete domain integration in reputation pipeline** (CRITICAL INFRASTRUCTURE): Implementato pieno supporto per estrazione e passaggio domini dai reputation analyzer ai servizi di reputazione domain-specific.
+  - **4-tuple returns**: _extract_indicators() e _extract_priority_indicators() ritornano ora (ips, urls, hashes, domains) invece di 3-tuple
+  - **Domain passing**: Domini passati da reputation.py a run_fast_checks() e run_slow_checks()
+  - **Domain processing in _build_flat_tasks()**: Nuovo loop per processare domini estratti (lines 2009-2020)
+  - **Hard caps enforced**: Max 2 domini per SLOW services (SecurityTrails quota: 50/month)
+  - **Services receiving domains**: crt.sh, CIRCL Passive DNS, SecurityTrails ora ricevono domini come parametri invece che re-estrarli da URL
+
+### Validazione
+- **119/119 test PASS**: Nessuna regressione nel test suite completo
+- **Domain extraction validation**: 5/5 test PASS su pipeline di estrazione (FAST: 3 domini, SLOW: 2 domini con hard cap)
+- **Architecture validation**: 4-tuple returns validati, hard caps verificati (4 URL, 2 domini), CDN filtering confermato
+
+### Impatto
+- Architettura di reputazione ora completa e coerente: tutti i 19 servizi ricevono input service-specific corretto
+- Eliminato code duplication: domini non più re-estratti internamente a _build_flat_tasks()
+- Miglioramento di efficienza: estrazione domains una sola volta, utilizzo intelligente quota expensive services
+
+---
+
 ## [0.14.5] — 2026-05-21
 
 ### Corretto
