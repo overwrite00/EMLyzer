@@ -476,6 +476,26 @@ def _check_homoglyphs(body_text: str, result: BodyAnalysisResult):
     """
     Rileva caratteri Unicode omoglifi (cirillico/greco) visivamente identici
     a caratteri latini — tecnica usata per spoofing visivo nei link e nel testo.
+
+    Omoglifi: caratteri da alfabeti diversi che hanno forma IDENTICA ma codice Unicode
+    diverso:
+    - Cirillico 'а' (U+0430) vs Latino 'a' (U+0061) — indistinguibili a occhio
+    - Cirillico 'е' (U+0435) vs Latino 'e' (U+0065)
+    - Greco 'ο' (U+03BF) vs Latino 'o' (U+006F)
+
+    Attacco: `рауpal.com` (prima lettera cirillica) visualizza come "paypal.com"
+    ma risolve a host diverso. Browser moderni mostrano indicatori, ma email
+    ricchi di testo normalizzato non beneficiano di questi avvisi.
+
+    Parametri di rilevamento:
+    - n >= 3 occorrenze → severity HIGH (tentativo deliberato)
+    - n == 1-2 → severity LOW (potrebbe essere errore ortografico, lingua mista)
+    - Sample: mostra fino a 10 caratteri unici trovati (per debugging)
+
+    Edge cases gestiti:
+    - Testo multilingua (cirillico legittimo): falso positivo potenziale
+    - URL codificato (punycode): omoglifi già normalizzati, non rilevati
+    - Email scritte da utenti russi/greci: falso positivo (normale)
     """
     if not body_text:
         return
@@ -498,8 +518,30 @@ def _check_homoglyphs(body_text: str, result: BodyAnalysisResult):
 def _check_languagetool(body_text: str, result: BodyAnalysisResult):
     """
     Verifica errori grammaticali via LanguageTool (opzionale).
-    Abilitato solo se LANGUAGETOOL_API_URL è configurato in .env.
-    ≥5 errori → finding MEDIUM (possibile testo tradotto automaticamente).
+
+    Rilevamento testo sospetto tramite analisi grammaticale:
+    - Email scritte da attaccanti non-native speaker
+    - Testo tradotto automaticamente (Google Translate, DeepL con settori errori)
+    - Contenuto generato da template phishing non-verificato
+
+    Configurazione:
+    - Abilitato solo se LANGUAGETOOL_API_URL è configurato in .env (es. http://localhost:8081)
+    - Se non configurato: check saltato silenziosamente (non è critico)
+    - LanguageTool è servizio remoto opzionale — timeout/errori non bloccano analisi
+
+    Parametri:
+    - ≥5 errori → finding MEDIUM (linguaggio anomalo, probabilmente phishing)
+    - <5 errori → no finding (rumore tollerato per email imperfette)
+    - text[:5000] limitato a 5000 char per performance
+    - timeout 5s per singola richiesta HTTP
+
+    Edge cases gestiti:
+    - URL non configurato → skip silenzioso (log WARNING)
+    - Timeout di connessione → skip silenzioso + log
+    - Servizio offline (status != 200) → skip silenzioso
+    - JSON malformato → exception capito, skip silenzioso
+    - Testo in lingua non supportata → LanguageTool ignora, ritorna 0 errori
+    - Falsi positivi: email scritte male (non native speaker) ma legittime
     """
     from utils.config import settings
     url = settings.LANGUAGETOOL_API_URL.strip()
