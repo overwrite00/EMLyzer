@@ -1124,10 +1124,17 @@ def _check_pulsedive(entity: str, entity_type: str) -> ReputationResult:
             source="Pulsedive", entity=entity, entity_type=entity_type,
             error=f"Pulsedive HTTP {e.response.status_code if e.response is not None else '?'}",
         )
-    except Exception as exc:
+    except (requests.ConnectionError, requests.Timeout) as exc:
+        # Pulsedive connectivity issue — mark as skipped with helpful message
         return ReputationResult(
             source="Pulsedive", entity=entity, entity_type=entity_type,
-            error=f"Pulsedive: {type(exc).__name__}",
+            skipped=True, skip_reason=f"Pulsedive indisponibile (connessione fallita). Quota free: 10 req/giorno — verifica su pulsedive.com/dashboard",
+        )
+    except Exception as exc:
+        # Other errors
+        return ReputationResult(
+            source="Pulsedive", entity=entity, entity_type=entity_type,
+            skipped=True, skip_reason=f"Pulsedive errore: {type(exc).__name__}",
         )
 
 
