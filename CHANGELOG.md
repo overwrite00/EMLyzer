@@ -24,7 +24,7 @@ Le funzionalità sono ordinate per priorità di implementazione.
 
 ## [0.14.8] — 2026-05-21
 
-### Risolto — Code Cleanup & Production Stability (PHASE 1 + PHASE 2)
+### Risolto — Code Cleanup & Production Stability (PHASE 1 + PHASE 2 + PHASE 3)
 
 **PHASE 1: 4 Critical Bugs (ALTA)**
 - **Transaction Race Condition** (analysis.py:239-243)
@@ -69,12 +69,45 @@ Le funzionalità sono ordinate per priorità di implementazione.
 - ✅ **Syntax verified** — Tutti file modificati compilano senza errori
 - ✅ **Performance** — bulk_delete O(1), pattern matching -40 linee
 
+**PHASE 3: 6 Code Quality Documentation Issues (BASSA)**
+- **Reporting module docstrings** (docx_reporter.py)
+  - `_add_heading()`: explain alignment + usage
+  - `_add_kv()`: explain key-value formatting with font size consistency
+  - `_add_finding_row()`: severity color-coding + evidence display
+  - `generate_report()`: comprehensive 8-section report structure documentation
+
+- **URL analyzer edge cases** (url_analyzer.py)
+  - `_parse_url()`: document malformed URL handling, relative path fallback
+  - Constants: explain why specific timeout values (DNS 5s, WHOIS 8s)
+  - Workers/batch timeout: rationale for parallelization strategy
+
+- **Attachment analysis security** (attachment_analyzer.py)
+  - `_check_double_extension()`: explain invoice.pdf.exe spoofing technique
+  - `_analyze_office_ole()`: VBA signature scanning, best-effort limitation
+  - `_analyze_ooxml()`: ZIP bomb prevention, vbaProject.bin detection
+  - `_analyze_pdf()`: JavaScript/stream detection, 2MB limit rationale, false positives
+
+- **Body analysis patterns** (body_analyzer.py)
+  - `_check_homoglyphs()`: Cyrillic/Greek homoglyph spoofing technique explained
+  - `_check_languagetool()`: optional integration, timeout handling, edge cases
+
+- **Campaign clustering algorithm** (campaign_detector.py)
+  - `_normalize_subject()`: explain normalization steps, reply prefix removal
+  - `_subject_tokens()`: stopwords rationale (EN+IT), token filtering
+  - `_jaccard()`: similarity coefficient formula, threshold interpretation
+
+- **Email routing analysis** (header_analyzer.py)
+  - `_extract_ip_from_received()`: explain 5 regex groups (IPv4/IPv6 variants)
+  - `_parse_received_chain()`: RFC 5321 hop ordering explanation, attack detection
+
 ### Impatto
-- Eliminati 8 problemi critici e ad alto impatto
-- Migliorata production stability
+- Eliminati 14 problemi critici, ad alto impatto e di qualità
+- Migliorata production stability e manutenibilità
 - Ridotta complessità algoritmica e code duplication
 - Database transactions ora atomic
 - Chiarezza negli error message su startup
+- Documentazione completa di edge case e rationale algoritmica
+- Migliorata comprensione delle tecniche di phishing detection
 
 ---
 
