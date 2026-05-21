@@ -647,7 +647,7 @@ def check_domain_crtsh(domain: str) -> ReputationResult:
     Utile per capire l'età reale del sito e i suoi sottodomini.
     502/503/504 sono errori temporanei di crt.sh — non vengono mostrati come errori bloccanti.
     """
-    r = ReputationResult(source="crt.sh", entity=domain, entity_type="url", queried=True)
+    r = ReputationResult(source="crt.sh", entity=domain, entity_type="domain", queried=True)
 
     try:
         # _http_get_with_retry gestisce 429 (con Retry-After), 502/503/504 (retry 2x)
@@ -1790,6 +1790,7 @@ class ReputationSummary:
     ip_results:       list[ReputationResult] = field(default_factory=list)
     url_results:      list[ReputationResult] = field(default_factory=list)
     hash_results:     list[ReputationResult] = field(default_factory=list)
+    domain_results:   list[ReputationResult] = field(default_factory=list)
     service_registry: list[dict]             = field(default_factory=list)
     malicious_count:  int   = 0
     reputation_score: float = 0.0
@@ -1980,18 +1981,18 @@ def _build_flat_tasks(
         except ValueError:
             domain = host.lstrip("www.")
             if domain:
-                _c(check_domain_crtsh, domain, "url")
+                _c(check_domain_crtsh, domain, "domain")
                 if settings.CIRCL_API_KEY:
-                    _c(check_domain_circl_pdns, domain, "url")
+                    _c(check_domain_circl_pdns, domain, "domain")
                 _c(check_url_urlscan, url, "url")
                 if settings.PULSEDIVE_API_KEY:
                     _c(check_url_pulsedive, url, "url")
                 else:
                     _s("Pulsedive", url, "url", "PULSEDIVE_API_KEY non configurata — registrati su pulsedive.com")
                 if settings.SECURITYTRAILS_API_KEY:
-                    _c(check_domain_securitytrails, domain, "url")
+                    _c(check_domain_securitytrails, domain, "domain")
                 else:
-                    _s("SecurityTrails", url, "url", "SECURITYTRAILS_API_KEY non configurata — registrati su securitytrails.com")
+                    _s("SecurityTrails", domain, "domain", "SECURITYTRAILS_API_KEY non configurata — registrati su securitytrails.com")
         except Exception:
             pass
 
@@ -2055,6 +2056,8 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
             summary.ip_results.append(r)
         elif r.entity_type == "url":
             summary.url_results.append(r)
+        elif r.entity_type == "domain":
+            summary.domain_results.append(r)
         else:
             summary.hash_results.append(r)
 
@@ -2092,6 +2095,8 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
                     summary.ip_results.append(r)
                 elif kind == "url":
                     summary.url_results.append(r)
+                elif kind == "domain":
+                    summary.domain_results.append(r)
                 else:
                     summary.hash_results.append(r)
 
@@ -2106,12 +2111,14 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
                     summary.ip_results.append(r)
                 elif kind == "url":
                     summary.url_results.append(r)
+                elif kind == "domain":
+                    summary.domain_results.append(r)
                 else:
                     summary.hash_results.append(r)
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
 
-    all_results = summary.ip_results + summary.url_results + summary.hash_results
+    all_results = summary.ip_results + summary.url_results + summary.hash_results + summary.domain_results
     summary.service_registry = _build_service_registry(all_results)
 
     malicious = [r for r in all_results if r.is_malicious and not r.skipped and not r.error]
@@ -2150,9 +2157,10 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str], domains:
 
     summary = ReputationSummary()
     for r in skip_results + slow_skips:
-        if r.entity_type == "ip":    summary.ip_results.append(r)
-        elif r.entity_type == "url": summary.url_results.append(r)
-        else:                        summary.hash_results.append(r)
+        if r.entity_type == "ip":      summary.ip_results.append(r)
+        elif r.entity_type == "url":   summary.url_results.append(r)
+        elif r.entity_type == "domain": summary.domain_results.append(r)
+        else:                          summary.hash_results.append(r)
 
     if fast_calls:
         n_workers = min(len(fast_calls), 16)
@@ -2173,23 +2181,25 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str], domains:
                 except Exception as e:
                     r = ReputationResult(source=fn_name, entity=entity,
                                          entity_type=kind, error=f"Errore: {e}")
-                if kind == "ip":    summary.ip_results.append(r)
-                elif kind == "url": summary.url_results.append(r)
-                else:               summary.hash_results.append(r)
+                if kind == "ip":      summary.ip_results.append(r)
+                elif kind == "url":   summary.url_results.append(r)
+                elif kind == "domain": summary.domain_results.append(r)
+                else:                 summary.hash_results.append(r)
             for future in not_done:
                 future.cancel()
                 kind, entity, fn_name = future_map[future]
                 r = ReputationResult(source=fn_name, entity=entity,
                                      entity_type=kind, error="Timeout")
-                if kind == "ip":    summary.ip_results.append(r)
-                elif kind == "url": summary.url_results.append(r)
-                else:               summary.hash_results.append(r)
+                if kind == "ip":      summary.ip_results.append(r)
+                elif kind == "url":   summary.url_results.append(r)
+                elif kind == "domain": summary.domain_results.append(r)
+                else:                 summary.hash_results.append(r)
         finally:
             # shutdown(wait=False, cancel_futures=True): non blocca
             # threading._shutdown() alla chiusura → nessun KeyboardInterrupt su CTRL+C
             pool.shutdown(wait=False, cancel_futures=True)
 
-    all_results = summary.ip_results + summary.url_results + summary.hash_results
+    all_results = summary.ip_results + summary.url_results + summary.hash_results + summary.domain_results
     summary.service_registry = _build_service_registry(all_results)
     malicious = [r for r in all_results if r.is_malicious and not r.skipped and not r.error]
     summary.malicious_count = len(malicious)
@@ -2207,12 +2217,12 @@ def finalize_fast_only(summary: "ReputationSummary") -> "ReputationSummary":
     Ricalcola service_registry dopo la pulizia: i servizi SLOW appaiono
     come 'not_applicable' anziché 'pending'.
     """
-    for lst in (summary.ip_results, summary.url_results, summary.hash_results):
+    for lst in (summary.ip_results, summary.url_results, summary.hash_results, summary.domain_results):
         to_remove = [r for r in lst if r.skipped
                      and "in elaborazione" in (r.skip_reason or "")]
         for r in to_remove:
             lst.remove(r)
-    all_results = summary.ip_results + summary.url_results + summary.hash_results
+    all_results = summary.ip_results + summary.url_results + summary.hash_results + summary.domain_results
     summary.service_registry = _build_service_registry(all_results)
     return summary
 
@@ -2256,26 +2266,27 @@ def run_slow_checks(ips: list[str], urls: list[str], hashes: list[str],
             except Exception as e:
                 r = ReputationResult(source=fn_name, entity=entity,
                                      entity_type=kind, error=f"Errore: {e}")
-            if kind == "ip":    existing.ip_results.append(r)
-            elif kind == "url": existing.url_results.append(r)
-            else:               existing.hash_results.append(r)
+            if kind == "ip":      existing.ip_results.append(r)
+            elif kind == "url":   existing.url_results.append(r)
+            elif kind == "domain": existing.domain_results.append(r)
+            else:                 existing.hash_results.append(r)
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 
     # Ricalcola registry e score dopo merge
-    all_results = existing.ip_results + existing.url_results + existing.hash_results
+    all_results = existing.ip_results + existing.url_results + existing.hash_results + existing.domain_results
     # Rimuovi i placeholder "in elaborazione" per i servizi ora completati
     # Usa _FN_TO_SOURCE per i nomi corretti (stessa mappa usata per crearli)
     slow_names = {_FN_TO_SOURCE.get(fn.__name__, fn.__name__)
                   for fn, _, _ in slow_calls}
-    for lst in (existing.ip_results, existing.url_results, existing.hash_results):
+    for lst in (existing.ip_results, existing.url_results, existing.hash_results, existing.domain_results):
         to_remove = [r for r in lst if r.skipped
                      and r.source in slow_names
                      and "in elaborazione" in (r.skip_reason or "")]
         for r in to_remove:
             lst.remove(r)
 
-    all_results = existing.ip_results + existing.url_results + existing.hash_results
+    all_results = existing.ip_results + existing.url_results + existing.hash_results + existing.domain_results
     existing.service_registry = _build_service_registry(all_results)
     malicious = [r for r in all_results if r.is_malicious and not r.skipped and not r.error]
     existing.malicious_count = len(malicious)

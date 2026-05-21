@@ -664,6 +664,7 @@ def _dict_to_summary(d: dict) -> ReputationSummary:
         ip_results=  [to_result(r) for r in d.get("ip_results", [])],
         url_results= [to_result(r) for r in d.get("url_results", [])],
         hash_results=[to_result(r) for r in d.get("hash_results", [])],
+        domain_results=[to_result(r) for r in d.get("domain_results", [])],
         service_registry=d.get("service_registry", []),
         malicious_count=d.get("malicious_count", 0),
         reputation_score=d.get("reputation_score", 0.0),
