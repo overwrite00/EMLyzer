@@ -15,7 +15,6 @@ import re
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +63,24 @@ class CampaignReport:
 # ---------------------------------------------------------------------------
 
 def _normalize_subject(subject: str) -> str:
-    """Normalizza il subject rimuovendo prefissi comuni e punteggiatura."""
+    """
+    Normalizza il subject rimuovendo prefissi comuni e punteggiatura.
+
+    Passaggi:
+    1. Lowercase + strip spazi
+    2. Rimuovi prefissi reply: "re:", "fwd:", "fw:", "inoltro:" (italiano/inglese)
+    3. Rimuovi punteggiatura non-word (mantieni spazi e alphanumerici)
+    4. Schiaccia spazi multipli a singolo spazio
+
+    Esempio:
+    - "Re: Urgent Action Required!!! " → "urgent action required"
+    - "FWD: Your Account™ Needs Update" → "your account needs update"
+
+    Edge cases:
+    - Soggetto vuoto → ritorna ""
+    - Solo punteggiatura → ritorna ""
+    - Prefix ripetuti "Re: Re:" → rimossi solo il primo (legacy email)
+    """
     if not subject:
         return ""
     s = re.sub(r'^(re|fwd?|fw|inoltro|risposta|r):\s*', '', subject.lower().strip(),
@@ -75,7 +91,30 @@ def _normalize_subject(subject: str) -> str:
 
 
 def _subject_tokens(subject: str) -> set[str]:
-    """Tokenizza il subject in parole significative (min 3 caratteri)."""
+    """
+    Tokenizza il subject in parole significative (min 3 caratteri).
+
+    Processamento:
+    1. Normalizza subject (vedi _normalize_subject)
+    2. Split su spazi → token list
+    3. Filtra: token length >= 3 AND non in stopwords (filler words)
+    4. Ritorna set (deduplica)
+
+    Stopwords (EN + IT):
+    - Articoli: the, del, della, una
+    - Congiunzioni: and, con
+    - Pronomi: you, your, his
+    - Verbi comuni: have, has
+    - Preposizioni: per, in (nel), from
+    - Dimostrativi: this, that
+
+    Esempio:
+    - "Your account needs verification" → {'account', 'needs', 'verification'}
+    - "Your account" → set() (tutti stopwords)
+    - "Re: UrgentAction" → {'urgentaction'} (normalized per minuscole)
+
+    Nota: set ritorna deduplica, quindi "verify verify" → {'verify'}
+    """
     stopwords = {'the', 'and', 'for', 'you', 'your', 'our', 'this',
                  'that', 'with', 'from', 'have', 'has', 'per', 'con',
                  'del', 'della', 'che', 'una', 'suo', 'nel', 'dei'}
@@ -84,7 +123,27 @@ def _subject_tokens(subject: str) -> set[str]:
 
 
 def _jaccard(set_a: set, set_b: set) -> float:
-    """Coefficiente di Jaccard tra due insiemi."""
+    """
+    Coefficiente di Jaccard (J) tra due insiemi — misura somiglianza.
+
+    Formula:
+        J(A, B) = |A ∩ B| / |A ∪ B|
+
+    Significato:
+    - J = 1.0: insiemi identici ("account" vs "account" → 100%)
+    - J = 0.5: metà elementi in comune ("account action" vs "account verify" → 50%)
+    - J = 0.0: nessun elemento in comune (set disgiunti)
+
+    Utilizzo in clustering:
+    - threshold=0.6 (60%): richiedere almeno 60% token matching
+    - email con subject simile ma non identico vengono raggruppati
+    - esempio: "Verify Your Account" (3 token) vs "Account Needs Verify" (3 token)
+      → intersezione {"account", "verify"} = 2, unione = 4 → J = 2/4 = 0.5 (non cluster)
+
+    Edge cases gestiti:
+    - set_a o set_b vuoti → ritorna 0.0 (nessun match possibile)
+    - unione vuota (entrambi vuoti) → ritorna 0.0 (defensive)
+    """
     if not set_a or not set_b:
         return 0.0
     intersection = len(set_a & set_b)
@@ -127,10 +186,42 @@ def detect_campaigns(emails: list[EmailSummary],
                      subject_threshold: float = 0.6,
                      min_cluster_size: int = 2) -> CampaignReport:
     """
-    Analizza una lista di email e raggruppa quelle simili in cluster/campagne.
+    Rileva campagne phishing/spam raggruppando email simili con più strategie.
 
-    subject_threshold: similarità Jaccard minima per raggruppare (0.0–1.0)
-    min_cluster_size: numero minimo di email per formare un cluster
+    Strategie di clustering (in ordine di priorità):
+    1. Body hash deduplication: email identici hanno stesso corpo hash
+    2. Subject Jaccard similarity: soggetti simili (es. "Your account..." vs "Your email...")
+       O(n²) algorithm — performance: ~2-3s per 1k email, ~30-60s per 5k, >10k può timeout
+    3. Message-ID pattern: email dello stesso mittente con pattern ID (es. @example.com)
+    4. Campaign-ID: X-Campaign-ID header identico (tracker esplicito)
+    5. Sender domain: stesso dominio mittente
+
+    Parametri:
+    - subject_threshold: similarità Jaccard minima (0.6 = 60% token matching)
+      Valori comuni:
+      - 0.5: molto permissive, molti falsi positivi
+      - 0.6-0.7: equilibrio (consigliato)
+      - 0.8+: molto restrittivo, perdi campagne simili
+    - min_cluster_size: minimo email per formare un cluster valido (tipico: 2-3)
+
+    Output:
+    - clusters: lista campagne rilevate con emails, tipo, similarità
+    - isolated_emails: email non associate a nessuna campagna
+    - high_risk_clusters: campagne prioritarie (phishing/spam confirmed)
+    - campaign_stats: statistiche aggregate
+
+    Returns:
+        CampaignReport con tutti i cluster, stats e email isolate
+
+    Args:
+        emails: Lista EmailSummary da analizzare
+        subject_threshold: Jaccard similarity threshold (0.0-1.0, default 0.6)
+        min_cluster_size: Minimum emails to form valid cluster (default 2)
+
+    Performance Notes:
+    - O(n²) subject clustering: use selectively on <5k emails
+    - Consider pre-filtering by date range or risk_score to reduce dataset
+    - Background task recommended for large batches
     """
     report = CampaignReport(total_emails_analyzed=len(emails))
     if len(emails) < min_cluster_size:
@@ -205,7 +296,20 @@ def detect_campaigns(emails: list[EmailSummary],
                 ))
 
     # ── 4. Clustering per subject simile (Jaccard) ────────────────────────────
+    # PERFORMANCE NOTE: O(n²) algorithm — pairwise comparison of all emails
+    # For ~1000 emails: ~1M comparisons (~2-3s)
+    # For ~5000 emails: ~25M comparisons (~30-60s)
+    # For >10000 emails: may timeout or cause performance degradation
+    # Future optimization: use locality-sensitive hashing (MinHash) for O(n log n)
     email_tokens = [(e, _subject_tokens(e.subject)) for e in emails if e.subject]
+
+    if len(email_tokens) > 10000:
+        _logger.warning(
+            "Large email set for Jaccard clustering: %d emails. Performance may degrade. "
+            "Consider filtering by date range or processing in batches.",
+            len(email_tokens)
+        )
+
     visited = set()
 
     for i, (email_i, tokens_i) in enumerate(email_tokens):

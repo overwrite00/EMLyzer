@@ -78,6 +78,13 @@ async def analyze_manual(payload: ManualInput):
     _do_whois = payload.do_whois
 
     def _pipeline():
+        """
+        Esegue la full analysis pipeline per un'email da sorgente incollato.
+
+        Sequenza: parse → analyze_headers → analyze_body → analyze_urls → analyze_attachments → compute_risk_score
+
+        Returns: 6-tuple (parsed, header_result, body_result, url_result, attachment_result, risk_score)
+        """
         _parsed            = parse_email_file(raw, payload.filename)
         _header_result     = analyze_headers(_parsed)
         _body_result       = analyze_body(_parsed)

@@ -13,7 +13,7 @@ import re
 import html
 import urllib.parse
 import concurrent.futures
-import logging as _logging
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
@@ -23,29 +23,45 @@ import dns.resolver
 import dns.exception
 from utils.i18n import t
 
-_logger = _logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
-# URL shortener noti (stesso set usato in body_analyzer)
+# URL shortener noti (stesso set usato in body_analyzer).
+# Rilevamento shortener è indicatore di URL offuscato → rischio MEDIUM.
 URL_SHORTENER_DOMAINS = {
     "bit.ly", "tinyurl.com", "t.co", "ow.ly", "is.gd", "buff.ly",
     "rebrand.ly", "short.io", "cutt.ly", "tiny.cc", "rb.gy", "goo.gl",
 }
 
-# Regex per rilevare indirizzi IP diretti come host
+# Regex per rilevare indirizzi IP diretti come host.
+# Formato: 4 ottetti decimali 0-255 separati da punti (senza porta nel match).
+# IP diretto in href è HIGH risk: mostra tentativo evasione filtering DNS/dominio.
 IP_HOST_RE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
 
-# Punycode / IDN
+# Punycode / IDN (Internationalized Domain Names).
+# Formato: xn-- prefix → valore Unicode nascosto in ASCII.
+# Rilevamento: HIGH risk (omoglifi Unicode usati per spoofing).
 PUNYCODE_RE = re.compile(r"xn--", re.IGNORECASE)
 
-# Timeout operazioni di rete (secondi)
-DNS_TIMEOUT   = 5.0   # per singola query DNS (dnspython, per-resolver)
-WHOIS_TIMEOUT = 8.0   # wall-clock per singola query WHOIS (via executor)
+# Timeout operazioni di rete (secondi).
+# DNS_TIMEOUT = 5s: timeout per singola query DNS (dnspython, per-resolver).
+#   Ricerca per hostname singolo + port; su Linux può rallentare se nameserver non risponde.
+#   5s è bilanciamento tra coverage e latenza per endpoint /api/analysis.
+# WHOIS_TIMEOUT = 8s: wall-clock per singola query WHOIS (via ThreadPoolExecutor).
+#   WHOIS può contattare molti server remoti; timeout garantisce fail-fast se lento.
+DNS_TIMEOUT   = 5.0
+WHOIS_TIMEOUT = 8.0
 
-# Worker paralleli per l'analisi URL
+# Worker paralleli per l'analisi URL (ThreadPoolExecutor).
+# URL_WORKERS = 8: bilanciamento tra velocità (pochi worker = lento) e file descriptor
+#   (molti worker = molte connessioni TCP aperte in parallelo).
+# Default: min(workers=8, task_size) → per 2 URL usa 2 worker; per 50+ usa 8.
 URL_WORKERS = 8
 
-# Timeout totale (secondi) per l'intera analisi URL batch
+# Timeout totale (secondi) per l'intera analisi URL batch.
+# URL_BATCH_TIMEOUT = 55: valore conservativo per /api/analysis route (timeout 50s).
+#   Lascia 5s di margine per header/body/attachment/reputation checks.
+#   Con 8 worker in parallelo: 55s / 8 worker = ~7s per URL nel caso peggiore.
 URL_BATCH_TIMEOUT = 55
 
 
@@ -80,7 +96,17 @@ class URLAnalysisResult:
 
 
 def _parse_url(url: str) -> tuple[str, str, str, str]:
-    """Ritorna (scheme, host, path, query)."""
+    """
+    Esegue il parsing di un URL ritornando componenti principali.
+
+    Ritorna (scheme, host, path, query).
+
+    Edge cases gestiti:
+    - URL malformato → restituisce ("", url_integrale, "", "")
+    - URL senza host (relativo) → usa parsed.path come host
+    - Scheme non presente → scheme = ""
+    - Query string → estratta automaticamente
+    """
     try:
         parsed = urllib.parse.urlparse(url)
         return parsed.scheme, parsed.netloc or parsed.path, parsed.path, parsed.query
@@ -119,14 +145,14 @@ def _whois_age_blocking(domain: str) -> tuple[Optional[datetime], Optional[int],
     Funzione bloccante — deve essere sempre chiamata tramite _whois_age()
     che la avvolge in un executor con timeout wall-clock garantito.
     """
-    import logging as _logging
+    import logging
     import whois  # import lazy per performance
-    _whois_logger       = _logging.getLogger("whois")
-    _whois_whois_logger = _logging.getLogger("whois.whois")
+    _whois_logger       = logging.getLogger("whois")
+    _whois_whois_logger = logging.getLogger("whois.whois")
     _prev_level  = _whois_logger.level
     _prev_level2 = _whois_whois_logger.level
-    _whois_logger.setLevel(_logging.CRITICAL)
-    _whois_whois_logger.setLevel(_logging.CRITICAL)
+    _whois_logger.setLevel(logging.CRITICAL)
+    _whois_whois_logger.setLevel(logging.CRITICAL)
     try:
         w = whois.whois(domain)
         creation = w.creation_date
