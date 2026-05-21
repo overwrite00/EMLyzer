@@ -36,7 +36,7 @@ URGENCY_PATTERNS = [
     r"\bbloccato\b", r"\blimitato\b", r"\brestritto\b",
     r"\battivit[aà]\s+(?:inusuale|sospetta|anomala|strana)\b",
     # Portoghese — espanso
-    r"\bexpirando\b", r"\bexpira\b", r"\bimediato\b", r"\bimediatamente\b",
+    r"\bexpirando\b", r"\bexpira[m]?\b", r"\bimediato\b", r"\bimediatamente\b",
     r"\bverificar.*conta", r"\bconfirme.*identidade", r"\bacesso.*bloqueado\b",
     r"\bclique.*agora\b",
     # Portoghese — aggiunti
@@ -48,6 +48,7 @@ URGENCY_PATTERNS = [
     r"\bconfirme\s+(?:sua|seu|seus|sua)\s+(?:conta|email|e-mail|identidade)\b",
     r"\bprazo\s+final\b", r"\blimite.*tempo\b",
     r"\bsuspen[dç][ãa]o?\b",
+    r"\bhoje\b",  # "hoje" (today) — urgency indicator in Portuguese
 ]
 
 PHISHING_CTAS = [
