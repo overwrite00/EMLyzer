@@ -13,7 +13,6 @@ import email.header
 import email.policy
 from email import message_from_bytes
 from pathlib import Path
-from typing import Optional
 from dataclasses import dataclass, field
 
 import filetype

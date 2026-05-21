@@ -12,7 +12,6 @@ Analisi degli header email:
 import re
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
 
 from core.analysis.email_parser import ParsedEmail
 from utils.i18n import t

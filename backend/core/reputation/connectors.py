@@ -2062,7 +2062,7 @@ def _build_flat_tasks(
             _s("ThreatFox", ip, "ip", "ABUSECH_API_KEY non configurata — registrati su auth.abuse.ch")
 
     # ── URL ─────────────────────────────────────────────────────────────────
-    for url in urls[:20]:
+    for url in urls[:20]:  # Cap at 20 to avoid overwhelming requests for spam emails with many URLs
         _c(check_url_openphish, url, "url")
         if settings.ABUSECH_API_KEY:
             _c(check_url_urlhaus,   url, "url")
@@ -2109,7 +2109,7 @@ def _build_flat_tasks(
             pass
 
     # ── Hash ────────────────────────────────────────────────────────────────
-    for h in hashes[:10]:
+    for h in hashes[:10]:  # Cap at 10 to avoid excessive hash checking on emails with many attachments
         if settings.ABUSECH_API_KEY:
             _c(check_hash_threatfox, h, "hash")
         else:
