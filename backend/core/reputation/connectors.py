@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT      = 8    # servizi di sicurezza (AbuseIPDB, VirusTotal, ecc.)
 REQUEST_TIMEOUT_ASN  = 4    # ASN lookup
-REQUEST_TIMEOUT_INFO = 5    # servizi informativi (crt.sh, redirect chain)
+REQUEST_TIMEOUT_INFO = 8    # servizi informativi (crt.sh, redirect chain) — crt.sh può essere molto lento
 REQUEST_TIMEOUT_PULSEDIVE = 15  # Pulsedive può essere lento (free tier: 10 req/day, rate limit aggressivo)
 
 # ---------------------------------------------------------------------------
