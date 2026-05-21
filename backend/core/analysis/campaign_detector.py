@@ -64,7 +64,24 @@ class CampaignReport:
 # ---------------------------------------------------------------------------
 
 def _normalize_subject(subject: str) -> str:
-    """Normalizza il subject rimuovendo prefissi comuni e punteggiatura."""
+    """
+    Normalizza il subject rimuovendo prefissi comuni e punteggiatura.
+
+    Passaggi:
+    1. Lowercase + strip spazi
+    2. Rimuovi prefissi reply: "re:", "fwd:", "fw:", "inoltro:" (italiano/inglese)
+    3. Rimuovi punteggiatura non-word (mantieni spazi e alphanumerici)
+    4. Schiaccia spazi multipli a singolo spazio
+
+    Esempio:
+    - "Re: Urgent Action Required!!! " → "urgent action required"
+    - "FWD: Your Account™ Needs Update" → "your account needs update"
+
+    Edge cases:
+    - Soggetto vuoto → ritorna ""
+    - Solo punteggiatura → ritorna ""
+    - Prefix ripetuti "Re: Re:" → rimossi solo il primo (legacy email)
+    """
     if not subject:
         return ""
     s = re.sub(r'^(re|fwd?|fw|inoltro|risposta|r):\s*', '', subject.lower().strip(),
@@ -75,7 +92,30 @@ def _normalize_subject(subject: str) -> str:
 
 
 def _subject_tokens(subject: str) -> set[str]:
-    """Tokenizza il subject in parole significative (min 3 caratteri)."""
+    """
+    Tokenizza il subject in parole significative (min 3 caratteri).
+
+    Processamento:
+    1. Normalizza subject (vedi _normalize_subject)
+    2. Split su spazi → token list
+    3. Filtra: token length >= 3 AND non in stopwords (filler words)
+    4. Ritorna set (deduplica)
+
+    Stopwords (EN + IT):
+    - Articoli: the, del, della, una
+    - Congiunzioni: and, con
+    - Pronomi: you, your, his
+    - Verbi comuni: have, has
+    - Preposizioni: per, in (nel), from
+    - Dimostrativi: this, that
+
+    Esempio:
+    - "Your account needs verification" → {'account', 'needs', 'verification'}
+    - "Your account" → set() (tutti stopwords)
+    - "Re: UrgentAction" → {'urgentaction'} (normalized per minuscole)
+
+    Nota: set ritorna deduplica, quindi "verify verify" → {'verify'}
+    """
     stopwords = {'the', 'and', 'for', 'you', 'your', 'our', 'this',
                  'that', 'with', 'from', 'have', 'has', 'per', 'con',
                  'del', 'della', 'che', 'una', 'suo', 'nel', 'dei'}
@@ -84,7 +124,27 @@ def _subject_tokens(subject: str) -> set[str]:
 
 
 def _jaccard(set_a: set, set_b: set) -> float:
-    """Coefficiente di Jaccard tra due insiemi."""
+    """
+    Coefficiente di Jaccard (J) tra due insiemi — misura somiglianza.
+
+    Formula:
+        J(A, B) = |A ∩ B| / |A ∪ B|
+
+    Significato:
+    - J = 1.0: insiemi identici ("account" vs "account" → 100%)
+    - J = 0.5: metà elementi in comune ("account action" vs "account verify" → 50%)
+    - J = 0.0: nessun elemento in comune (set disgiunti)
+
+    Utilizzo in clustering:
+    - threshold=0.6 (60%): richiedere almeno 60% token matching
+    - email con subject simile ma non identico vengono raggruppati
+    - esempio: "Verify Your Account" (3 token) vs "Account Needs Verify" (3 token)
+      → intersezione {"account", "verify"} = 2, unione = 4 → J = 2/4 = 0.5 (non cluster)
+
+    Edge cases gestiti:
+    - set_a o set_b vuoti → ritorna 0.0 (nessun match possibile)
+    - unione vuota (entrambi vuoti) → ritorna 0.0 (defensive)
+    """
     if not set_a or not set_b:
         return 0.0
     intersection = len(set_a & set_b)
