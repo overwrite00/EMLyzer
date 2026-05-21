@@ -127,10 +127,42 @@ def detect_campaigns(emails: list[EmailSummary],
                      subject_threshold: float = 0.6,
                      min_cluster_size: int = 2) -> CampaignReport:
     """
-    Analizza una lista di email e raggruppa quelle simili in cluster/campagne.
+    Rileva campagne phishing/spam raggruppando email simili con più strategie.
 
-    subject_threshold: similarità Jaccard minima per raggruppare (0.0–1.0)
-    min_cluster_size: numero minimo di email per formare un cluster
+    Strategie di clustering (in ordine di priorità):
+    1. Body hash deduplication: email identici hanno stesso corpo hash
+    2. Subject Jaccard similarity: soggetti simili (es. "Your account..." vs "Your email...")
+       O(n²) algorithm — performance: ~2-3s per 1k email, ~30-60s per 5k, >10k può timeout
+    3. Message-ID pattern: email dello stesso mittente con pattern ID (es. @example.com)
+    4. Campaign-ID: X-Campaign-ID header identico (tracker esplicito)
+    5. Sender domain: stesso dominio mittente
+
+    Parametri:
+    - subject_threshold: similarità Jaccard minima (0.6 = 60% token matching)
+      Valori comuni:
+      - 0.5: molto permissive, molti falsi positivi
+      - 0.6-0.7: equilibrio (consigliato)
+      - 0.8+: molto restrittivo, perdi campagne simili
+    - min_cluster_size: minimo email per formare un cluster valido (tipico: 2-3)
+
+    Output:
+    - clusters: lista campagne rilevate con emails, tipo, similarità
+    - isolated_emails: email non associate a nessuna campagna
+    - high_risk_clusters: campagne prioritarie (phishing/spam confirmed)
+    - campaign_stats: statistiche aggregate
+
+    Returns:
+        CampaignReport con tutti i cluster, stats e email isolate
+
+    Args:
+        emails: Lista EmailSummary da analizzare
+        subject_threshold: Jaccard similarity threshold (0.0-1.0, default 0.6)
+        min_cluster_size: Minimum emails to form valid cluster (default 2)
+
+    Performance Notes:
+    - O(n²) subject clustering: use selectively on <5k emails
+    - Consider pre-filtering by date range or risk_score to reduce dataset
+    - Background task recommended for large batches
     """
     report = CampaignReport(total_emails_analyzed=len(emails))
     if len(emails) < min_cluster_size:
