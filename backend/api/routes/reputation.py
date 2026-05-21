@@ -24,6 +24,7 @@ import re
 import asyncio
 import ipaddress
 import threading
+import logging as _logging
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,6 +41,7 @@ from dataclasses import asdict
 import json
 
 router = APIRouter()
+_logger = _logging.getLogger(__name__)
 
 
 def _is_public_ip(ip_str: str) -> bool:
@@ -228,6 +230,15 @@ async def run_reputation_fast(
 
     ips, urls, hashes = _extract_indicators(record)
 
+    # DEBUG LOGGING: Mostra esattamente cosa viene estratto
+    print(f"\n[REPUTATION DEBUG] Extracted indicators for job {job_id}:")
+    print(f"  IPs: {ips}")
+    print(f"  URLs: {urls}")
+    print(f"  Hashes: {hashes}")
+    print(f"  Header received_hops: {record.header_indicators.get('received_hops', []) if record.header_indicators else []}")
+    print(f"  X-Originating-IP: {record.x_originating_ip}")
+    _logger.info(f"[REPUTATION DEBUG] Extracted indicators for job {job_id}: IPs={ips}, URLs={urls}, Hashes={hashes}")
+
     # Fase 1: servizi fast, timeout generoso 25s
     loop = asyncio.get_event_loop()
     try:
@@ -250,6 +261,13 @@ async def run_reputation_fast(
     slow_ips, slow_urls, slow_hashes = _extract_priority_indicators(record)
     has_slow = bool(slow_ips or slow_urls or slow_hashes)
     slow_indicators = {"ips": slow_ips, "urls": slow_urls, "hashes": slow_hashes}
+
+    # DEBUG LOGGING: Mostra indicatori selettivi per SLOW services
+    print(f"[REPUTATION DEBUG] Slow indicators for job {job_id}:")
+    print(f"  SLOW IPs: {slow_ips}")
+    print(f"  SLOW URLs: {slow_urls}")
+    print(f"  SLOW Hashes: {slow_hashes}")
+    _logger.info(f"[REPUTATION DEBUG] Slow indicators: IPs={slow_ips}, URLs={slow_urls}, Hashes={slow_hashes}")
 
     if has_slow:
         rep_dict["slow_indicators"] = slow_indicators

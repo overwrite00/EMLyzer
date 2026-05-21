@@ -48,10 +48,13 @@ import ipaddress as _ipaddress
 #   [IPv6:2001:db8::1]   — prefisso esplicito (Gmail, Postfix)
 #   [2001:db8::1]        — IPv6 senza prefisso
 #   [203.0.113.42]       — IPv4 classico
+#   (203.0.113.42)        — IPv4 in parentheses (some headers use this format)
 _IP_IN_RECEIVED_RE = re.compile(
-    r"\[IPv6:([0-9a-fA-F:]+)\]"           # IPv6 con prefisso esplicito
-    r"|\[(\d{1,3}(?:\.\d{1,3}){3})\]"  # IPv4 classico
-    r"|\[([0-9a-fA-F]{0,4}(?::[0-9a-fA-F]{0,4}){2,7})\]",  # IPv6 senza prefisso
+    r"\[IPv6:([0-9a-fA-F:]+)\]"           # IPv6 con prefisso esplicito in square brackets
+    r"|\[(\d{1,3}(?:\.\d{1,3}){3})\]"  # IPv4 classico in square brackets
+    r"|\[([0-9a-fA-F]{0,4}(?::[0-9a-fA-F]{0,4}){2,7})\]"  # IPv6 senza prefisso in square brackets
+    r"|[(\(](\d{1,3}(?:\.\d{1,3}){3})[)\)]"  # IPv4 in parentheses
+    r"|[(\(]([0-9a-fA-F:]+)[)\)]",  # IPv6 in parentheses
     re.IGNORECASE,
 )
 
@@ -63,7 +66,8 @@ def _extract_ip_from_received(received: str) -> tuple[str | None, bool]:
     m = _IP_IN_RECEIVED_RE.search(received)
     if not m:
         return None, False
-    raw = m.group(1) or m.group(2) or m.group(3)
+    # Check all groups (brackets and parentheses variants)
+    raw = m.group(1) or m.group(2) or m.group(3) or m.group(4) or m.group(5)
     if not raw:
         return None, False
     try:

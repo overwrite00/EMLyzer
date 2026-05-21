@@ -207,7 +207,7 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
     parsed.return_path = get_header("Return-Path")
     parsed.reply_to = get_header("Reply-To")
     parsed.x_mailer = get_header("X-Mailer") or get_header("User-Agent")
-    parsed.x_originating_ip = get_header("X-Originating-IP")
+    parsed.x_originating_ip = get_header("X-Originating-IP") or get_header("X-Sender-IP")
     parsed.x_campaign_id = get_header("X-Campaign-ID")
     parsed.list_unsubscribe = get_header("List-Unsubscribe")
 

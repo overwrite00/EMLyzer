@@ -957,7 +957,8 @@ def check_url_urlscan(url: str) -> ReputationResult:
         headers["API-Key"] = settings.URLSCAN_API_KEY.strip()
 
     # Diagnostic logging (v0.14.3+): Log request details
-    logger.debug(f"URLScan.io request: url={url}, query={query}, has_api_key={has_api_key}, auth_method=header")
+    logger.info(f"[URLScan.io DEBUG] Processing URL: {url}")
+    logger.info(f"[URLScan.io DEBUG] Extracted host: {host}, is_ip: {is_ip}, query: {query}, has_api_key: {has_api_key}")
 
     try:
         resp = _http_get_with_retry(
