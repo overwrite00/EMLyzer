@@ -71,16 +71,32 @@ def _dataclass_to_dict(obj) -> dict:
 
 def _cleanup_files(job_id: str) -> int:
     """Elimina file email caricato e report .docx per un job_id. Ritorna numero file rimossi."""
+    import logging
+    logger = logging.getLogger(__name__)
     removed = 0
+
+    # Elimina file email (tutti gli estensioni supportate)
     for ext in settings.ALLOWED_EXTENSIONS:
         candidate = settings.UPLOAD_DIR / f"{job_id}{ext}"
         if candidate.exists():
-            candidate.unlink()
-            removed += 1
+            try:
+                candidate.unlink()
+                logger.debug(f"[CLEANUP] Deleted: {candidate}")
+                removed += 1
+            except Exception as e:
+                logger.error(f"[CLEANUP] Failed to delete {candidate}: {e}")
+
+    # Elimina report .docx
     report = settings.REPORTS_DIR / f"{job_id}.docx"
     if report.exists():
-        report.unlink()
-        removed += 1
+        try:
+            report.unlink()
+            logger.debug(f"[CLEANUP] Deleted: {report}")
+            removed += 1
+        except Exception as e:
+            logger.error(f"[CLEANUP] Failed to delete {report}: {e}")
+
+    logger.info(f"[CLEANUP] Job {job_id}: {removed} files removed")
     return removed
 
 
