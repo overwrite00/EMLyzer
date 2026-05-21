@@ -100,6 +100,22 @@ Le funzionalità sono ordinate per priorità di implementazione.
   - `_extract_ip_from_received()`: explain 5 regex groups (IPv4/IPv6 variants)
   - `_parse_received_chain()`: RFC 5321 hop ordering explanation, attack detection
 
+**PHASE 3 (Continued): Additional Code Quality Improvements (BASSA)**
+- **Reputation connector docstrings** (connectors.py)
+  - `check_ip_spamhaus()`: Document Spamhaus DROP blocklist behavior, feed caching, no API key required
+  - `check_hash_malwarebazaar()`: Document malware database lookup, confidence interpretation, auth key requirements
+  - Completes documentation of all 25 check_* functions with consistent format:
+    - Service/API identifier
+    - Rate limits and quotas
+    - Score/confidence interpretation
+    - API key requirements
+    - Special response handling
+
+- **Import organization** (reputation.py)
+  - Removed duplicate `import logging` statement (was at line 568 inside function)
+  - Moved `_bg_logger` initialization to module-level with other loggers
+  - Follows Python best practices for import organization
+
 ### Impatto
 - Eliminati 14 problemi critici, ad alto impatto e di qualità
 - Migliorata production stability e manutenibilità
