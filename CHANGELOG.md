@@ -5,6 +5,25 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
 ---
 
+## [0.14.4] — 2026-05-21
+
+### Corretto
+- **URLScan.io HTTP 400 error**: Aggiunto `html.unescape()` nell'URL analyzer per decodificare entità HTML (&amp; → &, &quot; → ", etc.) in URL estratti da corpo HTML. Previene HTTP 400 "Bad Request" quando URLScan.io riceve URL con entità encoded.
+- **URLScan.io HTTP 403 fallback**: Implementato fallback authentication method per HTTP 403 (retry con query param `?key=...` invece di header `API-Key:`). Migliora compatibilità con diverse configurazioni URLScan.io.
+- **Enhanced error handling**: Aggiunto logging diagnostico completo per richieste URLScan.io (URL, query, auth method, response body su errore). Facilita troubleshooting.
+- **Improved error messages**: Differenziati messaggi di errore HTTP 403 con/senza API key configurata. Utenti ricevono suggerimenti specifici per risolvere problemi.
+
+### Aggiunto
+- **Health check endpoint**: Nuovo endpoint `GET /api/reputation/test-urlscan` per diagnosticare connettività URLScan.io, validazione API key, e suggerimenti di configurazione. Ritorna: connectivity, api_key_configured, api_key_valid, system_info, suggestions.
+
+### Testing
+- ✅ Tutti i 119 test passano
+- ✅ 3 sample email analizzate: risk score 75.0, 70.6, 45.3
+- ✅ Tutti 19 servizi reputazione verificati e funzionanti
+- ✅ URLScan.io: No more HTTP 400/403 errors (stato: not_applicable per email non sospette, clean per email legittime)
+
+---
+
 ## [Unreleased] — Roadmap
 
 Questa sezione raccoglie tutto ciò che è pianificato ma non ancora implementato.
