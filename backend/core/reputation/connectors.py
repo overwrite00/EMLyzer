@@ -1247,7 +1247,7 @@ def check_url_urlscan(url: str) -> ReputationResult:
             detail=detail,
         )
     except requests.HTTPError as e:
-        code = e.response.status_code if e.response is not None else "?"
+        code = e.response.status_code if e.response is not None else None
         body = ""
         try:
             if e.response is not None:
@@ -1255,28 +1255,33 @@ def check_url_urlscan(url: str) -> ReputationResult:
         except Exception:
             pass
 
-        # Fallback: mark as skipped instead of error on HTTP failures
         logger.warning(f"URLScan.io HTTP {code} for {url}. Response: {body}")
+
+        # Categorize error and provide service-specific message
+        error_type, error_msg = _categorize_error(e, code, has_api_key=has_api_key)
 
         # Phase 2D: Improved error messages (v0.14.3+)
         if code == 403:
             if has_api_key:
-                skip_reason = "URLScan.io HTTP 403 Forbidden con API key. Verifica: 1) API key valida, 2) Rate limit (1000 req/giorno), 3) IP non blacklisted. Vai a urlscan.io/user/settings per controllare lo stato dell'account"
+                error_msg = "HTTP 403 Forbidden con API key. Verifica: 1) API key valida, 2) Rate limit (1000 req/giorno), 3) IP non blacklisted. Vai a urlscan.io/user/settings"
             else:
-                skip_reason = "URLScan.io ricerca pubblica non disponibile. Configura URLSCAN_API_KEY in .env per aumentare il limite (1000 req/giorno)"
-        else:
-            skip_reason = f"URLScan.io indisponibile (HTTP {code})"
+                error_msg = "Ricerca pubblica non disponibile. Configura URLSCAN_API_KEY in .env per aumentare il limite (1000 req/giorno)"
+        elif code == 429:
+            error_msg = "Rate limit exceeded (1000 req/day). Wait before retrying."
 
         return ReputationResult(
             source="URLScan.io", entity=url, entity_type="url",
-            skipped=True, skip_reason=skip_reason,
+            error_type=error_type,
+            error=f"URLScan.io: {error_msg}",
         )
     except Exception as exc:
-        # Fallback: mark as skipped on other errors
+        # Categorize error type
+        error_type, error_msg = _categorize_error(exc)
         logger.exception(f"URLScan.io error for {url}: {type(exc).__name__}")
         return ReputationResult(
             source="URLScan.io", entity=url, entity_type="url",
-            skipped=True, skip_reason=f"URLScan.io errore: {type(exc).__name__}",
+            error_type=error_type,
+            error=f"URLScan.io: {error_msg}",
         )
 
 
