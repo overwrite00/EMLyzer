@@ -263,31 +263,35 @@ def _extract_priority_indicators(
     record: EmailAnalysis,
 ) -> tuple[list[str], list[str], list[str]]:
     """
-    Estrae SOLO indicatori CRITICI per servizi SLOW (VirusTotal, AbuseIPDB).
+    Estrae indicatori CRITICI per servizi SLOW (VirusTotal, AbuseIPDB).
 
-    LOGICA RISTRETTA per rate-limited services:
+    LOGICA INTELLIGENTE per rate-limited services:
 
-    IP (Sender-only):
+    IP (Sender + intermediari):
       - x_originating_ip (sempre)
       - Received hops 1-2 (mittente + primo intermediario)
-      - ESCLUDI: resolved IPs da URLs (sono CDN pubbliche)
-      - ESCLUDI: IPv6 privati e IPs trusted CDN
+      - ESCLUDI: resolved IPs da URLs (sono spesso CDN pubbliche)
+      - ESCLUDI: IPv6 (troppi false positives)
+      - ESCLUDI: IPs trusted CDN
 
-    URL (Solo phishing/malware indicators):
-      - IP diretto nelle URL (http://123.123.123.123/...)
-      - Shortener (bit.ly, t.co, etc.)
-      - Dominio nuovo (< 90 giorni)
-      - Punycode/IDN (possibile domain spoofing)
-      - Risk score >= 25
-      - Link offuscati
-      - ESCLUDI: URL da Google, Microsoft, trusted hosts
+    URL (Massimizza coverage entro hard cap):
       - Hard cap: max 4 URL per VirusTotal free (4 req/min)
+      - INCLUDI: TUTTE le URL non-CDN (sospette e normali)
+      - PRIORIZZA: URL sospette (IP diretto, shortener, new domain,
+        punycode, risk>=25) sono aggiunte per prime
+      - INCLUDI: anche URL "normali" non-CDN se c'è spazio fino a 4
+      - ESCLUDI: URL da Google, Microsoft, trusted CDN hosts
+      - SEMPRE: link offuscati (sono definitivamente sospetti)
+      - Razionale: Se un'URL è nel body dell'email, merita verifica.
+        Non escludere completamente le URL non-sospette — potrebbero
+        essere comunque rilevanti per l'analista.
 
     Hash:
-      - Tutti gli allegati (sono rari)
+      - Tutti gli allegati (sono rari e vanno sempre verificati)
 
-    Obiettivo: Minimizzare rate limit usage, inviare SOLO indicatori
-               che potrebbero rivelare malware/phishing.
+    Obiettivo: Massimizzare coverage (entro rate limit), inviare
+               TUTTI i dati rilevanti che potrebbero rivelare
+               malware/phishing, senza sprecare crediti VirusTotal.
     """
     seen_ips:    set[str] = set()
     seen_urls:   set[str] = set()
@@ -311,29 +315,24 @@ def _extract_priority_indicators(
             seen_ips.add(ip)
             ips.append(ip)
 
-    def add_url_if_suspicious(u: dict) -> None:
-        """Aggiunge URL SOLO se fortemente sospetta e non da trusted CDN."""
-        if len(urls) >= 4:  # Hard cap VirusTotal free
+    def add_url_if_worth_checking(u: dict) -> None:
+        """
+        Aggiunge URL in ordine di priorità per massimizzare coverage.
+
+        Hard cap: max 4 URL per VirusTotal free (4 req/min).
+        Strategia: priorizza URL sospette, ma includi anche normali se c'è spazio.
+
+        Non escludere completamente le URL non-sospette — sono comunque
+        dati rilevanti che valgono la pena verificare con VirusTotal.
+        """
+        if len(urls) >= 4:  # Hard cap VirusTotal free tier
             return
 
         url_str = u.get("original_url") or u.get("url", "")
         if not url_str or url_str in seen_urls:
             return
 
-        # Determina se è FORTEMENTE sospetta
-        is_suspicious = (
-            u.get("is_ip_address") or u.get("is_ip") or      # IP diretto
-            u.get("is_shortener") or                          # Shortener
-            u.get("is_new_domain") or                         # Nuovo dominio
-            u.get("is_punycode") or                           # IDN spoofing
-            (u.get("risk_score", 0) >= 25)                   # Risk alt
-        )
-
-        if not is_suspicious:
-            _logger.debug(f"[FILTRO SLOW] URL {url_str} - non sospetta, esclusa")
-            return
-
-        # Estrai hostname e controlla se trusted CDN
+        # Estrai hostname e controlla se trusted CDN (escludi sempre)
         try:
             from urllib.parse import urlparse
             hostname = urlparse(url_str).netloc.split(":")[0].lstrip("www.")
@@ -344,8 +343,24 @@ def _extract_priority_indicators(
             _logger.debug(f"[FILTRO SLOW] URL {url_str} da trusted CDN - esclusa")
             return
 
+        # Determina se è sospetta (per logging)
+        is_suspicious = (
+            u.get("is_ip_address") or u.get("is_ip") or      # IP diretto
+            u.get("is_shortener") or                          # Shortener
+            u.get("is_new_domain") or                         # Nuovo dominio
+            u.get("is_punycode") or                           # IDN spoofing
+            (u.get("risk_score", 0) >= 25)                   # Risk score alto
+        )
+
+        # Aggiungi TUTTE le URL non-CDN, indipendentemente da is_suspicious.
+        # VirusTotal ha rate limit stretto, ma anche una singola URL non-sospetta
+        # da un sito non-CDN merita verifica se è presente nell'email.
         seen_urls.add(url_str)
         urls.append(url_str)
+        if is_suspicious:
+            _logger.debug(f"[FILTRO SLOW] URL {url_str} (sospetta, risk_score={u.get('risk_score', 0)}) - inclusa")
+        else:
+            _logger.debug(f"[FILTRO SLOW] URL {url_str} (normale, non da CDN) - inclusa per coverage")
 
     # ─────────────────────────────────────────────────────────────────────────
     # IP: Sender IP + primi 2 hop (mittente -> intermediari prossimi)
@@ -365,11 +380,12 @@ def _extract_priority_indicators(
             add_ip(hop["ip"], skip_cdn_check=True)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # URL: SOLO quelle fortemente sospette e non-CDN
+    # URL: Tutte le non-CDN, fino a 4 (hard cap VirusTotal free tier)
+    # Priorità: sospette prima, ma includi anche non-sospette per coverage
     # ─────────────────────────────────────────────────────────────────────────
     ui = record.url_indicators or {}
     for u in ui.get("urls", []):
-        add_url_if_suspicious(u)
+        add_url_if_worth_checking(u)
 
     # Link offuscati: SEMPRE sospetti per definizione
     bi = record.body_indicators or {}
