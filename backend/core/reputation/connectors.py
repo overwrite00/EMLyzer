@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 REQUEST_TIMEOUT      = 8    # servizi di sicurezza (AbuseIPDB, VirusTotal, ecc.)
 REQUEST_TIMEOUT_ASN  = 4    # ASN lookup
 REQUEST_TIMEOUT_INFO = 5    # servizi informativi (crt.sh, redirect chain)
+REQUEST_TIMEOUT_PULSEDIVE = 12  # Pulsedive può essere lento (free tier con 10 req/day quota)
 
 # ---------------------------------------------------------------------------
 # Disk cache per feed locali (Spamhaus DROP, OpenPhish)
@@ -1085,7 +1086,7 @@ def _check_pulsedive(entity: str, entity_type: str) -> ReputationResult:
         resp = _http_get_with_retry(
             "https://pulsedive.com/api/info.php",
             params={"indicator": entity, "pretty": "1", "key": api_key},
-            timeout=REQUEST_TIMEOUT,
+            timeout=REQUEST_TIMEOUT_PULSEDIVE,
             rate_key="pulsedive",
         )
         if resp.status_code == 404:
