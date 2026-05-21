@@ -7,12 +7,19 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
 ## [Unreleased] — Next Release
 
+### Corretto
+- **CRITICO: URL filtering logic for SLOW services**: Bug in _extract_priority_indicators escludeva completamente le URL non-sospette, sprecando il rate limit di VirusTotal. Se un'email aveva 1 URL malicious + 3 URL normali non-CDN, VirusTotal riceveva SOLO 1 URL. Ora include TUTTE le URL non-CDN (fino a 4), prioritizzando quelle sospette. Questo massimizza la coverage entro il limite di 4 req/min free tier.
+  - Renamed: add_url_if_suspicious() → add_url_if_worth_checking()
+  - Logica: INCLUDI TUTTE le URL non-CDN, NON escludere le non-sospette
+  - Priorità: URL sospette aggiunte per prime, poi altre non-CDN se c'è spazio
+  - Risultato: Analista riceve assessment più completo, rate limit VirusTotal non sprecato
+
 ### Aggiunto
 - **Intelligent data filtering for reputation services** (v0.14.5+): Implementato sistema di filtraggio a livello analista per estrarre SOLO indicatori rilevanti per ogni tipo di servizio di reputazione. Riduce il rumore e previene query non necessarie che causano timeout.
   - **CDN Domain Whitelist**: 40+ domini trusted (Google, Microsoft, CloudFlare, AWS, Akamai, CDN networks, social media, payment services, email providers)
   - **CDN IP Whitelist**: IP prefix ranges per provider principali (Google AS15169, CloudFlare AS13335, Microsoft Azure AS8075, Amazon AWS AS16509)
   - **Intelligent IP Extraction**: Solo sender IP + primi 2-3 received hops (SKIP trusted CDN IPs, SKIP resolved IPs da URLs)
-  - **Intelligent URL Extraction**: Solo URL sospette (shortener, IP diretto, dominio nuovo, punycode, risk score alto) da host NON-CDN
+  - **Intelligent URL Extraction**: TUTTE le URL non-CDN dai body (non SOLO le sospette)
   - **Priority Extraction for SLOW services**: Sender IP + primi 2 hops, max 4 URL, skip IPv6 (troppi false positives), rispetta rate limit VirusTotal 4 req/min
   - **Debug logging**: [FILTRO] e [FILTRO SLOW] prefixes per transparency sui dati filtrati
   - **Risultati**: Riduce query volume, previene timeout (crt.sh), rispetta rate limits, migliora precision dell'analisi
