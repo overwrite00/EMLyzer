@@ -1795,50 +1795,92 @@ class ReputationSummary:
 #       → eseguiti in background, il frontend fa polling
 
 _FAST_SERVICES = frozenset({
-    # Feed locali e chiamate HTTP singole leggere — completano in < 5s
-    # indipendentemente dal numero di entità
+    # Feed locali e chiamate HTTP singole con rate limit moderato
+    # → completano in < 15s indipendentemente dal numero di entità
+    # Esclusi servizi con quota bassa o rate limit stringente (vedi _SLOW_SERVICES)
+
+    # IP services (no quota limit)
     "check_ip_spamhaus",           # feed locale, 0s
-    "check_ip_asn",                # 1 HTTP, 0.3s rate
-    "check_ip_shodan_internetdb",  # 1 HTTP, 0.3s rate — InternetDB gratuito
-    "check_ip_circl_pdns",         # 1 HTTP, 0.5s rate — CIRCL Passive DNS
-    "check_ip_greynoise",          # 1 HTTP, 1.1s rate — GreyNoise Community
-    "check_ip_pulsedive",          # 1 HTTP, 2.5s rate — Pulsedive
-    "check_ip_criminalip",         # 1 HTTP, 1.1s rate — Criminal IP
-    "check_ip_threatfox",          # 1 HTTP, 0.3s rate
+    "check_ip_asn",                # 1 HTTP, 0.3s rate, quota 50k/month OK
+    "check_ip_shodan_internetdb",  # 1 HTTP, 0.3s rate, unlimited
+    "check_ip_circl_pdns",         # 1 HTTP, 0.5s rate, unlimited free
+    "check_ip_criminalip",         # 1 HTTP, 1.1s rate, unlimited
+    "check_ip_threatfox",          # 1 HTTP, 0.3s rate, unlimited (abuse.ch)
+
+    # URL services
     "check_url_openphish",         # feed locale, 0s
-    "check_url_redirect_chain",    # 1 HTTP per URL, 0.2s rate
-    "check_url_phishtank",         # 1 HTTP, 0.5s rate
-    "check_url_urlhaus",           # 1 HTTP, 0.3s rate
-    "check_url_threatfox",         # 1 HTTP, 0.3s rate
-    "check_domain_circl_pdns",     # 1 HTTP, 0.5s rate — CIRCL Passive DNS
-    "check_url_urlscan",           # 1 HTTP, 1.0s rate — URLScan.io
-    "check_url_pulsedive",         # 1 HTTP, 2.5s rate — Pulsedive
-    "check_domain_securitytrails", # 1 HTTP, 3.0s rate — SecurityTrails
-    "check_hash_malwarebazaar",    # 1 HTTP, 0.7s rate
-    "check_hash_threatfox",        # 1 HTTP, 0.3s rate
-    "check_hash_hybrid_analysis",  # 1 HTTP, 1.0s rate — Hybrid Analysis
+    "check_url_redirect_chain",    # 1 HTTP per URL, 0.2s rate, unlimited
+    "check_url_phishtank",         # 1 HTTP, 0.5s rate, unlimited
+    "check_url_urlhaus",           # 1 HTTP, 0.3s rate, unlimited (abuse.ch)
+    "check_url_threatfox",         # 1 HTTP, 0.3s rate, unlimited (abuse.ch)
+    "check_url_urlscan",           # 1 HTTP, 1.0s rate, quota 1000/day OK
+
+    # Domain services (passive DNS lookup)
+    "check_domain_circl_pdns",     # 1 HTTP, 0.5s rate, unlimited free
+
+    # Hash services
+    "check_hash_malwarebazaar",    # 1 HTTP, 0.7s rate, unlimited (abuse.ch)
+    "check_hash_threatfox",        # 1 HTTP, 0.3s rate, unlimited (abuse.ch)
+    "check_hash_hybrid_analysis",  # 1 HTTP, 1.0s rate, unlimited free
 })
 
 _SLOW_SERVICES = frozenset({
-    # Servizi con rate limit stringente o timeout alto per molte entità
-    # → eseguiti in background dopo la risposta al browser
-    "check_ip_abuseipdb",   # 1.1s rate
-    "check_ip_virustotal",  # 15.5s rate
-    "check_url_virustotal", # 15.5s rate
-    "check_hash_virustotal",# 15.5s rate
-    "check_domain_crtsh",   # 2.5s rate × N domini = troppo per risposta sincrona
+    # Servizi con rate limit stringente, quota molto limitata, o timeout alto
+    # per molte entità → eseguiti in background dopo la risposta al browser
+    "check_ip_abuseipdb",           # 1.1s rate, quota 1000/day
+    "check_ip_virustotal",          # 15.5s rate, quota 4 req/min
+    "check_url_virustotal",         # 15.5s rate, quota 4 req/min
+    "check_hash_virustotal",        # 15.5s rate, quota 4 req/min
+    "check_domain_crtsh",           # 2.5s rate × N domini = cumulativo troppo
+    "check_ip_greynoise",           # 1.1s rate, quota ~50/week (bassa)
+    "check_ip_pulsedive",           # 2.5s rate, quota 10/day (molto bassa)
+    "check_url_pulsedive",          # 2.5s rate, quota 10/day (molto bassa)
+    "check_domain_securitytrails",  # 3.0s rate, quota 50/month (molto bassa)
 })
 
 # Mappa fn.__name__ → nome servizio corretto per _build_service_registry
 # IMPORTANTE: senza questa mappa i placeholder "in elaborazione" usano nomi sbagliati
 # (es. "check_ip_abuseipdb" → "Ip Abuseipdb" invece di "AbuseIPDB")
 _FN_TO_SOURCE: dict[str, str] = {
-    "check_ip_abuseipdb":    "AbuseIPDB",
-    "check_ip_virustotal":   "VirusTotal",
-    "check_url_virustotal":  "VirusTotal",
-    "check_hash_virustotal": "VirusTotal",
-    "check_hash_virustotal": "VirusTotal",
-    "check_domain_crtsh":    "crt.sh",
+    # FAST IP services
+    "check_ip_spamhaus":           "Spamhaus DROP",
+    "check_ip_asn":                "ASN Lookup",
+    "check_ip_shodan_internetdb":  "Shodan InternetDB",
+    "check_ip_circl_pdns":         "CIRCL Passive DNS",
+    "check_ip_criminalip":         "Criminal IP",
+    "check_ip_threatfox":          "ThreatFox",
+
+    # FAST URL services
+    "check_url_openphish":         "OpenPhish",
+    "check_url_redirect_chain":    "Redirect Chain",
+    "check_url_phishtank":         "PhishTank",
+    "check_url_urlhaus":           "URLhaus",
+    "check_url_threatfox":         "ThreatFox",
+    "check_url_urlscan":           "URLScan.io",
+
+    # FAST Domain services
+    "check_domain_circl_pdns":     "CIRCL Passive DNS",
+
+    # FAST Hash services
+    "check_hash_malwarebazaar":    "MalwareBazaar",
+    "check_hash_hybrid_analysis":  "Hybrid Analysis",
+
+    # SLOW IP services
+    "check_ip_abuseipdb":          "AbuseIPDB",
+    "check_ip_virustotal":         "VirusTotal",
+    "check_ip_greynoise":          "GreyNoise Community",
+    "check_ip_pulsedive":          "Pulsedive",
+
+    # SLOW URL services
+    "check_url_virustotal":        "VirusTotal",
+    "check_url_pulsedive":         "Pulsedive",
+
+    # SLOW Hash services
+    "check_hash_virustotal":       "VirusTotal",
+
+    # SLOW Domain services
+    "check_domain_crtsh":          "crt.sh",
+    "check_domain_securitytrails": "SecurityTrails",
 }
 
 

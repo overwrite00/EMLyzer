@@ -152,9 +152,11 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
     seen_ips:    set[str] = set()
     seen_urls:   set[str] = set()
     seen_hashes: set[str] = set()
+    seen_domains: set[str] = set()
     ips:    list[str] = []
     urls:   list[str] = []
     hashes: list[str] = []
+    domains: list[str] = []
 
     def add_ip(raw: str, skip_cdn_check: bool = False) -> None:
         """Aggiunge IP solo se pubblico e non di CDN legittimi."""
@@ -201,6 +203,22 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
         if h and h not in seen_hashes:
             seen_hashes.add(h)
             hashes.append(h)
+
+    def add_domain(raw: str) -> None:
+        """Estrai dominio da URL e aggiungilo se non è CDN trusted."""
+        if not raw:
+            return
+        try:
+            from urllib.parse import urlparse
+            hostname = urlparse(raw).netloc.split(":")[0].lstrip("www.")
+            # Scarta IP diretti
+            if hostname and not (hostname.count(".") < 1 or hostname.replace(".", "").isdigit()):
+                if hostname not in seen_domains and not _is_trusted_cdn(hostname):
+                    seen_domains.add(hostname)
+                    domains.append(hostname)
+                    _logger.debug(f"[DOMAIN] {hostname} - estratto da URL")
+        except:
+            pass
 
     # ─────────────────────────────────────────────────────────────────────────
     # ESTRAZIONE IP: Sender IP + Received headers (ESCLUDI resolved IPs from URLs)
@@ -256,14 +274,26 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
         if h:
             add_hash(h)
 
-    return ips, urls, hashes
+    # ─────────────────────────────────────────────────────────────────────────
+    # ESTRAZIONE DOMINI: Per servizi che lavorano su domini (crt.sh, CIRCL, etc.)
+    # ─────────────────────────────────────────────────────────────────────────
+    for u in ui.get("urls", []):
+        url_str = u.get("original_url") or u.get("url", "")
+        if url_str:
+            add_domain(url_str)
+    for link in bi.get("obfuscated_links", []):
+        href = link.get("actual_href", "")
+        if href:
+            add_domain(href)
+
+    return ips, urls, hashes, domains
 
 
 def _extract_priority_indicators(
     record: EmailAnalysis,
-) -> tuple[list[str], list[str], list[str]]:
+) -> tuple[list[str], list[str], list[str], list[str]]:
     """
-    Estrae indicatori CRITICI per servizi SLOW (VirusTotal, AbuseIPDB).
+    Estrae indicatori CRITICI per servizi SLOW (VirusTotal, AbuseIPDB, SecurityTrails, etc.).
 
     LOGICA INTELLIGENTE per rate-limited services:
 
@@ -282,23 +312,27 @@ def _extract_priority_indicators(
       - INCLUDI: anche URL "normali" non-CDN se c'è spazio fino a 4
       - ESCLUDI: URL da Google, Microsoft, trusted CDN hosts
       - SEMPRE: link offuscati (sono definitivamente sospetti)
-      - Razionale: Se un'URL è nel body dell'email, merita verifica.
-        Non escludere completamente le URL non-sospette — potrebbero
-        essere comunque rilevanti per l'analista.
+
+    Domain (Per SecurityTrails, crt.sh):
+      - Hard cap: max 1 dominio per SecurityTrails (quota 50/month)
+      - Hard cap: max 2 domini per crt.sh
+      - Prioritizza domini da URL sospette
 
     Hash:
       - Tutti gli allegati (sono rari e vanno sempre verificati)
 
     Obiettivo: Massimizzare coverage (entro rate limit), inviare
                TUTTI i dati rilevanti che potrebbero rivelare
-               malware/phishing, senza sprecare crediti VirusTotal.
+               malware/phishing, senza sprecare crediti VirusTotal/SecurityTrails.
     """
     seen_ips:    set[str] = set()
     seen_urls:   set[str] = set()
     seen_hashes: set[str] = set()
+    seen_domains: set[str] = set()
     ips:    list[str] = []
     urls:   list[str] = []
     hashes: list[str] = []
+    domains: list[str] = []
 
     def add_ip(raw: str, skip_cdn_check: bool = True) -> None:
         """Aggiunge SOLO sender IP e intermediari prossimi."""
@@ -405,7 +439,33 @@ def _extract_priority_indicators(
             seen_hashes.add(h)
             hashes.append(h)
 
-    return ips, urls, hashes
+    # ─────────────────────────────────────────────────────────────────────────
+    # Domain: Per SecurityTrails (max 1) e crt.sh (max 2)
+    # Estrai domini da URL sospette
+    # ─────────────────────────────────────────────────────────────────────────
+    for u in ui.get("urls", []):
+        if len(domains) >= 2:  # Hard cap crt.sh (2 domini)
+            break
+        url_str = u.get("original_url") or u.get("url", "")
+        if url_str:
+            try:
+                from urllib.parse import urlparse
+                hostname = urlparse(url_str).netloc.split(":")[0].lstrip("www.")
+                is_suspicious = (
+                    u.get("is_ip_address") or u.get("is_ip") or
+                    u.get("is_shortener") or u.get("is_new_domain") or
+                    u.get("is_punycode") or (u.get("risk_score", 0) >= 25)
+                )
+                if hostname and not _is_trusted_cdn(hostname) and hostname not in seen_domains:
+                    # Prioritizza domini da URL sospette
+                    if is_suspicious or len(domains) < 1:
+                        seen_domains.add(hostname)
+                        domains.append(hostname)
+                        _logger.debug(f"[FILTRO SLOW] Domain {hostname} - estratto da URL sospetta")
+            except:
+                pass
+
+    return ips, urls, hashes, domains
 
 
 def _summary_to_dict(summary: ReputationSummary) -> dict:
@@ -437,13 +497,14 @@ async def run_reputation_fast(
         raise HTTPException(status_code=404,
             detail=t("analysis.run_first", job_id=job_id))
 
-    ips, urls, hashes = _extract_indicators(record)
+    ips, urls, hashes, domains = _extract_indicators(record)
 
     # DEBUG LOGGING: Mostra esattamente cosa viene estratto
     _logger.info(f"[REPUTATION DEBUG] Extracted indicators for job {job_id}:")
     _logger.info(f"  IPs: {ips}")
     _logger.info(f"  URLs: {urls}")
     _logger.info(f"  Hashes: {hashes}")
+    _logger.info(f"  Domains: {domains}")
     _logger.info(f"  Header received_hops count: {len(record.header_indicators.get('received_hops', []) if record.header_indicators else [])}")
     _logger.info(f"  X-Originating-IP: {record.x_originating_ip}")
 
@@ -466,9 +527,16 @@ async def run_reputation_fast(
 
     # Avvia fase 2 in background con indicatori SELETTIVI (solo IP interni + URL sospetti)
     # per rispettare i rate limit di VirusTotal (4/min) e AbuseIPDB senza sprecare richieste
-    slow_ips, slow_urls, slow_hashes = _extract_priority_indicators(record)
-    has_slow = bool(slow_ips or slow_urls or slow_hashes)
-    slow_indicators = {"ips": slow_ips, "urls": slow_urls, "hashes": slow_hashes}
+    slow_ips, slow_urls, slow_hashes, slow_domains = _extract_priority_indicators(record)
+    has_slow = bool(slow_ips or slow_urls or slow_hashes or slow_domains)
+    slow_indicators = {"ips": slow_ips, "urls": slow_urls, "hashes": slow_hashes, "domains": slow_domains}
+
+    # DEBUG LOGGING: Mostra indicatori selettivi per SLOW services
+    _logger.info(f"[REPUTATION DEBUG] Slow indicators for job {job_id}:")
+    _logger.info(f"  SLOW IPs: {slow_ips}")
+    _logger.info(f"  SLOW URLs: {slow_urls}")
+    _logger.info(f"  SLOW Hashes: {slow_hashes}")
+    _logger.info(f"  SLOW Domains: {slow_domains}")
 
     # DEBUG LOGGING: Mostra indicatori selettivi per SLOW services
     _logger.info(f"[REPUTATION DEBUG] Slow indicators for job {job_id}:")
