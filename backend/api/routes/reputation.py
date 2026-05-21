@@ -512,7 +512,7 @@ async def run_reputation_fast(
     loop = asyncio.get_event_loop()
     try:
         summary = await asyncio.wait_for(
-            loop.run_in_executor(None, run_fast_checks, ips, urls, hashes),
+            loop.run_in_executor(None, run_fast_checks, ips, urls, hashes, domains),
             timeout=50.0,  # sicuro con axios frontend timeout=60s
         )
     except asyncio.TimeoutError:
@@ -547,7 +547,7 @@ async def run_reputation_fast(
     if has_slow:
         rep_dict["slow_indicators"] = slow_indicators
         background_tasks.add_task(
-            _run_slow_background, job_id, slow_ips, slow_urls, slow_hashes, rep_dict
+            _run_slow_background, job_id, slow_ips, slow_urls, slow_hashes, rep_dict, slow_domains
         )
     else:
         # Nessun indicatore SLOW: rimuovi i placeholder "in elaborazione" prima di
@@ -592,6 +592,7 @@ async def _run_slow_background(
     urls: list[str],
     hashes: list[str],
     fast_rep_dict: dict,
+    domains: list[str] | None = None,
 ) -> None:
     """
     Esegue VirusTotal/AbuseIPDB/crt.sh in background.
@@ -602,11 +603,12 @@ async def _run_slow_background(
     from models.database import AsyncSessionLocal as async_session_factory
 
     fast_summary = _dict_to_summary(fast_rep_dict)
+    domains = domains or []
 
     try:
         loop = asyncio.get_running_loop()
         updated = await loop.run_in_executor(
-            None, run_slow_checks, ips, urls, hashes, fast_summary
+            None, run_slow_checks, ips, urls, hashes, fast_summary, domains
         )
     except Exception as e:
         _bg_logger.error("run_slow_checks fallito per job %s: %s", job_id, e)

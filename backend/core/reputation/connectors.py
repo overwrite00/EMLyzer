@@ -1885,8 +1885,7 @@ _FN_TO_SOURCE: dict[str, str] = {
 
 
 def _build_flat_tasks(
-
-    ips: list[str], urls: list[str], hashes: list[str]
+    ips: list[str], urls: list[str], hashes: list[str], domains: list[str] | None = None
 ) -> tuple[list[tuple], list[ReputationResult]]:
     """
     Costruisce la lista piatta di tutti i task da eseguire e le risposte immediate (skip).
@@ -1894,6 +1893,7 @@ def _build_flat_tasks(
       call_tasks = [(fn, entity, kind), ...]  — da eseguire in parallelo
       skip_results = [ReputationResult, ...]  — skipped perché manca API key
     """
+    domains = domains or []
     call_tasks: list[tuple] = []
     skip_results: list[ReputationResult] = []
 
@@ -2006,6 +2006,18 @@ def _build_flat_tasks(
         else:
             _s("Hybrid Analysis", h, "hash", "HYBRID_ANALYSIS_API_KEY non configurata — registrati su hybrid-analysis.com")
 
+    # ── Domain ──────────────────────────────────────────────────────────────
+    # Processa domini PASSATI da reputation.py (non estratti da URL)
+    # Questo è più efficiente e previene duplicazione
+    for domain in domains[:2]:  # Hard cap: crt.sh (max 2 domini)
+        _c(check_domain_crtsh, domain, "domain")
+        if settings.CIRCL_API_KEY:
+            _c(check_domain_circl_pdns, domain, "domain")
+        if settings.SECURITYTRAILS_API_KEY:
+            _c(check_domain_securitytrails, domain, "domain")
+        else:
+            _s("SecurityTrails", domain, "domain", "SECURITYTRAILS_API_KEY non configurata — registrati su securitytrails.com")
+
     return call_tasks, skip_results
 
 
@@ -2107,7 +2119,7 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str]) ->
 # Interfaccia a due fasi — FAST e SLOW
 # ---------------------------------------------------------------------------
 
-def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str]) -> "ReputationSummary":
+def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str], domains: list[str] | None = None) -> "ReputationSummary":
     """
     Fase 1 — servizi senza rate limit stringente.
     Risposta garantita in < 15s indipendentemente dal numero di entità.
@@ -2117,7 +2129,7 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str]) -> "Repu
     _load_spamhaus()
     _load_openphish()
 
-    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes)
+    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes, domains)
 
     # Filtra solo i servizi fast
     fast_calls = [(fn, entity, kind) for fn, entity, kind in call_tasks
@@ -2198,13 +2210,13 @@ def finalize_fast_only(summary: "ReputationSummary") -> "ReputationSummary":
 
 
 def run_slow_checks(ips: list[str], urls: list[str], hashes: list[str],
-                    existing: "ReputationSummary") -> "ReputationSummary":
+                    existing: "ReputationSummary", domains: list[str] | None = None) -> "ReputationSummary":
     """
     Fase 2 — servizi con rate limit stringente (VirusTotal, AbuseIPDB).
     Eseguita in background; i risultati vengono mergiati con quelli della fase 1.
     Il rate limiter thread-safe garantisce max 4 req/min per VirusTotal.
     """
-    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes)
+    call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes, domains)
 
     slow_calls = [(fn, entity, kind) for fn, entity, kind in call_tasks
                   if fn.__name__ in _SLOW_SERVICES]

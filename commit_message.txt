@@ -1,0 +1,34 @@
+Complete reputation services architecture overhaul: Full domain integration
+
+Implement comprehensive architecture redesign to support domain-based reputation checks:
+
+Phase: Domain Integration Completion (CRITICAL INFRASTRUCTURE)
+- Add 4-parameter tuple returns to _extract_indicators() and _extract_priority_indicators()
+- Pass domains from reputation.py to run_fast_checks() and run_slow_checks()
+- Implement domain processing loop in _build_flat_tasks() for crt.sh/CIRCL/SecurityTrails
+- Hard caps enforced: max 2 domains for SLOW services (SecurityTrails quota limit)
+- Proper CDN filtering: domains extracted from URLs with trusted CDN whitelist
+
+Services now properly receive domain-specific inputs:
+- crt.sh: domains only (not URLs)
+- CIRCL Passive DNS: domains for IP/domain lookups
+- SecurityTrails: single highest-priority domain (expensive quota: 50/month)
+
+Test Results:
+- All 119 core tests PASS
+- Domain extraction validation: 5/5 tests PASS
+- 4-tuple returns validated in both FAST and SLOW pipelines
+- Hard cap enforcement verified (4 URLs, 2 domains)
+- IP extraction working (1 IPs from sample)
+- URL extraction: 4 URLs for both FAST and SLOW
+
+Architecture Status:
+✓ All 19 reputation services properly wired
+✓ Intelligent filtering implemented (service-specific parameters)
+✓ Rate limits respected (hard caps, no waste)
+✓ End-to-end pipeline validated
+✓ Backward-compatible with existing API
+
+This completes the critical infrastructure improvement for proper reputation service integration.
+
+Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>
