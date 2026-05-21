@@ -135,6 +135,7 @@ def _http_get_with_retry(
     params: dict | None = None,
     headers: dict | None = None,
     auth: tuple | None = None,
+    api_key: str = "",
     timeout: float = REQUEST_TIMEOUT,
     max_retries: int = 2,
     rate_key: str = "",
@@ -143,6 +144,7 @@ def _http_get_with_retry(
     Esegue una GET con retry su errori temporanei (429, 502, 503, 504).
     Backoff esponenziale: 2s, 4s. Su 429 usa Retry-After se presente.
     auth: tupla (user, password) per HTTP Basic Auth (opzionale).
+    api_key: chiave API per header "API-Key" (non esposta in variabili globali).
     """
     last_exc: Exception | None = None
     for attempt in range(max_retries + 1):
@@ -153,7 +155,11 @@ def _http_get_with_retry(
         try:
             if rate_key:
                 _rate_limit(rate_key)
-            resp = requests.get(url, params=params, headers=headers, auth=auth, timeout=timeout)
+            # Aggiunge API key ai headers DENTRO la funzione (non espone la chiave al codice che chiama)
+            req_headers = dict(headers or {})
+            if api_key:
+                req_headers["API-Key"] = api_key
+            resp = requests.get(url, params=params, headers=req_headers, auth=auth, timeout=timeout)
             if resp.status_code == 429:
                 retry_after = float(resp.headers.get("Retry-After", 5))
                 logger.debug("429 da %s — attesa %.1fs", url, retry_after)
@@ -954,10 +960,8 @@ def check_url_urlscan(url: str) -> ReputationResult:
     query = host if not is_ip else url
     headers: dict = {"Content-Type": "application/json"}
     has_api_key = bool(settings.URLSCAN_API_KEY)
-    if has_api_key:
-        headers["API-Key"] = settings.URLSCAN_API_KEY.strip()
 
-    # Diagnostic logging (v0.14.3+): Log request details
+    # Diagnostic logging (v0.14.3+): Log request details (NO API key exposed)
     logger.info(f"[URLScan.io DEBUG] Processing URL: {url}")
     logger.info(f"[URLScan.io DEBUG] Extracted host: {host}, is_ip: {is_ip}, query: {query}, has_api_key: {has_api_key}")
 
@@ -966,6 +970,7 @@ def check_url_urlscan(url: str) -> ReputationResult:
             "https://urlscan.io/api/v1/search/",
             params={"q": f"page.domain:{query}", "size": "3", "sort": "date"},
             headers=headers,
+            api_key=settings.URLSCAN_API_KEY.strip() if has_api_key else "",
             timeout=REQUEST_TIMEOUT,
             rate_key="urlscan",
         )
