@@ -231,20 +231,11 @@ def _load_campaigns_db() -> dict:
 
 CAMPAIGNS_DB = _load_campaigns_db()
 CAMPAIGNS_BY_KEYWORDS = {}  # Will be built below
-
-# DEBUG: Print what was loaded
-_logger.info("[BODY] CAMPAIGNS_DB type: %s, keys: %s", type(CAMPAIGNS_DB), list(CAMPAIGNS_DB.keys()) if isinstance(CAMPAIGNS_DB, dict) else "N/A")
-_logger.info("[BODY] Number of campaigns in DB: %d", len(CAMPAIGNS_DB.get("campaigns", [])))
-
 for campaign in CAMPAIGNS_DB.get("campaigns", []):
     for keyword in campaign.get("keywords", []):
         if keyword not in CAMPAIGNS_BY_KEYWORDS:
             CAMPAIGNS_BY_KEYWORDS[keyword] = []
         CAMPAIGNS_BY_KEYWORDS[keyword].append(campaign)
-
-# Log campaign database status at startup
-_logger.info("[BODY] Campaign database loaded: %d campaigns, %d keywords indexed",
-             len(CAMPAIGNS_DB.get("campaigns", [])), len(CAMPAIGNS_BY_KEYWORDS))
 
 
 @dataclass
@@ -330,29 +321,21 @@ def _detect_campaign_match(text_lower: str, subject_lower: str) -> dict | None:
         Dict with campaign_id, campaign_name, risk_contribution; or None if no match
     """
     combined_text = f"{subject_lower} {text_lower}"
-    _logger.error("[CAMPAIGN_MATCH] Combined text length: %d, Keywords in index: %d", len(combined_text), len(CAMPAIGNS_BY_KEYWORDS))
 
     for keyword, campaigns in CAMPAIGNS_BY_KEYWORDS.items():
         if keyword.lower() in combined_text:
-            _logger.error("[CAMPAIGN_MATCH] Found keyword: %s", keyword)
             for campaign in campaigns:
-                # Check if multiple keywords from this campaign are present
                 campaign_keywords = campaign.get("keywords", [])
                 matches = sum(1 for kw in campaign_keywords if kw.lower() in combined_text)
                 threshold = max(1, len(campaign_keywords) // 2)
 
-                _logger.error("[CAMPAIGN_MATCH] Campaign: %s, Keywords: %d, Matches: %d, Threshold: %d",
-                             campaign.get("id", "unknown"), len(campaign_keywords), matches, threshold)
-
-                if matches >= threshold:  # At least 50% of keywords
-                    _logger.error("[CAMPAIGN_MATCH] MATCH FOUND: %s", campaign.get("id", "unknown"))
+                if matches >= threshold:
                     return {
                         "campaign_id": campaign.get("id", "unknown"),
                         "campaign_name": campaign.get("name", "Unknown Campaign"),
                         "risk_contribution": campaign.get("risk_contribution", 40)
                     }
 
-    _logger.error("[CAMPAIGN_MATCH] NO MATCH FOUND")
     return None
 
 
@@ -858,20 +841,11 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
             _logger.info("[BODY] Language mismatch detected: %s (expected 'it')", lang_check["detected_language"])
 
     # Known campaign detection (v0.15)
-    # v0.15.1 FIX: Include hidden content in campaign matching
-    # Many sophisticated phishing emails have innocuous visible text but malicious hidden HTML
-    _logger.error("[BODY] CAMPAIGN_DEBUG: campaigns_db_len=%d, campaigns_by_keywords_len=%d, has_campaigns=%s",
-                  len(CAMPAIGNS_DB.get("campaigns", [])), len(CAMPAIGNS_BY_KEYWORDS), bool(CAMPAIGNS_DB.get("campaigns")))
-
     if CAMPAIGNS_DB.get("campaigns"):
         subject_lower = (parsed.mail_subject or "").lower()
-        # v0.15.1 FIX: Include visible HTML text for campaign detection
-        # Silvercrest email has phishing content in visible HTML, not in plain text or hidden elements
         all_body_for_campaign = clean_body + " " + (result.extracted_html_text or "") + " " + (result.raw_hidden_content or "")
         body_lower = all_body_for_campaign.lower()
-        _logger.debug("[BODY] Running campaign detection with combined_text_len=%d", len(all_body_for_campaign))
         campaign_match = _detect_campaign_match(body_lower, subject_lower)
-        _logger.debug("[BODY] Campaign match result: %s", "MATCHED" if campaign_match else "NO MATCH")
 
         if campaign_match:
             result.matched_campaign_id = campaign_match["campaign_id"]
@@ -883,10 +857,6 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
                 evidence=f"Campaign ID: {campaign_match['campaign_id']}, Risk contribution: +{campaign_match['risk_contribution']}",
             ))
             _logger.info("[BODY] Known campaign detected: %s (id=%s)", campaign_match["campaign_name"], campaign_match["campaign_id"])
-        else:
-            _logger.debug("[BODY] No campaign matched")
-    else:
-        _logger.warning("[BODY] Campaign database is empty or not loaded!")
 
     # Deduplica URL
     result.extracted_urls = list(dict.fromkeys(result.extracted_urls))
