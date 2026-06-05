@@ -647,7 +647,7 @@ function CampaignSection({ campaign, t }) {
   if (!campaign.matched_campaign_name) return null
 
   return (
-    <Section title={t('body.campaign_detected') || '🎯 Known Campaign Detected'} icon="🎯">
+    <Section title={t('body.campaign_detected') || '🎯 Known Campaign Detected'}>
       <div style={{ padding: '12px 16px', borderRadius: 8, background: 'var(--risk-high-bg)', border: '2px solid var(--risk-high)', }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <div style={{ fontSize: 20 }}>⚠️</div>
