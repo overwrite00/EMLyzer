@@ -900,7 +900,7 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
             result.findings.append(BodyFinding(
                 category="nlp",
                 severity=sev,
-                description=t("body.nlp_phishing", **{"prob": int(result.nlp_result.phishing_probability * 100), "confidence": result.nlp_result.confidence}),
+                description=t("body.nlp_phishing", **{"prob": round(result.nlp_result.phishing_probability * 100), "confidence": result.nlp_result.confidence}),
                 evidence="Feature: " + ", ".join(result.nlp_result.top_features[:5]) if result.nlp_result.top_features else "",
             ))
             _logger.info("[BODY] NLP: label=%s, prob=%.2f, confidence=%s (model=v0.15.1-tabular)", result.nlp_result.label, result.nlp_result.phishing_probability, result.nlp_result.confidence)
