@@ -237,6 +237,10 @@ for campaign in CAMPAIGNS_DB.get("campaigns", []):
             CAMPAIGNS_BY_KEYWORDS[keyword] = []
         CAMPAIGNS_BY_KEYWORDS[keyword].append(campaign)
 
+# Log campaign database status at startup
+_logger.info("[BODY] Campaign database loaded: %d campaigns, %d keywords indexed",
+             len(CAMPAIGNS_DB.get("campaigns", [])), len(CAMPAIGNS_BY_KEYWORDS))
+
 
 @dataclass
 class BodyFinding:
@@ -845,6 +849,7 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
         # Combine visible + hidden content for campaign detection
         all_body_for_campaign = clean_body + " " + (result.raw_hidden_content or "")
         body_lower = all_body_for_campaign.lower()
+        _logger.debug("[BODY] Running campaign detection with combined_text_len=%d", len(all_body_for_campaign))
         campaign_match = _detect_campaign_match(body_lower, subject_lower)
         if campaign_match:
             result.matched_campaign_id = campaign_match["campaign_id"]
@@ -856,6 +861,8 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
                 evidence=f"Campaign ID: {campaign_match['campaign_id']}, Risk contribution: +{campaign_match['risk_contribution']}",
             ))
             _logger.info("[BODY] Known campaign detected: %s (id=%s)", campaign_match["campaign_name"], campaign_match["campaign_id"])
+        else:
+            _logger.debug("[BODY] No campaign matched")
 
     # Deduplica URL
     result.extracted_urls = list(dict.fromkeys(result.extracted_urls))
