@@ -270,6 +270,7 @@ class BodyAnalysisResult:
     base64_inline_count: int = 0
     extracted_urls: list[str] = field(default_factory=list)
     raw_hidden_content: str = ""   # testo estratto dagli elementi nascosti
+    extracted_html_text: str = ""  # v0.15.1: testo visibile estratto dall'HTML (per campaign matching)
     nlp_result: object = None           # NLPResult dal classificatore ML
     score_contribution: float = 0.0
     # Language mismatch detection (v0.15)
@@ -825,6 +826,8 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
             soup = BeautifulSoup(parsed.body_html, "html.parser")
             html_text = soup.get_text(separator=" ", strip=True)
             if html_text and len(html_text) > 50:
+                # v0.15.1: Save extracted HTML text for campaign matching
+                result.extracted_html_text = html_text
                 _logger.debug("[BODY] Extracting text from HTML for pattern analysis (html_text_len=%d)", len(html_text))
                 _analyze_text(html_text, result)
     except Exception as e:
@@ -862,8 +865,9 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
 
     if CAMPAIGNS_DB.get("campaigns"):
         subject_lower = (parsed.mail_subject or "").lower()
-        # Combine visible + hidden content for campaign detection
-        all_body_for_campaign = clean_body + " " + (result.raw_hidden_content or "")
+        # v0.15.1 FIX: Include visible HTML text for campaign detection
+        # Silvercrest email has phishing content in visible HTML, not in plain text or hidden elements
+        all_body_for_campaign = clean_body + " " + (result.extracted_html_text or "") + " " + (result.raw_hidden_content or "")
         body_lower = all_body_for_campaign.lower()
         _logger.debug("[BODY] Running campaign detection with combined_text_len=%d", len(all_body_for_campaign))
         campaign_match = _detect_campaign_match(body_lower, subject_lower)
