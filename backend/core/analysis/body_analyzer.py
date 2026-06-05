@@ -837,9 +837,13 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
             _logger.info("[BODY] Language mismatch detected: %s (expected 'it')", lang_check["detected_language"])
 
     # Known campaign detection (v0.15)
+    # v0.15.1 FIX: Include hidden content in campaign matching
+    # Many sophisticated phishing emails have innocuous visible text but malicious hidden HTML
     if CAMPAIGNS_DB.get("campaigns"):
         subject_lower = (parsed.mail_subject or "").lower()
-        body_lower = clean_body.lower()
+        # Combine visible + hidden content for campaign detection
+        all_body_for_campaign = clean_body + " " + (result.raw_hidden_content or "")
+        body_lower = all_body_for_campaign.lower()
         campaign_match = _detect_campaign_match(body_lower, subject_lower)
         if campaign_match:
             result.matched_campaign_id = campaign_match["campaign_id"]
