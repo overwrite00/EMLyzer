@@ -408,6 +408,8 @@ def _build_response_from_record(record) -> dict:
             "obfuscated_links":        bi.get("obfuscated_links", []),
             "findings":                bi.get("findings", []),
             "extracted_urls_count":    bi.get("extracted_urls_count", 0),
+            "matched_campaign_id":     bi.get("matched_campaign_id", ""),
+            "matched_campaign_name":   bi.get("matched_campaign_name", ""),
             "nlp":                     bi.get("nlp", None),
         },
         "url_analysis": {
@@ -508,6 +510,8 @@ def _build_response(job_id, parsed, header_result, body_result, url_result, atta
             "obfuscated_links": body_result.obfuscated_links,
             "findings": [_dataclass_to_dict(f) for f in body_result.findings],
             "extracted_urls_count": len(body_result.extracted_urls),
+            "matched_campaign_id": body_result.matched_campaign_id,
+            "matched_campaign_name": body_result.matched_campaign_name,
             "nlp": {
                 "available": getattr(body_result.nlp_result, "available", False),
                 "phishing_probability": getattr(body_result.nlp_result, "phishing_probability", 0.0),
