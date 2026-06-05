@@ -575,6 +575,9 @@ function TabBody({ data, t, jobId }) {
         </div>
       </Section>
 
+      {/* ── Sezione Linguaggio Rilevato (v0.15) ── */}
+      {data.language_mismatch && <LanguageMismatchSection data={data} t={t} />}
+
       {/* ── Sezione Campagna Rilevata (v0.15) ── */}
       {data.matched_campaign_name && <CampaignSection campaign={data} t={t} />}
 
@@ -606,6 +609,35 @@ function TabBody({ data, t, jobId }) {
           : <EmptyState message={t('body.no_findings')} />}
       </Section>
     </>
+  )
+}
+
+
+// ── Language Mismatch Section (v0.15) ──────────────────────────────────────
+function LanguageMismatchSection({ data, t }) {
+  if (!data.language_mismatch) return null
+
+  return (
+    <Section title={t('body.language_mismatch') || '🌐 Language Mismatch Detected'} icon="🌐">
+      <div style={{ padding: '12px 16px', borderRadius: 8, background: 'var(--risk-high-bg)', border: '2px solid var(--risk-high)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 20 }}>⚠️</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--risk-high)', marginBottom: 6 }}>
+              {t('body.language_mismatch_title') || 'Unexpected Language Detected'}
+            </div>
+            {data.detected_language && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontFamily: 'var(--font-mono)' }}>
+                {t('body.detected_language') || 'Detected language'}: <strong>{data.detected_language}</strong>
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+              {t('body.language_mismatch_desc') || 'Email body language does not match expected user language. This may indicate a compromised account or unauthorized mailing.'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Section>
   )
 }
 
@@ -696,7 +728,7 @@ function NLPSection({ nlp, t }) {
           {nlp.top_features?.length > 0 && (
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
-                Feature rilevanti (TF-IDF):
+                {t('body.nlp_top_features') || 'Top features'}:
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                 {nlp.top_features.map(f => (
