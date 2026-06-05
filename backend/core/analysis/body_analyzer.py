@@ -19,7 +19,7 @@ import bleach
 from langdetect import detect, LangDetectException
 
 from core.analysis.email_parser import ParsedEmail
-from core.analysis.nlp_classifier import classify_text, NLPResult
+from core.analysis.nlp_classifier import classify_text, classify_features, NLPResult
 from utils.i18n import t
 
 _logger = logging.getLogger(__name__)
@@ -756,7 +756,7 @@ def _compute_score(result: BodyAnalysisResult) -> float:
     return min(score, 100.0)
 
 
-def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
+def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = None) -> BodyAnalysisResult:
     """
     Analizza il corpo email per rilevare pattern phishing, urgenza e credenziali.
 
@@ -772,13 +772,15 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
     - Base64 inline (embedding di malware/phishing page)
     - Grammatica (via LanguageTool se configurato)
 
-    NLP Classification:
-    - LogisticRegression + TF-IDF per classificare legittima vs phishing
+    NLP Classification v0.15.1 (Tabular Random Forest):
+    - Estrae feature numeriche (urgency, CTA, credentials, body length, etc.)
+    - Passa al modello tabular per classificazione phishing/legittima
     - Confidence: low/medium/high based on probability
     - Contribuisce al body score finale
 
     Args:
         parsed: ParsedEmail con body_text (plain) e body_html (HTML)
+        header_result: Optional HeaderAnalysisResult per estrarre info autenticazione (SPF/DKIM/DMARC)
 
     Returns:
         BodyAnalysisResult con findings, conteggi pattern, URLs estratte, NLP result, score
@@ -847,9 +849,37 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
     result.extracted_urls = list(dict.fromkeys(result.extracted_urls))
     _logger.info("[BODY] Extracted %d unique URLs from body", len(result.extracted_urls))
 
-    # Classificatore NLP (se scikit-learn disponibile)
+    # Classificatore NLP v0.15.1 (Tabular Random Forest model)
     try:
-        result.nlp_result = classify_text(parsed.body_text, parsed.body_html)
+        # Extract authentication flags from header_result
+        spf_pass = False
+        dkim_pass = False
+        dmarc_pass = False
+        if header_result and hasattr(header_result, 'auth_detail') and header_result.auth_detail:
+            spf_pass = header_result.auth_detail.spf_result == "pass"
+            dkim_pass = any(sig.get("result") == "pass" for sig in (header_result.auth_detail.dkim_signatures or []))
+            dmarc_pass = header_result.auth_detail.dmarc_result == "pass"
+
+        # Extract feature dimensions for tabular model
+        body_length = len(parsed.body_text or "")
+        subject_length = len(parsed.mail_subject or "")
+        url_count = len(result.extracted_urls)
+        has_attachments = len(parsed.attachments) > 0
+
+        # Call tabular NLP model with features (v0.15.1)
+        result.nlp_result = classify_features(
+            urgency_count=result.urgency_count,
+            cta_count=result.phishing_cta_count,
+            credential_count=result.credential_keyword_count,
+            body_length=body_length,
+            subject_length=subject_length,
+            url_count=url_count,
+            has_attachments=has_attachments,
+            spf_pass=spf_pass,
+            dkim_pass=dkim_pass,
+            dmarc_pass=dmarc_pass
+        )
+
         if result.nlp_result.available and result.nlp_result.label in ("phishing", "suspicious"):
             sev = "high" if result.nlp_result.confidence == "high" else "medium"
             result.findings.append(BodyFinding(
@@ -858,9 +888,9 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
                 description=t("body.nlp_phishing", **{"prob": int(result.nlp_result.phishing_probability * 100), "confidence": result.nlp_result.confidence}),
                 evidence="Feature: " + ", ".join(result.nlp_result.top_features[:5]) if result.nlp_result.top_features else "",
             ))
-            _logger.info("[BODY] NLP: label=%s, prob=%.2f, confidence=%s", result.nlp_result.label, result.nlp_result.phishing_probability, result.nlp_result.confidence)
+            _logger.info("[BODY] NLP: label=%s, prob=%.2f, confidence=%s (model=v0.15.1-tabular)", result.nlp_result.label, result.nlp_result.phishing_probability, result.nlp_result.confidence)
     except Exception as e:
-        _logger.warning("[BODY] NLP classification failed: %s", e)
+        _logger.warning("[BODY] NLP classification failed (v0.15.1 tabular model): %s", e)
 
     result.score_contribution = _compute_score(result)
     _logger.info("[BODY END] Total findings: %d (urgency=%d, cta=%d, creds=%d, score=%.1f)",

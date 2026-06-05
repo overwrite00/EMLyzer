@@ -183,7 +183,7 @@ async def run_analysis(
         """
         _parsed            = parse_email_file(raw, original_filename)
         _header_result     = analyze_headers(_parsed)
-        _body_result       = analyze_body(_parsed)
+        _body_result       = analyze_body(_parsed, _header_result)
         _url_result        = analyze_urls(_body_result.extracted_urls, do_whois=do_whois)
         _attachment_result = analyze_attachments(_parsed.attachments)
         _risk              = compute_risk_score(_header_result, _body_result, _url_result, _attachment_result)
