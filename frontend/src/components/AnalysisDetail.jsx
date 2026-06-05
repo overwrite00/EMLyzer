@@ -682,7 +682,9 @@ function NLPSection({ nlp, t }) {
     unknown:    { color: 'var(--text-muted)',    bg: 'var(--bg-card)' },
   }
   const lc = LABEL_COLORS[nlp.label] || LABEL_COLORS.unknown
-  const pct = Math.round((nlp.phishing_probability || 0) * 100)
+  // Use standard mathematical rounding (not JavaScript banker's rounding)
+  // Math.round(94.5) = 94 (wrong - rounds to even), floor(94.5 + 0.5) = 95 (correct)
+  const pct = Math.floor((nlp.phishing_probability || 0) * 100 + 0.5)
 
   return (
     <Section title={t('body.nlp_section')} icon="🤖">
