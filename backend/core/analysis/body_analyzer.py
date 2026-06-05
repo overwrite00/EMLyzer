@@ -583,6 +583,13 @@ def _analyze_html(body_html: str, result: BodyAnalysisResult):
                     hidden_texts.append(txt)
         if hidden_texts:
             result.raw_hidden_content = "\n".join(hidden_texts[:20])
+            # v0.15.1 FIX: Analyze patterns in hidden content too!
+            # Hidden text often contains phishing indicators masked from visual inspection
+            hidden_content_combined = " ".join(hidden_texts)
+            _analyze_text(hidden_content_combined, result)
+            _logger.debug("[BODY] Hidden content analyzed: %d urgency, %d cta, %d credentials",
+                         result.urgency_count, result.phishing_cta_count, result.credential_keyword_count)
+
         result.findings.append(BodyFinding(
             category="html",
             severity="medium",
@@ -861,7 +868,9 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
             dmarc_pass = header_result.auth_detail.dmarc_result == "pass"
 
         # Extract feature dimensions for tabular model
-        body_length = len(parsed.body_text or "")
+        # v0.15.1 FIX: Include hidden content in body_length calculation
+        all_body_text = (parsed.body_text or "") + " " + (result.raw_hidden_content or "")
+        body_length = len(all_body_text)
         subject_length = len(parsed.mail_subject or "")
         url_count = len(result.extracted_urls)
         has_attachments = len(parsed.attachments) > 0
