@@ -22,6 +22,38 @@ Le funzionalità sono ordinate per priorità di implementazione.
 
 ---
 
+## [0.15.1] — 2026-06-06
+
+### Risolto — Campaign Detection & NLP Score Consistency (Bugfix Release)
+
+#### Campaign Detection Improvements
+- **Root Cause**: Campaign matching ignored visible HTML text (only used plain text + CSS-hidden content)
+- **Fix**: Added `extracted_html_text` field to `BodyAnalysisResult` dataclass
+- **Impact**: Silvercrest and other campaigns with visible HTML phishing content now correctly detected
+- **Example**: Email with "Friggitrice Silvercrest" in visible HTML now matches campaign (+40 points instead of 0)
+
+#### NLP Score Consistency
+- **Root Cause 1 (Backend)**: Used `int()` truncation instead of `round()` for NLP percentage in findings
+  - Result: `int(94.5) = 94%` but should be `95%`
+- **Root Cause 2 (Frontend)**: JavaScript `Math.round()` uses banker's rounding (rounds 0.5 to even)
+  - Result: `Math.round(94.5) = 94%` but should be `95%`
+- **Fixes**:
+  - Backend: Changed `int(prob * 100)` → `round(prob * 100)` in findings creation
+  - Frontend: Changed `Math.round()` → `Math.floor(x + 0.5)` for standard mathematical rounding
+- **Result**: NLP score now consistent across all display locations (always 95% for 0.945 probability)
+
+#### UI Polish
+- **Removed duplicate emoji** in campaign detection section header
+- **Cleaned debug logging** from campaign detection code
+
+### Testing
+- ✅ **119/119 tests PASS** — Zero regressions from bugfixes
+- ✅ **Campaign detection**: Silvercrest now correctly detected with visible HTML text
+- ✅ **NLP consistency**: Same probability value shows same percentage everywhere
+- ✅ **Frontend compilation**: Bundle rebuilt and deployed
+
+---
+
 ## [0.15.0] — 2026-06-05
 
 ### Aggiunto — Phishing Detection Improvements (6 Features)

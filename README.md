@@ -85,6 +85,8 @@ Email (.eml / .msg / testo incollato)
 
 ## 🔧 Versione
 
+**v0.15.1** — Bugfix release: Fixed campaign detection to include visible HTML text (Silvercrest and other campaigns now correctly detected), fixed NLP score consistency (both backend and frontend now use standard mathematical rounding), removed duplicate emoji from campaign UI, cleaned debug logging. All 119 tests passing, production-ready.
+
 **v0.15.0** — Python 3.11–3.13, 119 test automatici, Windows + Linux. Phishing Detection Improvements: Language Mismatch Detector, Domain Mismatch Detector, Storage CDN Blocklist, Known Campaign Detection (13 campaigns), Brand Spoofing Detector (25 brands). Production-ready with zero technical debt.
 
 ---
