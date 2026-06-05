@@ -52,6 +52,24 @@ URGENCY_PATTERNS = [
     r"\bprazo\s+final\b", r"\blimite.*tempo\b",
     r"\bsuspen[dç][ãa]o?\b",
     r"\bhoje\b",  # "hoje" (today) — urgency indicator in Portuguese
+    # Italiano — nuovi pattern v0.15.1 (Italian-specific phishing)
+    r"\bultimo\s+tentativo\b",  # "last attempt" (Quechua sample)
+    r"\bsi\s+prega\s+di\s+(?:attendere|aspettare|agire|verificare|confermare)\b",  # "please wait/verify"
+    r"\bentro\s+(?:\d+\s+)?(?:ore|giorni|minuti|settimane)\b",  # "within X hours/days"
+    r"\bentro\s+(?:il\s+|la\s+)?(?:oggi|domani|stasera)\b",  # "by today/tomorrow"
+    r"\bnon\s+(?:aspettare|rimandare|ignorare)\b",  # "don't wait"
+    r"\bagisci\s+(?:subito|ora|adesso|velocemente)\b",  # "act now"
+    r"\bprima\s+(?:che|di|della|del)\s+.*(?:scad|perdi|blocca|sospen|rimuov|disattiva)\b",  # "before [bad event]"
+    r"\brinnovo\s+(?:urgente|necessario|richiesto)\b",  # "urgent renewal"
+    r"\b(?:modifica|cambio|aggiornamento)\s+(?:dati|account|profilo|password)\b",  # "change/update"
+    r"\battivazione.*richiest\b",  # "activation requested"
+    r"\bperiodo\s+di\s+(?:prova|trial)\b",  # "trial period"
+    r"\baccesso\s+(?:temporaneo|limitato|ristretto)\b",  # "temporary access"
+    r"\b(?:disattivazione|chiusura)\s+(?:account|conto)\b",  # "deactivation/closure"
+    # Portoghese — nuovi pattern v0.15.1
+    r"\bultima\s+tentativa\b",  # "last attempt" (PT)
+    r"\bfaça\s+(?:logo|agora|depressa)\b",  # "do it now" (PT)
+    r"\bprecisa\s+(?:agora|imediatamente|urgentemente)\b",  # "needs to be done now" (PT)
 ]
 
 PHISHING_CTAS = [
@@ -78,6 +96,24 @@ PHISHING_CTAS = [
     r"\bvalide\s+sua\s+identidade\b",
     r"\bautentique-?se\b", r"\bautenticate\b",
     r"\bfaça\s+(?:seu\s+)?(?:login|acesso)\b",
+    # Italiano — nuovi CTA pattern v0.15.1
+    r"\baccedi\s+qui\b", r"\baccedi\s+al\s+(?:tuo\s+)?(?:conto|account)\b",  # "log in here/to your account"
+    r"\bcompila\s+il\s+(?:modulo|form|formulario)\b",  # "fill the form"
+    r"\binvia\s+(?:i\s+)?dati\b",  # "send the data"
+    r"\bfai\s+clic\s+(?:qui|qua|qui\s+sotto)\b",  # "click here"
+    r"\btocca\s+il\s+link\b",  # "tap the link"
+    r"\bvisita\s+il\s+(?:link|sito)\b",  # "visit the link/site"
+    r"\bapri\s+il\s+(?:file|documento|allegato)\b",  # "open the file/document"
+    r"\bcompleta\s+il\s+(?:modulo|form)\b",  # "complete the form"
+    r"\brisolvi\s+il\s+(?:problema|issue)\b",  # "resolve the issue"
+    r"\bcopia\s+il\s+codice\b",  # "copy the code"
+    r"\bscarica\s+il\s+(?:file|documento|allegato)\b",  # "download the file"
+    r"\bclicca\s+qui\s+(?:sotto|adesso|subito)\b",  # "click here now"
+    # Portoghese — nuovi CTA pattern v0.15.1
+    r"\bacesse\s+(?:aqui|agora)\b",  # "access here/now" (PT)
+    r"\bpreencha\s+o\s+(?:formulario|form)\b",  # "fill the form" (PT)
+    r"\benvie\s+os\s+dados\b",  # "send the data" (PT)
+    r"\bclique\s+aqui\s+(?:embaixo|agora|abaixo)\b",  # "click here below/now" (PT)
 ]
 
 CREDENTIAL_KEYWORDS = [
@@ -100,6 +136,31 @@ CREDENTIAL_KEYWORDS = [
     r"\botp\b", r"\bone-?time\s+password\b",
     r"\bpix\b",  # Sistema di pagamento istantaneo brasiliano — altamente rilevante
     r"\b(?:rg|identidade|cédula)\b",
+    # Italiano — nuovi CREDENTIAL pattern v0.15.1 (Italian-specific personal data)
+    r"\bnumero\s+(?:di\s+)?cellulare\b",  # "phone number"
+    r"\bnumero\s+di\s+telefono\b",  # "phone number" (variant)
+    r"\bnome\s+(?:e\s+)?cognome\b",  # "full name" (very common phishing request)
+    r"\bindirizzo\s+(?:completo|di\s+residenza)\b",  # "complete address"
+    r"\bdata\s+di\s+nascita\b",  # "date of birth"
+    r"\bconto\s+corrente\b",  # "checking account"
+    r"\bnumero\s+di\s+conto\b",  # "account number"
+    r"\bcarta\s+prepagata\b",  # "prepaid card"
+    r"\bpatente\s+(?:di\s+guida|numero)\b",  # "driver's license"
+    r"\bpassaporto\b",  # "passport"
+    r"\bnumero\s+passaporto\b",  # "passport number"
+    r"\bcodice\s+fiscale\b",  # "tax ID" (very common in Italy)
+    r"\bnumero\s+di\s+sicurezza\b",  # "security number" (generic)
+    r"\b(?:rinnovo|aggiornamento)\s+(?:dati|profilo|informazioni)\b",  # "data renewal/update"
+    r"\bverifica\s+identit[aà]\b",  # "identity verification"
+    r"\bconferma\s+(?:dati\s+)?bancari\b",  # "confirm banking data"
+    # Portoghese — nuovi CREDENTIAL pattern v0.15.1
+    r"\bnumero\s+de\s+celular\b",  # "phone number" (PT)
+    r"\bnome\s+completo\b",  # "full name" (PT)
+    r"\bendereço\s+completo\b",  # "complete address" (PT)
+    r"\bdata\s+de\s+nascimento\b",  # "date of birth" (PT)
+    r"\bconta\s+corrente\b",  # "checking account" (PT)
+    r"\bcnh\b",  # "Brazilian driver's license"
+    r"\brnc\s+(?:numero|número)\b",  # "RNC number" (PT)
 ]
 
 # Mappa omoglifi Unicode → carattere latino equivalente
