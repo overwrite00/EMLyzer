@@ -231,6 +231,11 @@ def _load_campaigns_db() -> dict:
 
 CAMPAIGNS_DB = _load_campaigns_db()
 CAMPAIGNS_BY_KEYWORDS = {}  # Will be built below
+
+# DEBUG: Print what was loaded
+_logger.info("[BODY] CAMPAIGNS_DB type: %s, keys: %s", type(CAMPAIGNS_DB), list(CAMPAIGNS_DB.keys()) if isinstance(CAMPAIGNS_DB, dict) else "N/A")
+_logger.info("[BODY] Number of campaigns in DB: %d", len(CAMPAIGNS_DB.get("campaigns", [])))
+
 for campaign in CAMPAIGNS_DB.get("campaigns", []):
     for keyword in campaign.get("keywords", []):
         if keyword not in CAMPAIGNS_BY_KEYWORDS:
@@ -844,6 +849,9 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
     # Known campaign detection (v0.15)
     # v0.15.1 FIX: Include hidden content in campaign matching
     # Many sophisticated phishing emails have innocuous visible text but malicious hidden HTML
+    _logger.debug("[BODY] Campaign DB check: campaigns_db_len=%d, campaigns_by_keywords_len=%d",
+                  len(CAMPAIGNS_DB.get("campaigns", [])), len(CAMPAIGNS_BY_KEYWORDS))
+
     if CAMPAIGNS_DB.get("campaigns"):
         subject_lower = (parsed.mail_subject or "").lower()
         # Combine visible + hidden content for campaign detection
@@ -851,6 +859,8 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
         body_lower = all_body_for_campaign.lower()
         _logger.debug("[BODY] Running campaign detection with combined_text_len=%d", len(all_body_for_campaign))
         campaign_match = _detect_campaign_match(body_lower, subject_lower)
+        _logger.debug("[BODY] Campaign match result: %s", "MATCHED" if campaign_match else "NO MATCH")
+
         if campaign_match:
             result.matched_campaign_id = campaign_match["campaign_id"]
             result.matched_campaign_name = campaign_match["campaign_name"]
@@ -863,6 +873,8 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
             _logger.info("[BODY] Known campaign detected: %s (id=%s)", campaign_match["campaign_name"], campaign_match["campaign_id"])
         else:
             _logger.debug("[BODY] No campaign matched")
+    else:
+        _logger.warning("[BODY] Campaign database is empty or not loaded!")
 
     # Deduplica URL
     result.extracted_urls = list(dict.fromkeys(result.extracted_urls))
