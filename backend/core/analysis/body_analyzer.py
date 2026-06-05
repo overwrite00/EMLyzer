@@ -329,21 +329,29 @@ def _detect_campaign_match(text_lower: str, subject_lower: str) -> dict | None:
         Dict with campaign_id, campaign_name, risk_contribution; or None if no match
     """
     combined_text = f"{subject_lower} {text_lower}"
+    _logger.error("[CAMPAIGN_MATCH] Combined text length: %d, Keywords in index: %d", len(combined_text), len(CAMPAIGNS_BY_KEYWORDS))
 
     for keyword, campaigns in CAMPAIGNS_BY_KEYWORDS.items():
         if keyword.lower() in combined_text:
+            _logger.error("[CAMPAIGN_MATCH] Found keyword: %s", keyword)
             for campaign in campaigns:
                 # Check if multiple keywords from this campaign are present
                 campaign_keywords = campaign.get("keywords", [])
                 matches = sum(1 for kw in campaign_keywords if kw.lower() in combined_text)
+                threshold = max(1, len(campaign_keywords) // 2)
 
-                if matches >= max(1, len(campaign_keywords) // 2):  # At least 50% of keywords
+                _logger.error("[CAMPAIGN_MATCH] Campaign: %s, Keywords: %d, Matches: %d, Threshold: %d",
+                             campaign.get("id", "unknown"), len(campaign_keywords), matches, threshold)
+
+                if matches >= threshold:  # At least 50% of keywords
+                    _logger.error("[CAMPAIGN_MATCH] MATCH FOUND: %s", campaign.get("id", "unknown"))
                     return {
                         "campaign_id": campaign.get("id", "unknown"),
                         "campaign_name": campaign.get("name", "Unknown Campaign"),
                         "risk_contribution": campaign.get("risk_contribution", 40)
                     }
 
+    _logger.error("[CAMPAIGN_MATCH] NO MATCH FOUND")
     return None
 
 
