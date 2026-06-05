@@ -849,8 +849,8 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
     # Known campaign detection (v0.15)
     # v0.15.1 FIX: Include hidden content in campaign matching
     # Many sophisticated phishing emails have innocuous visible text but malicious hidden HTML
-    _logger.debug("[BODY] Campaign DB check: campaigns_db_len=%d, campaigns_by_keywords_len=%d",
-                  len(CAMPAIGNS_DB.get("campaigns", [])), len(CAMPAIGNS_BY_KEYWORDS))
+    _logger.error("[BODY] CAMPAIGN_DEBUG: campaigns_db_len=%d, campaigns_by_keywords_len=%d, has_campaigns=%s",
+                  len(CAMPAIGNS_DB.get("campaigns", [])), len(CAMPAIGNS_BY_KEYWORDS), bool(CAMPAIGNS_DB.get("campaigns")))
 
     if CAMPAIGNS_DB.get("campaigns"):
         subject_lower = (parsed.mail_subject or "").lower()
