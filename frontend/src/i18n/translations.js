@@ -175,6 +175,8 @@ export const translations = {
   "body.hidden_evidence": { it: "Elementi nascosti tramite CSS o stili inline rilevati nel body HTML.", en: "Elements hidden via CSS or inline styles detected in HTML body." },
   "body.yes": { it: "Sì", en: "Yes" },
   "body.no": { it: "No", en: "No" },
+  "body.campaign_detected": { it: "🎯 Campagna di Phishing Rilevata", en: "🎯 Known Campaign Detected" },
+  "body.campaign_known_threat": { it: "Questa email corrisponde a una campagna di phishing nota. Rivedi con attenzione tutti gli indicatori.", en: "This email matches a known phishing campaign. Review all indicators carefully." },
 
   // ── URL tab ──────────────────────────────────────────────────────────────────
   "url.total": { it: "{n} URL analizzati", en: "{n} URLs analyzed" },

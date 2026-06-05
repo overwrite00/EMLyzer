@@ -575,6 +575,9 @@ function TabBody({ data, t, jobId }) {
         </div>
       </Section>
 
+      {/* ── Sezione Campagna Rilevata (v0.15) ── */}
+      {data.matched_campaign_name && <CampaignSection campaign={data} t={t} />}
+
       {/* ── Sezione NLP ── */}
       <NLPSection nlp={data.nlp} t={t} />
 
@@ -603,6 +606,35 @@ function TabBody({ data, t, jobId }) {
           : <EmptyState message={t('body.no_findings')} />}
       </Section>
     </>
+  )
+}
+
+
+// ── Campaign Section (v0.15) ────────────────────────────────────────────────
+function CampaignSection({ campaign, t }) {
+  if (!campaign.matched_campaign_name) return null
+
+  return (
+    <Section title={t('body.campaign_detected') || '🎯 Known Campaign Detected'} icon="🎯">
+      <div style={{ padding: '12px 16px', borderRadius: 8, background: 'var(--risk-high-bg)', border: '2px solid var(--risk-high)', }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 20 }}>⚠️</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--risk-high)', marginBottom: 6 }}>
+              {campaign.matched_campaign_name}
+            </div>
+            {campaign.matched_campaign_id && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontFamily: 'var(--font-mono)' }}>
+                ID: {campaign.matched_campaign_id}
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+              {t('body.campaign_known_threat') || 'This email matches a known phishing campaign. Review all indicators carefully.'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Section>
   )
 }
 
