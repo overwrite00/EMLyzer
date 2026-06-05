@@ -11,9 +11,12 @@ import re
 import base64
 import logging
 import unicodedata
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from bs4 import BeautifulSoup
 import bleach
+from langdetect import detect, LangDetectException
 
 from core.analysis.email_parser import ParsedEmail
 from core.analysis.nlp_classifier import classify_text, NLPResult
@@ -153,6 +156,27 @@ URL_SHORTENER_DOMAINS = {
 }
 
 
+# --- Load campaigns database (v0.15) ---
+def _load_campaigns_db() -> dict:
+    """Load known phishing campaigns from JSON config."""
+    try:
+        campaigns_path = Path(__file__).parent.parent.parent / "config" / "campaigns.json"
+        if campaigns_path.exists():
+            with open(campaigns_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        _logger.error("[BODY] Failed to load campaigns database: %s", e)
+    return {"campaigns": []}
+
+CAMPAIGNS_DB = _load_campaigns_db()
+CAMPAIGNS_BY_KEYWORDS = {}  # Will be built below
+for campaign in CAMPAIGNS_DB.get("campaigns", []):
+    for keyword in campaign.get("keywords", []):
+        if keyword not in CAMPAIGNS_BY_KEYWORDS:
+            CAMPAIGNS_BY_KEYWORDS[keyword] = []
+        CAMPAIGNS_BY_KEYWORDS[keyword].append(campaign)
+
+
 @dataclass
 class BodyFinding:
     category: str  # text / html / url / base64
@@ -178,6 +202,79 @@ class BodyAnalysisResult:
     raw_hidden_content: str = ""   # testo estratto dagli elementi nascosti
     nlp_result: object = None           # NLPResult dal classificatore ML
     score_contribution: float = 0.0
+    # Language mismatch detection (v0.15)
+    language_mismatch: bool = False
+    detected_language: str = ""
+    # Known campaign detection (v0.15)
+    matched_campaign_id: str = ""
+    matched_campaign_name: str = ""
+
+
+def _detect_language_mismatch(text: str, expected_lang: str = "it", accepted_langs: set[str] | None = None) -> dict:
+    """
+    Detect if email body language mismatches expected recipient language.
+    Used to identify compromised accounts or unauthorized mailings.
+
+    Only flags languages that are clearly suspicious (not in accepted_langs).
+    By default, accepts 'it' (Italian) and 'en' (English) for Italian users.
+
+    Args:
+        text: Email body text (HTML stripped, >100 chars)
+        expected_lang: Expected language code (default 'it' for Italian)
+        accepted_langs: Set of acceptable language codes (default: {'it', 'en'})
+
+    Returns:
+        Dict with language_mismatch (bool), detected_language (str), risk_contribution (int)
+    """
+    if accepted_langs is None:
+        accepted_langs = {"it", "en"}  # Default: Italian + English are OK
+
+    if not text or len(text) < 100:
+        return {"language_mismatch": False, "detected_language": "", "risk_contribution": 0}
+
+    try:
+        detected = detect(text)
+        # Only flag as mismatch if detected language is NOT in accepted list
+        is_mismatch = detected not in accepted_langs
+
+        return {
+            "language_mismatch": is_mismatch,
+            "detected_language": detected,
+            "risk_contribution": 20 if is_mismatch else 0
+        }
+    except LangDetectException:
+        # Ambiguous/short text, no conclusion
+        return {"language_mismatch": False, "detected_language": "", "risk_contribution": 0}
+
+
+def _detect_campaign_match(text_lower: str, subject_lower: str) -> dict | None:
+    """
+    Detect if email matches known phishing campaign patterns.
+
+    Args:
+        text_lower: Email body (lowercase)
+        subject_lower: Email subject (lowercase)
+
+    Returns:
+        Dict with campaign_id, campaign_name, risk_contribution; or None if no match
+    """
+    combined_text = f"{subject_lower} {text_lower}"
+
+    for keyword, campaigns in CAMPAIGNS_BY_KEYWORDS.items():
+        if keyword.lower() in combined_text:
+            for campaign in campaigns:
+                # Check if multiple keywords from this campaign are present
+                campaign_keywords = campaign.get("keywords", [])
+                matches = sum(1 for kw in campaign_keywords if kw.lower() in combined_text)
+
+                if matches >= max(1, len(campaign_keywords) // 2):  # At least 50% of keywords
+                    return {
+                        "campaign_id": campaign.get("id", "unknown"),
+                        "campaign_name": campaign.get("name", "Unknown Campaign"),
+                        "risk_contribution": campaign.get("risk_contribution", 40)
+                    }
+
+    return None
 
 
 def _count_pattern_matches(pattern_list: list[str], text: str, result: BodyAnalysisResult, attr_name: str, max_match_len: int = 150) -> list[tuple[str, int]]:
@@ -653,6 +750,37 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
 
     _check_languagetool(parsed.body_text, result)
     _logger.debug("[BODY] languagetool checked: %d findings", len(result.findings))
+
+    # Language mismatch detection (v0.15)
+    clean_body = parsed.body_text or ""
+    if clean_body.strip():
+        lang_check = _detect_language_mismatch(clean_body)
+        if lang_check["language_mismatch"]:
+            result.language_mismatch = True
+            result.detected_language = lang_check["detected_language"]
+            result.findings.append(BodyFinding(
+                category="language",
+                severity="high",
+                description=t("body.language_mismatch", detected=lang_check["detected_language"]),
+                evidence=f"Email body detected as {lang_check['detected_language'].upper()} but expected 'it' (Italian)",
+            ))
+            _logger.info("[BODY] Language mismatch detected: %s (expected 'it')", lang_check["detected_language"])
+
+    # Known campaign detection (v0.15)
+    if CAMPAIGNS_DB.get("campaigns"):
+        subject_lower = (parsed.mail_subject or "").lower()
+        body_lower = clean_body.lower()
+        campaign_match = _detect_campaign_match(body_lower, subject_lower)
+        if campaign_match:
+            result.matched_campaign_id = campaign_match["campaign_id"]
+            result.matched_campaign_name = campaign_match["campaign_name"]
+            result.findings.append(BodyFinding(
+                category="campaign",
+                severity="high",
+                description=t("body.known_campaign", name=campaign_match["campaign_name"]),
+                evidence=f"Campaign ID: {campaign_match['campaign_id']}, Risk contribution: +{campaign_match['risk_contribution']}",
+            ))
+            _logger.info("[BODY] Known campaign detected: %s (id=%s)", campaign_match["campaign_name"], campaign_match["campaign_id"])
 
     # Deduplica URL
     result.extracted_urls = list(dict.fromkeys(result.extracted_urls))

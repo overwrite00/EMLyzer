@@ -43,6 +43,18 @@ IP_HOST_RE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
 # Rilevamento: HIGH risk (omoglifi Unicode usati per spoofing).
 PUNYCODE_RE = re.compile(r"xn--", re.IGNORECASE)
 
+# Malicious CDN patterns (v0.15).
+# Utilizzati in campagne di phishing coordinate per reindirizzare a pagine phishing.
+# Esempio: storage.googleapis.com/cartella/phish.html#?params
+MALICIOUS_CDN_PATTERNS = {
+    "storage.googleapis.com": {
+        "pattern": r"storage\.googleapis\.com/[\w\-]+/[^/]+\.html(?:#|\?|$)",
+        "risk": "CRITICAL",
+        "contribution": 30,
+        "reason": "Google Storage CDN used for phishing redirects (coordinated campaigns)"
+    }
+}
+
 # Timeout operazioni di rete (secondi).
 # DNS_TIMEOUT = 5s: timeout per singola query DNS (dnspython, per-resolver).
 #   Ricerca per hostname singolo + port; su Linux può rallentare se nameserver non risponde.
@@ -189,6 +201,31 @@ def _whois_age(domain: str) -> tuple[Optional[datetime], Optional[int], str]:
             return None, None, f"WHOIS timeout ({WHOIS_TIMEOUT}s)"
 
 
+def _check_malicious_cdn(url: str) -> dict | None:
+    """
+    Check if URL matches malicious CDN patterns.
+
+    Detects phishing campaigns that use legitimate CDN services as redirect intermediaries.
+    Example: storage.googleapis.com/secret/phish.html#?token
+
+    Args:
+        url: Full URL string
+
+    Returns:
+        Dict with CDN info if match found, None otherwise
+    """
+    for cdn, config in MALICIOUS_CDN_PATTERNS.items():
+        if re.search(config["pattern"], url, re.IGNORECASE):
+            return {
+                "cdn_malicious": True,
+                "cdn": cdn,
+                "risk_level": config["risk"],
+                "contribution": config["contribution"],
+                "reason": config["reason"]
+            }
+    return None
+
+
 def _analyze_single_url(
     url: str,
     do_whois: bool = True,
@@ -244,6 +281,16 @@ def _analyze_single_url(
                 "description": t("url.shortener", domain=analysis.domain),
                 "evidence": t("url.shortener_evidence"),
             })
+
+        # Malicious CDN check (v0.15)
+        cdn_check = _check_malicious_cdn(url)
+        if cdn_check:
+            analysis.findings.append({
+                "severity": "high",
+                "description": t("url.malicious_cdn", cdn=cdn_check["cdn"]),
+                "evidence": f"CDN: {cdn_check['cdn']} — {cdn_check['reason']}",
+            })
+            _logger.warning("[URL] Malicious CDN detected: %s in URL: %s", cdn_check["cdn"], url)
 
         # DNS lookup con timeout
         ip, dns_err = _resolve_ip(clean_host)

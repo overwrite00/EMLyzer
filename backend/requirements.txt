@@ -41,6 +41,9 @@ pytest==9.0.3
 pytest-asyncio==1.3.0
 httpx==0.28.1
 
+# Language detection
+langdetect==1.0.9
+
 # --- OPZIONALI (NLP avanzato) ---
 # Decommentare se serve il classificatore bayesiano:
 scikit-learn>=1.5.0
