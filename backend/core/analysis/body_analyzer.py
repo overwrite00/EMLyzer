@@ -799,18 +799,19 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
     _analyze_text(parsed.body_text, result)
     _logger.debug("[BODY] text analysis: %d findings", len(result.findings))
 
-    # Se il testo plain è vuoto o molto piccolo, estrarre il testo dall'HTML
-    # (alcuni email sono HTML-only e non hanno body_text)
-    if not parsed.body_text or len(parsed.body_text.strip()) < 50:
-        try:
-            if parsed.body_html:
-                soup = BeautifulSoup(parsed.body_html, "html.parser")
-                html_text = soup.get_text(separator=" ", strip=True)
-                if html_text and len(html_text) > 50:
-                    _logger.debug("[BODY] Extracting text from HTML for pattern analysis (html_text_len=%d)", len(html_text))
-                    _analyze_text(html_text, result)
-        except Exception as e:
-            _logger.error("[BODY] Failed to extract text from HTML (html_len=%d): %s", len(parsed.body_html or ''), e)
+    # v0.15.1 FIX: ALWAYS extract text from HTML for pattern analysis
+    # Many sophisticated phishing emails have innocuous plain text but malicious visible HTML content
+    # Example: Silvercrest email has "Top Stories of the Day" in plain text but phishing content in visible HTML
+    # Previously only extracted HTML if plain text was < 50 chars, missing many attacks
+    try:
+        if parsed.body_html:
+            soup = BeautifulSoup(parsed.body_html, "html.parser")
+            html_text = soup.get_text(separator=" ", strip=True)
+            if html_text and len(html_text) > 50:
+                _logger.debug("[BODY] Extracting text from HTML for pattern analysis (html_text_len=%d)", len(html_text))
+                _analyze_text(html_text, result)
+    except Exception as e:
+        _logger.error("[BODY] Failed to extract text from HTML (html_len=%d): %s", len(parsed.body_html or ''), e)
 
     _analyze_html(parsed.body_html, result)
     _logger.debug("[BODY] html analysis: %d findings, %d urls extracted", len(result.findings), len(result.extracted_urls))
