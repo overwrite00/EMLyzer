@@ -11,12 +11,15 @@ import re
 import base64
 import logging
 import unicodedata
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from bs4 import BeautifulSoup
 import bleach
+from langdetect import detect, LangDetectException
 
 from core.analysis.email_parser import ParsedEmail
-from core.analysis.nlp_classifier import classify_text, NLPResult
+from core.analysis.nlp_classifier import classify_text, classify_features, NLPResult
 from utils.i18n import t
 
 _logger = logging.getLogger(__name__)
@@ -49,6 +52,24 @@ URGENCY_PATTERNS = [
     r"\bprazo\s+final\b", r"\blimite.*tempo\b",
     r"\bsuspen[dç][ãa]o?\b",
     r"\bhoje\b",  # "hoje" (today) — urgency indicator in Portuguese
+    # Italiano — nuovi pattern v0.15.1 (Italian-specific phishing)
+    r"\bultimo\s+tentativo\b",  # "last attempt" (Quechua sample)
+    r"\bsi\s+prega\s+di\s+(?:attendere|aspettare|agire|verificare|confermare)\b",  # "please wait/verify"
+    r"\bentro\s+(?:\d+\s+)?(?:ore|giorni|minuti|settimane)\b",  # "within X hours/days"
+    r"\bentro\s+(?:il\s+|la\s+)?(?:oggi|domani|stasera)\b",  # "by today/tomorrow"
+    r"\bnon\s+(?:aspettare|rimandare|ignorare)\b",  # "don't wait"
+    r"\bagisci\s+(?:subito|ora|adesso|velocemente)\b",  # "act now"
+    r"\bprima\s+(?:che|di|della|del)\s+.*(?:scad|perdi|blocca|sospen|rimuov|disattiva)\b",  # "before [bad event]"
+    r"\brinnovo\s+(?:urgente|necessario|richiesto)\b",  # "urgent renewal"
+    r"\b(?:modifica|cambio|aggiornamento)\s+(?:dati|account|profilo|password)\b",  # "change/update"
+    r"\battivazione.*richiest\b",  # "activation requested"
+    r"\bperiodo\s+di\s+(?:prova|trial)\b",  # "trial period"
+    r"\baccesso\s+(?:temporaneo|limitato|ristretto)\b",  # "temporary access"
+    r"\b(?:disattivazione|chiusura)\s+(?:account|conto)\b",  # "deactivation/closure"
+    # Portoghese — nuovi pattern v0.15.1
+    r"\bultima\s+tentativa\b",  # "last attempt" (PT)
+    r"\bfaça\s+(?:logo|agora|depressa)\b",  # "do it now" (PT)
+    r"\bprecisa\s+(?:agora|imediatamente|urgentemente)\b",  # "needs to be done now" (PT)
 ]
 
 PHISHING_CTAS = [
@@ -75,6 +96,24 @@ PHISHING_CTAS = [
     r"\bvalide\s+sua\s+identidade\b",
     r"\bautentique-?se\b", r"\bautenticate\b",
     r"\bfaça\s+(?:seu\s+)?(?:login|acesso)\b",
+    # Italiano — nuovi CTA pattern v0.15.1
+    r"\baccedi\s+qui\b", r"\baccedi\s+al\s+(?:tuo\s+)?(?:conto|account)\b",  # "log in here/to your account"
+    r"\bcompila\s+il\s+(?:modulo|form|formulario)\b",  # "fill the form"
+    r"\binvia\s+(?:i\s+)?dati\b",  # "send the data"
+    r"\bfai\s+clic\s+(?:qui|qua|qui\s+sotto)\b",  # "click here"
+    r"\btocca\s+il\s+link\b",  # "tap the link"
+    r"\bvisita\s+il\s+(?:link|sito)\b",  # "visit the link/site"
+    r"\bapri\s+il\s+(?:file|documento|allegato)\b",  # "open the file/document"
+    r"\bcompleta\s+il\s+(?:modulo|form)\b",  # "complete the form"
+    r"\brisolvi\s+il\s+(?:problema|issue)\b",  # "resolve the issue"
+    r"\bcopia\s+il\s+codice\b",  # "copy the code"
+    r"\bscarica\s+il\s+(?:file|documento|allegato)\b",  # "download the file"
+    r"\bclicca\s+qui\s+(?:sotto|adesso|subito)\b",  # "click here now"
+    # Portoghese — nuovi CTA pattern v0.15.1
+    r"\bacesse\s+(?:aqui|agora)\b",  # "access here/now" (PT)
+    r"\bpreencha\s+o\s+(?:formulario|form)\b",  # "fill the form" (PT)
+    r"\benvie\s+os\s+dados\b",  # "send the data" (PT)
+    r"\bclique\s+aqui\s+(?:embaixo|agora|abaixo)\b",  # "click here below/now" (PT)
 ]
 
 CREDENTIAL_KEYWORDS = [
@@ -97,6 +136,31 @@ CREDENTIAL_KEYWORDS = [
     r"\botp\b", r"\bone-?time\s+password\b",
     r"\bpix\b",  # Sistema di pagamento istantaneo brasiliano — altamente rilevante
     r"\b(?:rg|identidade|cédula)\b",
+    # Italiano — nuovi CREDENTIAL pattern v0.15.1 (Italian-specific personal data)
+    r"\bnumero\s+(?:di\s+)?cellulare\b",  # "phone number"
+    r"\bnumero\s+di\s+telefono\b",  # "phone number" (variant)
+    r"\bnome\s+(?:e\s+)?cognome\b",  # "full name" (very common phishing request)
+    r"\bindirizzo\s+(?:completo|di\s+residenza)\b",  # "complete address"
+    r"\bdata\s+di\s+nascita\b",  # "date of birth"
+    r"\bconto\s+corrente\b",  # "checking account"
+    r"\bnumero\s+di\s+conto\b",  # "account number"
+    r"\bcarta\s+prepagata\b",  # "prepaid card"
+    r"\bpatente\s+(?:di\s+guida|numero)\b",  # "driver's license"
+    r"\bpassaporto\b",  # "passport"
+    r"\bnumero\s+passaporto\b",  # "passport number"
+    r"\bcodice\s+fiscale\b",  # "tax ID" (very common in Italy)
+    r"\bnumero\s+di\s+sicurezza\b",  # "security number" (generic)
+    r"\b(?:rinnovo|aggiornamento)\s+(?:dati|profilo|informazioni)\b",  # "data renewal/update"
+    r"\bverifica\s+identit[aà]\b",  # "identity verification"
+    r"\bconferma\s+(?:dati\s+)?bancari\b",  # "confirm banking data"
+    # Portoghese — nuovi CREDENTIAL pattern v0.15.1
+    r"\bnumero\s+de\s+celular\b",  # "phone number" (PT)
+    r"\bnome\s+completo\b",  # "full name" (PT)
+    r"\bendereço\s+completo\b",  # "complete address" (PT)
+    r"\bdata\s+de\s+nascimento\b",  # "date of birth" (PT)
+    r"\bconta\s+corrente\b",  # "checking account" (PT)
+    r"\bcnh\b",  # "Brazilian driver's license"
+    r"\brnc\s+(?:numero|número)\b",  # "RNC number" (PT)
 ]
 
 # Mappa omoglifi Unicode → carattere latino equivalente
@@ -153,6 +217,27 @@ URL_SHORTENER_DOMAINS = {
 }
 
 
+# --- Load campaigns database (v0.15) ---
+def _load_campaigns_db() -> dict:
+    """Load known phishing campaigns from JSON config."""
+    try:
+        campaigns_path = Path(__file__).parent.parent.parent / "config" / "campaigns.json"
+        if campaigns_path.exists():
+            with open(campaigns_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        _logger.error("[BODY] Failed to load campaigns database: %s", e)
+    return {"campaigns": []}
+
+CAMPAIGNS_DB = _load_campaigns_db()
+CAMPAIGNS_BY_KEYWORDS = {}  # Will be built below
+for campaign in CAMPAIGNS_DB.get("campaigns", []):
+    for keyword in campaign.get("keywords", []):
+        if keyword not in CAMPAIGNS_BY_KEYWORDS:
+            CAMPAIGNS_BY_KEYWORDS[keyword] = []
+        CAMPAIGNS_BY_KEYWORDS[keyword].append(campaign)
+
+
 @dataclass
 class BodyFinding:
     category: str  # text / html / url / base64
@@ -176,8 +261,82 @@ class BodyAnalysisResult:
     base64_inline_count: int = 0
     extracted_urls: list[str] = field(default_factory=list)
     raw_hidden_content: str = ""   # testo estratto dagli elementi nascosti
+    extracted_html_text: str = ""  # v0.15.1: testo visibile estratto dall'HTML (per campaign matching)
     nlp_result: object = None           # NLPResult dal classificatore ML
     score_contribution: float = 0.0
+    # Language mismatch detection (v0.15)
+    language_mismatch: bool = False
+    detected_language: str = ""
+    # Known campaign detection (v0.15)
+    matched_campaign_id: str = ""
+    matched_campaign_name: str = ""
+
+
+def _detect_language_mismatch(text: str, expected_lang: str = "it", accepted_langs: set[str] | None = None) -> dict:
+    """
+    Detect if email body language mismatches expected recipient language.
+    Used to identify compromised accounts or unauthorized mailings.
+
+    Only flags languages that are clearly suspicious (not in accepted_langs).
+    By default, accepts 'it' (Italian) and 'en' (English) for Italian users.
+
+    Args:
+        text: Email body text (HTML stripped, >100 chars)
+        expected_lang: Expected language code (default 'it' for Italian)
+        accepted_langs: Set of acceptable language codes (default: {'it', 'en'})
+
+    Returns:
+        Dict with language_mismatch (bool), detected_language (str), risk_contribution (int)
+    """
+    if accepted_langs is None:
+        accepted_langs = {"it", "en"}  # Default: Italian + English are OK
+
+    if not text or len(text) < 100:
+        return {"language_mismatch": False, "detected_language": "", "risk_contribution": 0}
+
+    try:
+        detected = detect(text)
+        # Only flag as mismatch if detected language is NOT in accepted list
+        is_mismatch = detected not in accepted_langs
+
+        return {
+            "language_mismatch": is_mismatch,
+            "detected_language": detected,
+            "risk_contribution": 20 if is_mismatch else 0
+        }
+    except LangDetectException:
+        # Ambiguous/short text, no conclusion
+        return {"language_mismatch": False, "detected_language": "", "risk_contribution": 0}
+
+
+def _detect_campaign_match(text_lower: str, subject_lower: str) -> dict | None:
+    """
+    Detect if email matches known phishing campaign patterns.
+
+    Args:
+        text_lower: Email body (lowercase)
+        subject_lower: Email subject (lowercase)
+
+    Returns:
+        Dict with campaign_id, campaign_name, risk_contribution; or None if no match
+    """
+    combined_text = f"{subject_lower} {text_lower}"
+
+    for keyword, campaigns in CAMPAIGNS_BY_KEYWORDS.items():
+        if keyword.lower() in combined_text:
+            for campaign in campaigns:
+                campaign_keywords = campaign.get("keywords", [])
+                matches = sum(1 for kw in campaign_keywords if kw.lower() in combined_text)
+                threshold = max(1, len(campaign_keywords) // 2)
+
+                if matches >= threshold:
+                    return {
+                        "campaign_id": campaign.get("id", "unknown"),
+                        "campaign_name": campaign.get("name", "Unknown Campaign"),
+                        "risk_contribution": campaign.get("risk_contribution", 40)
+                    }
+
+    return None
 
 
 def _count_pattern_matches(pattern_list: list[str], text: str, result: BodyAnalysisResult, attr_name: str, max_match_len: int = 150) -> list[tuple[str, int]]:
@@ -425,6 +584,13 @@ def _analyze_html(body_html: str, result: BodyAnalysisResult):
                     hidden_texts.append(txt)
         if hidden_texts:
             result.raw_hidden_content = "\n".join(hidden_texts[:20])
+            # v0.15.1 FIX: Analyze patterns in hidden content too!
+            # Hidden text often contains phishing indicators masked from visual inspection
+            hidden_content_combined = " ".join(hidden_texts)
+            _analyze_text(hidden_content_combined, result)
+            _logger.debug("[BODY] Hidden content analyzed: %d urgency, %d cta, %d credentials",
+                         result.urgency_count, result.phishing_cta_count, result.credential_keyword_count)
+
         result.findings.append(BodyFinding(
             category="html",
             severity="medium",
@@ -598,7 +764,7 @@ def _compute_score(result: BodyAnalysisResult) -> float:
     return min(score, 100.0)
 
 
-def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
+def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = None) -> BodyAnalysisResult:
     """
     Analizza il corpo email per rilevare pattern phishing, urgenza e credenziali.
 
@@ -614,13 +780,15 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
     - Base64 inline (embedding di malware/phishing page)
     - Grammatica (via LanguageTool se configurato)
 
-    NLP Classification:
-    - LogisticRegression + TF-IDF per classificare legittima vs phishing
+    NLP Classification v0.15.1 (Tabular Random Forest):
+    - Estrae feature numeriche (urgency, CTA, credentials, body length, etc.)
+    - Passa al modello tabular per classificazione phishing/legittima
     - Confidence: low/medium/high based on probability
     - Contribuisce al body score finale
 
     Args:
         parsed: ParsedEmail con body_text (plain) e body_html (HTML)
+        header_result: Optional HeaderAnalysisResult per estrarre info autenticazione (SPF/DKIM/DMARC)
 
     Returns:
         BodyAnalysisResult con findings, conteggi pattern, URLs estratte, NLP result, score
@@ -632,18 +800,21 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
     _analyze_text(parsed.body_text, result)
     _logger.debug("[BODY] text analysis: %d findings", len(result.findings))
 
-    # Se il testo plain è vuoto o molto piccolo, estrarre il testo dall'HTML
-    # (alcuni email sono HTML-only e non hanno body_text)
-    if not parsed.body_text or len(parsed.body_text.strip()) < 50:
-        try:
-            if parsed.body_html:
-                soup = BeautifulSoup(parsed.body_html, "html.parser")
-                html_text = soup.get_text(separator=" ", strip=True)
-                if html_text and len(html_text) > 50:
-                    _logger.debug("[BODY] Extracting text from HTML for pattern analysis (html_text_len=%d)", len(html_text))
-                    _analyze_text(html_text, result)
-        except Exception as e:
-            _logger.error("[BODY] Failed to extract text from HTML (html_len=%d): %s", len(parsed.body_html or ''), e)
+    # v0.15.1 FIX: ALWAYS extract text from HTML for pattern analysis
+    # Many sophisticated phishing emails have innocuous plain text but malicious visible HTML content
+    # Example: Silvercrest email has "Top Stories of the Day" in plain text but phishing content in visible HTML
+    # Previously only extracted HTML if plain text was < 50 chars, missing many attacks
+    try:
+        if parsed.body_html:
+            soup = BeautifulSoup(parsed.body_html, "html.parser")
+            html_text = soup.get_text(separator=" ", strip=True)
+            if html_text and len(html_text) > 50:
+                # v0.15.1: Save extracted HTML text for campaign matching
+                result.extracted_html_text = html_text
+                _logger.debug("[BODY] Extracting text from HTML for pattern analysis (html_text_len=%d)", len(html_text))
+                _analyze_text(html_text, result)
+    except Exception as e:
+        _logger.error("[BODY] Failed to extract text from HTML (html_len=%d): %s", len(parsed.body_html or ''), e)
 
     _analyze_html(parsed.body_html, result)
     _logger.debug("[BODY] html analysis: %d findings, %d urls extracted", len(result.findings), len(result.extracted_urls))
@@ -654,24 +825,87 @@ def analyze_body(parsed: ParsedEmail) -> BodyAnalysisResult:
     _check_languagetool(parsed.body_text, result)
     _logger.debug("[BODY] languagetool checked: %d findings", len(result.findings))
 
+    # Language mismatch detection (v0.15)
+    clean_body = parsed.body_text or ""
+    if clean_body.strip():
+        lang_check = _detect_language_mismatch(clean_body)
+        if lang_check["language_mismatch"]:
+            result.language_mismatch = True
+            result.detected_language = lang_check["detected_language"]
+            result.findings.append(BodyFinding(
+                category="language",
+                severity="high",
+                description=t("body.language_mismatch", detected=lang_check["detected_language"]),
+                evidence=f"Email body detected as {lang_check['detected_language'].upper()} but expected 'it' (Italian)",
+            ))
+            _logger.info("[BODY] Language mismatch detected: %s (expected 'it')", lang_check["detected_language"])
+
+    # Known campaign detection (v0.15)
+    if CAMPAIGNS_DB.get("campaigns"):
+        subject_lower = (parsed.mail_subject or "").lower()
+        all_body_for_campaign = clean_body + " " + (result.extracted_html_text or "") + " " + (result.raw_hidden_content or "")
+        body_lower = all_body_for_campaign.lower()
+        campaign_match = _detect_campaign_match(body_lower, subject_lower)
+
+        if campaign_match:
+            result.matched_campaign_id = campaign_match["campaign_id"]
+            result.matched_campaign_name = campaign_match["campaign_name"]
+            result.findings.append(BodyFinding(
+                category="campaign",
+                severity="high",
+                description=t("body.known_campaign", name=campaign_match["campaign_name"]),
+                evidence=f"Campaign ID: {campaign_match['campaign_id']}, Risk contribution: +{campaign_match['risk_contribution']}",
+            ))
+            _logger.info("[BODY] Known campaign detected: %s (id=%s)", campaign_match["campaign_name"], campaign_match["campaign_id"])
+
     # Deduplica URL
     result.extracted_urls = list(dict.fromkeys(result.extracted_urls))
     _logger.info("[BODY] Extracted %d unique URLs from body", len(result.extracted_urls))
 
-    # Classificatore NLP (se scikit-learn disponibile)
+    # Classificatore NLP v0.15.1 (Tabular Random Forest model)
     try:
-        result.nlp_result = classify_text(parsed.body_text, parsed.body_html)
+        # Extract authentication flags from header_result
+        spf_pass = False
+        dkim_pass = False
+        dmarc_pass = False
+        if header_result and hasattr(header_result, 'auth_detail') and header_result.auth_detail:
+            spf_pass = header_result.auth_detail.spf_result == "pass"
+            dkim_pass = any(sig.get("result") == "pass" for sig in (header_result.auth_detail.dkim_signatures or []))
+            dmarc_pass = header_result.auth_detail.dmarc_result == "pass"
+
+        # Extract feature dimensions for tabular model
+        # v0.15.1 FIX: Include hidden content in body_length calculation
+        all_body_text = (parsed.body_text or "") + " " + (result.raw_hidden_content or "")
+        body_length = len(all_body_text)
+        subject_length = len(parsed.mail_subject or "")
+        url_count = len(result.extracted_urls)
+        has_attachments = len(parsed.attachments) > 0
+
+        # Call tabular NLP model with features (v0.15.1)
+        result.nlp_result = classify_features(
+            urgency_count=result.urgency_count,
+            cta_count=result.phishing_cta_count,
+            credential_count=result.credential_keyword_count,
+            body_length=body_length,
+            subject_length=subject_length,
+            url_count=url_count,
+            has_attachments=has_attachments,
+            spf_pass=spf_pass,
+            dkim_pass=dkim_pass,
+            dmarc_pass=dmarc_pass
+        )
+
         if result.nlp_result.available and result.nlp_result.label in ("phishing", "suspicious"):
             sev = "high" if result.nlp_result.confidence == "high" else "medium"
             result.findings.append(BodyFinding(
                 category="nlp",
                 severity=sev,
-                description=t("body.nlp_phishing", **{"prob": int(result.nlp_result.phishing_probability * 100), "confidence": result.nlp_result.confidence}),
+                description=t("body.nlp_phishing", **{"prob": round(result.nlp_result.phishing_probability * 100), "confidence": result.nlp_result.confidence}),
                 evidence="Feature: " + ", ".join(result.nlp_result.top_features[:5]) if result.nlp_result.top_features else "",
             ))
-            _logger.info("[BODY] NLP: label=%s, prob=%.2f, confidence=%s", result.nlp_result.label, result.nlp_result.phishing_probability, result.nlp_result.confidence)
+            _logger.info("[BODY] NLP: label=%s, prob=%.2f, confidence=%s (model=v0.15.1-tabular)", result.nlp_result.label, result.nlp_result.phishing_probability, result.nlp_result.confidence)
     except Exception as e:
-        _logger.warning("[BODY] NLP classification failed: %s", e)
+        _logger.warning("[BODY] NLP classification failed (v0.15.1 tabular model): %s", e)
 
     result.score_contribution = _compute_score(result)
     _logger.info("[BODY END] Total findings: %d (urgency=%d, cta=%d, creds=%d, score=%.1f)",

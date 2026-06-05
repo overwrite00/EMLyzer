@@ -1,0 +1,243 @@
+{
+  "brands": [
+    {
+      "name": "Microsoft",
+      "frequency_rank": 1,
+      "phishing_frequency_percent": 22,
+      "aliases": ["Microsoft", "Office 365", "Outlook", "OneDrive", "Azure"],
+      "official_domains": ["microsoft.com", "outlook.com", "office.com"],
+      "attack_types": ["credential harvesting", "MFA bypass"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "Google",
+      "frequency_rank": 2,
+      "phishing_frequency_percent": 10,
+      "aliases": ["Google", "Gmail", "Google Workspace", "Drive"],
+      "official_domains": ["google.com", "gmail.com", "workspace.google.com"],
+      "attack_types": ["credential harvesting"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "Apple",
+      "frequency_rank": 3,
+      "phishing_frequency_percent": 9,
+      "aliases": ["Apple", "iCloud", "Apple ID", "iTunes"],
+      "official_domains": ["apple.com", "icloud.com"],
+      "attack_types": ["credential harvesting", "payment fraud"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "Amazon",
+      "frequency_rank": 4,
+      "phishing_frequency_percent": 8,
+      "aliases": ["Amazon", "AWS", "Amazon Prime"],
+      "official_domains": ["amazon.com", "amazon.it"],
+      "attack_types": ["account takeover", "payment fraud"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "DHL",
+      "frequency_rank": 5,
+      "phishing_frequency_percent": 7,
+      "aliases": ["DHL", "Deutsche Post"],
+      "official_domains": ["dhl.com"],
+      "attack_types": ["credential harvesting", "payment fraud"],
+      "region": "GLOBAL",
+      "note": "Ranked 4th globally in clicked URLs"
+    },
+    {
+      "name": "Intesa Sanpaolo",
+      "frequency_rank": 6,
+      "phishing_frequency_percent": 32,
+      "phishing_context": "32% of Italian bank phishing",
+      "aliases": ["Intesa Sanpaolo", "Intesa"],
+      "official_domains": ["intesasanpaolo.it"],
+      "attack_types": ["credential harvesting", "SPID theft", "banking trojan"],
+      "region": "IT",
+      "note": "Clear #1 target in Italy - leading Italian bank"
+    },
+    {
+      "name": "PayPal",
+      "frequency_rank": 7,
+      "phishing_frequency_percent": 12,
+      "phishing_context": "12% of smishing attacks",
+      "aliases": ["PayPal", "Venmo"],
+      "official_domains": ["paypal.com"],
+      "attack_types": ["credential harvesting", "payment fraud", "invoice phishing"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "Walmart",
+      "frequency_rank": 8,
+      "phishing_frequency_percent": 5,
+      "phishing_trend": "Surging - +400% in QR code phishing",
+      "aliases": ["Walmart", "Sam's Club"],
+      "official_domains": ["walmart.com"],
+      "attack_types": ["QR code phishing", "prize scams"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "Poste Italiane",
+      "frequency_rank": 9,
+      "phishing_frequency_percent": 14,
+      "phishing_context": "14% of Italian postal/banking phishing",
+      "aliases": ["Poste Italiane", "PostePay", "PosteItaliane"],
+      "official_domains": ["poste.it"],
+      "attack_types": ["credential harvesting", "payment fraud"],
+      "region": "IT",
+      "note": "Dual postal + banking service"
+    },
+    {
+      "name": "Unicredit",
+      "frequency_rank": 10,
+      "phishing_frequency_percent": 13,
+      "phishing_context": "13% of Italian bank phishing",
+      "aliases": ["Unicredit", "UniCredit"],
+      "official_domains": ["unicredit.it"],
+      "attack_types": ["credential harvesting", "SPID theft"],
+      "region": "IT"
+    },
+    {
+      "name": "Netflix",
+      "frequency_rank": 11,
+      "phishing_frequency_percent": 8,
+      "aliases": ["Netflix"],
+      "official_domains": ["netflix.com"],
+      "attack_types": ["credential harvesting", "account takeover"],
+      "region": "GLOBAL",
+      "note": "5M credentials compromised May 2025"
+    },
+    {
+      "name": "Mastercard",
+      "frequency_rank": 12,
+      "phishing_frequency_percent": 10,
+      "phishing_context": "10% of QR code phishing attacks",
+      "aliases": ["Mastercard", "Masteca"],
+      "official_domains": ["mastercard.com"],
+      "attack_types": ["QR code phishing", "payment fraud"],
+      "region": "GLOBAL",
+      "note": "14,233 malicious QR codes detected"
+    },
+    {
+      "name": "FedEx",
+      "frequency_rank": 13,
+      "phishing_frequency_percent": 6,
+      "aliases": ["FedEx", "Federal Express"],
+      "official_domains": ["fedex.com"],
+      "attack_types": ["credential harvesting", "payment fraud"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "UPS",
+      "frequency_rank": 14,
+      "phishing_frequency_percent": 5,
+      "aliases": ["UPS", "United Parcel Service"],
+      "official_domains": ["ups.com"],
+      "attack_types": ["credential harvesting"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "Vodafone",
+      "frequency_rank": 15,
+      "phishing_frequency_percent": 8,
+      "aliases": ["Vodafone", "Vodafone Italia"],
+      "official_domains": ["vodafone.it"],
+      "attack_types": ["credential harvesting", "payment fraud"],
+      "region": "IT",
+      "note": "Heavily targeted Italian utilities provider"
+    },
+    {
+      "name": "Enel",
+      "frequency_rank": 16,
+      "phishing_frequency_percent": 6,
+      "aliases": ["Enel", "Enel Energia"],
+      "official_domains": ["enel.it"],
+      "attack_types": ["credential harvesting", "payment fraud"],
+      "region": "IT",
+      "note": "Italian energy provider"
+    },
+    {
+      "name": "Telecom Italia",
+      "frequency_rank": 17,
+      "phishing_frequency_percent": 7,
+      "aliases": ["Telecom Italia", "TIM", "Tim"],
+      "official_domains": ["telecom.it"],
+      "attack_types": ["credential harvesting"],
+      "region": "IT"
+    },
+    {
+      "name": "Lidl",
+      "frequency_rank": 18,
+      "phishing_frequency_percent": 4,
+      "aliases": ["Lidl", "Lidl Premi", "Silvercrest"],
+      "official_domains": ["lidl.it"],
+      "attack_types": ["prize scams", "credential harvesting"],
+      "region": "EU",
+      "note": "Silvercrest air fryer scam targets this brand"
+    },
+    {
+      "name": "Leroy Merlin",
+      "frequency_rank": 19,
+      "phishing_frequency_percent": 3,
+      "aliases": ["Leroy Merlin", "Leroy-Merlin"],
+      "official_domains": ["leroymerlin.it"],
+      "attack_types": ["prize scams"],
+      "region": "IT"
+    },
+    {
+      "name": "Decathlon",
+      "frequency_rank": 20,
+      "phishing_frequency_percent": 3,
+      "aliases": ["Decathlon", "Quechua"],
+      "official_domains": ["decathlon.it"],
+      "attack_types": ["prize scams", "brand spoofing"],
+      "region": "EU"
+    },
+    {
+      "name": "eBay",
+      "frequency_rank": 21,
+      "phishing_frequency_percent": 5,
+      "aliases": ["eBay", "Ebay"],
+      "official_domains": ["ebay.com", "ebay.it"],
+      "attack_types": ["credential harvesting", "payment fraud"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "Facebook",
+      "frequency_rank": 22,
+      "phishing_frequency_percent": 6,
+      "aliases": ["Facebook", "Meta"],
+      "official_domains": ["facebook.com"],
+      "attack_types": ["credential harvesting", "account takeover"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "Instagram",
+      "frequency_rank": 23,
+      "phishing_frequency_percent": 4,
+      "aliases": ["Instagram"],
+      "official_domains": ["instagram.com"],
+      "attack_types": ["credential harvesting"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "LinkedIn",
+      "frequency_rank": 24,
+      "phishing_frequency_percent": 4,
+      "aliases": ["LinkedIn"],
+      "official_domains": ["linkedin.com"],
+      "attack_types": ["credential harvesting", "BEC"],
+      "region": "GLOBAL"
+    },
+    {
+      "name": "WhatsApp",
+      "frequency_rank": 25,
+      "phishing_frequency_percent": 3,
+      "aliases": ["WhatsApp", "Whatsapp"],
+      "official_domains": ["whatsapp.com"],
+      "attack_types": ["credential harvesting"],
+      "region": "GLOBAL"
+    }
+  ]
+}

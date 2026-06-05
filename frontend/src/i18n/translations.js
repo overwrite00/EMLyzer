@@ -167,6 +167,7 @@ export const translations = {
     it: "scikit-learn non installato — installa con: pip install scikit-learn nltk",
     en: "scikit-learn not installed — install with: pip install scikit-learn nltk",
   },
+  "body.nlp_top_features": { it: "Feature principali", en: "Top features" },
 
   "body.hidden_section": { it: "Contenuto HTML Nascosto", en: "Hidden HTML Content" },
   "body.hidden_count": { it: "{n} elementi nascosti tramite CSS", en: "{n} elements hidden via CSS" },
@@ -175,6 +176,12 @@ export const translations = {
   "body.hidden_evidence": { it: "Elementi nascosti tramite CSS o stili inline rilevati nel body HTML.", en: "Elements hidden via CSS or inline styles detected in HTML body." },
   "body.yes": { it: "Sì", en: "Yes" },
   "body.no": { it: "No", en: "No" },
+  "body.campaign_detected": { it: "🎯 Campagna di Phishing Rilevata", en: "🎯 Known Campaign Detected" },
+  "body.campaign_known_threat": { it: "Questa email corrisponde a una campagna di phishing nota. Rivedi con attenzione tutti gli indicatori.", en: "This email matches a known phishing campaign. Review all indicators carefully." },
+  "body.language_mismatch": { it: "🌐 Disallineamento Linguistico Rilevato", en: "🌐 Language Mismatch Detected" },
+  "body.language_mismatch_title": { it: "Lingua Inaspettata Rilevata", en: "Unexpected Language Detected" },
+  "body.language_mismatch_desc": { it: "La lingua del corpo email non corrisponde alla lingua attesa dell'utente. Questo potrebbe indicare un account compromesso o una mailing non autorizzata.", en: "Email body language does not match expected user language. This may indicate a compromised account or unauthorized mailing." },
+  "body.detected_language": { it: "Lingua rilevata", en: "Detected language" },
 
   // ── URL tab ──────────────────────────────────────────────────────────────────
   "url.total": { it: "{n} URL analizzati", en: "{n} URLs analyzed" },

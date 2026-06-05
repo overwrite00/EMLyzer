@@ -575,6 +575,12 @@ function TabBody({ data, t, jobId }) {
         </div>
       </Section>
 
+      {/* ── Sezione Linguaggio Rilevato (v0.15) ── */}
+      {data.language_mismatch && <LanguageMismatchSection data={data} t={t} />}
+
+      {/* ── Sezione Campagna Rilevata (v0.15) ── */}
+      {data.matched_campaign_name && <CampaignSection campaign={data} t={t} />}
+
       {/* ── Sezione NLP ── */}
       <NLPSection nlp={data.nlp} t={t} />
 
@@ -607,6 +613,64 @@ function TabBody({ data, t, jobId }) {
 }
 
 
+// ── Language Mismatch Section (v0.15) ──────────────────────────────────────
+function LanguageMismatchSection({ data, t }) {
+  if (!data.language_mismatch) return null
+
+  return (
+    <Section title={t('body.language_mismatch') || '🌐 Language Mismatch Detected'} icon="🌐">
+      <div style={{ padding: '12px 16px', borderRadius: 8, background: 'var(--risk-high-bg)', border: '2px solid var(--risk-high)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 20 }}>⚠️</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--risk-high)', marginBottom: 6 }}>
+              {t('body.language_mismatch_title') || 'Unexpected Language Detected'}
+            </div>
+            {data.detected_language && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontFamily: 'var(--font-mono)' }}>
+                {t('body.detected_language') || 'Detected language'}: <strong>{data.detected_language}</strong>
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+              {t('body.language_mismatch_desc') || 'Email body language does not match expected user language. This may indicate a compromised account or unauthorized mailing.'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+
+// ── Campaign Section (v0.15) ────────────────────────────────────────────────
+function CampaignSection({ campaign, t }) {
+  if (!campaign.matched_campaign_name) return null
+
+  return (
+    <Section title={t('body.campaign_detected') || '🎯 Known Campaign Detected'}>
+      <div style={{ padding: '12px 16px', borderRadius: 8, background: 'var(--risk-high-bg)', border: '2px solid var(--risk-high)', }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 20 }}>⚠️</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--risk-high)', marginBottom: 6 }}>
+              {campaign.matched_campaign_name}
+            </div>
+            {campaign.matched_campaign_id && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontFamily: 'var(--font-mono)' }}>
+                ID: {campaign.matched_campaign_id}
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+              {t('body.campaign_known_threat') || 'This email matches a known phishing campaign. Review all indicators carefully.'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+
 // ── NLP Section ────────────────────────────────────────────────────────────
 function NLPSection({ nlp, t }) {
   if (!nlp) return null
@@ -618,7 +682,9 @@ function NLPSection({ nlp, t }) {
     unknown:    { color: 'var(--text-muted)',    bg: 'var(--bg-card)' },
   }
   const lc = LABEL_COLORS[nlp.label] || LABEL_COLORS.unknown
-  const pct = Math.round((nlp.phishing_probability || 0) * 100)
+  // Use standard mathematical rounding (not JavaScript banker's rounding)
+  // Math.round(94.5) = 94 (wrong - rounds to even), floor(94.5 + 0.5) = 95 (correct)
+  const pct = Math.floor((nlp.phishing_probability || 0) * 100 + 0.5)
 
   return (
     <Section title={t('body.nlp_section')} icon="🤖">
@@ -664,7 +730,7 @@ function NLPSection({ nlp, t }) {
           {nlp.top_features?.length > 0 && (
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
-                Feature rilevanti (TF-IDF):
+                {t('body.nlp_top_features') || 'Top features'}:
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                 {nlp.top_features.map(f => (

@@ -10,8 +10,10 @@ Analisi degli header email:
 """
 
 import re
+import json
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from core.analysis.email_parser import ParsedEmail
 from utils.i18n import t
@@ -41,6 +43,20 @@ HEADER_INJECTION_PATTERNS = [
 ]
 
 import ipaddress as _ipaddress
+
+# Load brands database for spoofing detection (v0.15)
+def _load_brands_db() -> dict:
+    """Load brand database from JSON config."""
+    try:
+        brands_path = Path(__file__).parent.parent.parent / "config" / "brands_expanded.json"
+        if brands_path.exists():
+            with open(brands_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        _logger.error("[HEADER] Failed to load brands database: %s", e)
+    return {"brands": []}
+
+BRANDS_DB = _load_brands_db()
 
 # Regex per estrarre IP (v4 e v6) dai Received header
 # Formati RFC supportati:
@@ -885,6 +901,80 @@ def _compute_score(result: HeaderAnalysisResult) -> float:
     return min(score, 100.0)
 
 
+def _check_brand_spoofing(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """
+    Check if From field spoofs a known brand but domain doesn't match.
+
+    Detects when attacker impersonates legitimate brand (e.g., "PayPal" in From)
+    but uses different domain (e.g., @suspicious-domain.com).
+
+    Example: From='"PayPal Support" <noreply@attacker.com>'
+    """
+    from_text = parsed.mail_from or ""
+    if not from_text:
+        return
+
+    from_lower = from_text.lower()
+
+    # Extract domain from From field
+    domain_match = re.search(r"@([\w.\-]+)", from_text)
+    from_domain = domain_match.group(1).lower() if domain_match else ""
+
+    # Check against brands database
+    for brand in BRANDS_DB.get("brands", []):
+        aliases = brand.get("aliases", [])
+        official_domains = brand.get("official_domains", [])
+
+        # Check if brand name or alias appears in From field
+        for alias in aliases:
+            if alias.lower() in from_lower:
+                # If domain doesn't match official domains, it's spoofing
+                if from_domain and from_domain not in official_domains:
+                    result.findings.append(HeaderFinding(
+                        field="From",
+                        severity="high",
+                        description=t("header.brand_spoofing", brand=brand["name"], domain=from_domain),
+                        evidence=f"Brand spoofing: {brand['name']} in From field, but using domain {from_domain} (not {', '.join(official_domains)})"
+                    ))
+                    _logger.warning("[HEADER] Brand spoofing detected: %s claimed with domain %s", brand["name"], from_domain)
+                    return  # Report only first match
+
+
+def _check_dkim_domain_mismatch(parsed: ParsedEmail, result: HeaderAnalysisResult):
+    """
+    Check if From domain mismatches DKIM domain when DKIM passes.
+
+    This detects sophisticated spoofing where attacker:
+    - Uses legitimate domain in From field (e.g., support@dhl.com)
+    - But signs email with different domain (e.g., s=default, d=compromised-server.com)
+    - DKIM still passes because the signing domain's key is valid
+
+    Example: From="support@dhl.com" but DKIM domain="attacker.com" (dkim=pass)
+    """
+    from_match = re.search(r"@([\w.\-]+)", parsed.mail_from or "")
+    if not from_match:
+        return
+
+    from_domain = from_match.group(1).lower()
+
+    # Check DKIM signatures from auth_detail
+    if result.auth_detail.dkim_signatures:
+        for sig in result.auth_detail.dkim_signatures:
+            dkim_domain = (sig.get("d") or "").lower()
+            sig_result = (sig.get("result") or "").lower()
+
+            # Only flag if DKIM passes AND domains mismatch
+            if dkim_domain and dkim_domain != from_domain and sig_result == "pass":
+                result.findings.append(HeaderFinding(
+                    field="DKIM",
+                    severity="high",
+                    description=t("header.dkim_domain_mismatch", from_domain=from_domain, dkim_domain=dkim_domain),
+                    evidence=f"From domain: {from_domain}, DKIM-signing domain: {dkim_domain} (DKIM passed with mismatched domain)"
+                ))
+                _logger.warning("[HEADER] DKIM domain mismatch detected: From=%s, DKIM-d=%s", from_domain, dkim_domain)
+                break
+
+
 def analyze_headers(parsed: ParsedEmail) -> HeaderAnalysisResult:
     """
     Esegue analisi completa degli header email per rilevare phishing e spoofing.
@@ -916,6 +1006,12 @@ def analyze_headers(parsed: ParsedEmail) -> HeaderAnalysisResult:
 
     _check_auth(parsed, result)
     _logger.info("[HEADER] auth checked: SPF=%s, DKIM=%s, DMARC=%s, %d findings", result.spf_ok, result.dkim_ok, result.dmarc_ok, len(result.findings))
+
+    _check_brand_spoofing(parsed, result)
+    _logger.debug("[HEADER] brand_spoofing checked: %d findings", len(result.findings))
+
+    _check_dkim_domain_mismatch(parsed, result)
+    _logger.debug("[HEADER] dkim_domain_mismatch checked: %d findings", len(result.findings))
 
     _check_bulk_sender(parsed, result)
     _logger.debug("[HEADER] bulk_sender checked: %d findings", len(result.findings))
