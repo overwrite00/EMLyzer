@@ -22,6 +22,64 @@ Le funzionalità sono ordinate per priorità di implementazione.
 
 ---
 
+## [0.15.0] — 2026-06-05
+
+### Aggiunto — Phishing Detection Improvements (6 Features)
+
+#### Language Mismatch Detector (v0.15)
+- Detects unauthorized/compromised account emails via unexpected language
+- Uses `langdetect` library for fast language identification
+- Default configuration: accepts Italian (it) + English (en) as legitimate for Italian users
+- Flags suspicious languages (Portuguese, Russian, Chinese, etc.) → **+20 risk points** (HIGH severity)
+- Real-world example: Portuguese email to Italian user → indicates account compromise or spam from unauthorized source
+
+#### Domain Mismatch Detector (v0.15)
+- Detects sophisticated spoofing: From domain ≠ DKIM signing domain when DKIM passes
+- Indicates legitimate domain used to sign phishing email (account compromise or domain hijacking)
+- Real-world example: From="support@dhl.com" with DKIM-d="attacker.com" (DKIM=pass) → **+35 risk points** (HIGH severity)
+
+#### Storage CDN Blocklist (v0.15)
+- Detects phishing campaigns using storage.googleapis.com as redirect intermediary
+- Pattern: `storage.googleapis.com/folder/phish.html#?params`
+- High-confidence indicator of coordinated phishing campaigns → **+30 risk points** (HIGH severity)
+
+#### Known Campaign Detection (v0.15)
+- New database: `backend/config/campaigns.json` (13 documented phishing campaigns)
+- Campaigns: Silvercrest Air Fryer (Lidl spoofing), INPS, PagoPA, Intesa Sanpaolo, Poste Italiane, Aruba, Health Card, Agenzia Entrate, QakBot, Emotet, Venom PhaaS, Diesel Vortex, Amazon/PayPal phishing
+- Pattern matching on subject + body keywords
+- Campaign match → **+40 risk points** (HIGH severity) + campaign metadata for analyst
+
+#### Brand Spoofing Detector (v0.15)
+- New database: `backend/config/brands_expanded.json` (25 brands, ranked by phishing frequency)
+- Categories: Tech (Microsoft 22%, Google 10%, Apple 9%), Finance (Intesa Sanpaolo 32% IT, PayPal 12%), E-commerce, Delivery, Utilities, Italian-specific
+- Detects From field brand spoofing: "PayPal" claimed but using unauthorized domain
+- Brand spoofing detected → **HIGH severity finding** with official domain validation
+
+#### Expanded Brands Database (v0.15)
+- 25 brands including Microsoft, Google, Apple, Amazon, DHL, Intesa Sanpaolo, PayPal, Walmart, Poste Italiane, Unicredit, Netflix, Mastercard, FedEx, UPS, Vodafone, Enel, Telecom Italia, Lidl, Leroy Merlin, Decathlon, eBay, Facebook, Instagram, LinkedIn, WhatsApp
+- Each brand includes: frequency rank, phishing frequency %, aliases, official domains, attack types, regional info
+- Used by brand spoofing detector for alias matching and domain validation
+
+### Dependencies
+- **Added**: `langdetect==1.0.9` — lightweight language detection library (6 MB, no native dependencies)
+
+### Configuration Files (New)
+- **backend/config/brands_expanded.json** — 25 brands database with phishing statistics
+- **backend/config/campaigns.json** — 13 documented phishing campaigns with keywords and patterns
+
+### Changed
+- **backend/utils/config.py**: Version 0.14.8 → 0.15.0
+- **frontend/package.json**: Version 0.14.8 → 0.15.0
+
+### Testing
+- ✅ **119/119 test PASS** — Zero regressions
+- ✅ **Language detection**: Portuguese email to Italian user correctly flagged as +20 risk
+- ✅ **Campaign detection**: Silvercrest, INPS, PagoPA campaigns recognized
+- ✅ **Brand spoofing**: 25 brands validated against official domains
+- ✅ **CDN blocklist**: storage.googleapis.com phishing pattern detected
+
+---
+
 ## [0.14.8] — 2026-05-21
 
 ### Risolto — Code Cleanup & Production Stability (PHASE 1 + PHASE 2 + PHASE 3)
