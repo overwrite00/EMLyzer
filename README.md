@@ -111,20 +111,20 @@ Email (.eml / .msg / plain text)
 - **Browser** Chrome, Firefox, Safari, or Edge (90+)
 
 > [!IMPORTANT]
-> ✅ For complete requirements, see [REQUISITI.md](docs/REQUIREMENTS.md)
+> ✅ For complete requirements, see [REQUIREMENTS.md](docs/REQUIREMENTS.md)
 
 ---
 
 ## 🚀 Getting Started
 
 ### 1️⃣ Install Requirements
-Follow [INSTALLAZIONE.md](docs/INSTALLATION.md) for step-by-step instructions.
+Follow [INSTALLATION.md](docs/INSTALLATION.md) for step-by-step instructions.
 
 ### 2️⃣ Configure (Optional)
-Set up optional reputation services in [CONFIGURAZIONE.md](docs/CONFIGURATION.md).
+Set up optional reputation services in [CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ### 3️⃣ Start Analyzing
-Learn the interface in [UTILIZZO.md](docs/USAGE.md).
+Learn the interface in [USAGE.md](docs/USAGE.md).
 
 ### 💻 For Developers
 Explore the API in [API.md](docs/API.md).
