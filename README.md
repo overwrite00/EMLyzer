@@ -2,12 +2,12 @@
 
 ![EMLyzer](images/emlyzer_cover.png)
 
-**Piattaforma open-source di analisi delle email** per identificare spam, phishing e contenuti malevoli con precisione.
+**Open-source email threat analysis platform** for identifying spam, phishing, and malicious content with precision.
 
-EMLyzer permette di analizzare un'email sospetta caricando il file `.eml` o `.msg`, oppure incollando direttamente il sorgente, e ottiene in pochi secondi un **rapporto completo** con punteggio di rischio spiegabile, analisi degli header, del corpo, degli URL, degli allegati e dei servizi di reputazione.
+EMLyzer analyzes suspicious emails by uploading `.eml` or `.msg` files, or pasting the raw source directly. In seconds, it delivers a **complete report** with explainable risk score, header analysis, body content assessment, URL evaluation, attachment inspection, and reputation service checks.
 
 > [!TIP]
-> 💡 **Non è necessaria nessuna API key per iniziare.** Le integrazioni con servizi esterni (AbuseIPDB, VirusTotal, ecc.) sono opzionali e configurabili successivamente.
+> 💡 **No API keys required to get started.** Integrations with external services (AbuseIPDB, VirusTotal, etc.) are optional and configurable later.
 
 ---
 
