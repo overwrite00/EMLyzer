@@ -2,95 +2,209 @@
 
 ![EMLyzer](images/emlyzer_cover.png)
 
-**Piattaforma open-source di analisi delle email** per identificare spam, phishing e contenuti malevoli.
+**Open-source email threat analysis platform** for identifying spam, phishing, and malicious content with precision.
 
-EMLyzer permette di analizzare un'email sospetta caricando il file `.eml` o `.msg`, oppure incollando direttamente il sorgente, e ottiene in pochi secondi un **rapporto completo** con punteggio di rischio spiegabile, analisi degli header, del corpo, degli URL, degli allegati e dei servizi di reputazione.
+EMLyzer analyzes suspicious emails by uploading `.eml` or `.msg` files, or pasting the raw source directly. In seconds, it delivers a **complete report** with explainable risk score, header analysis, body content assessment, URL evaluation, attachment inspection, and reputation service checks.
 
-> **Non è necessaria nessuna API key per iniziare.** Le integrazioni con servizi esterni (AbuseIPDB, VirusTotal, ecc.) sono opzionali e configurabili successivamente.
+> [!TIP]
+> 💡 **No API keys required to get started.** Integrations with external services (AbuseIPDB, VirusTotal, etc.) are optional and configurable later.
 
 ---
 
-## 📋 Indice della documentazione
+## 📚 Documentation Index
 
-| File | Contenuto |
+| 📄 Document | 📝 Purpose |
 |---|---|
-| [docs/REQUISITI.md](docs/REQUISITI.md) | Requisiti di sistema, software necessario |
-| [docs/INSTALLAZIONE.md](docs/INSTALLAZIONE.md) | Guida installazione passo-passo (Windows e Linux) |
-| [docs/CONFIGURAZIONE.md](docs/CONFIGURAZIONE.md) | Configurazione `.env`, API key servizi di reputazione |
-| [docs/UTILIZZO.md](docs/UTILIZZO.md) | Come usare l'applicazione, tutte le funzioni |
-| [docs/API.md](docs/API.md) | Riferimento API REST (per sviluppatori) |
+| [📋 REQUIREMENTS.md](docs/REQUIREMENTS.md) | System requirements and prerequisites |
+| [🚀 INSTALLATION.md](docs/INSTALLATION.md) | Step-by-step installation guide |
+| [⚙️ CONFIGURATION.md](docs/CONFIGURATION.md) | Environment setup and API keys |
+| [📖 USAGE.md](docs/USAGE.md) | How to use the application |
+| [📡 API.md](docs/API.md) | REST API reference for developers |
 
 ---
 
-## ⚡ Avvio rapido
+## ⚡ Quick Start
 
-### Windows
-1. Installa **Python 3.13** da [python.org](https://www.python.org/downloads/) *(spunta "Add Python to PATH")*
-2. Scarica e decomprimi il progetto
-3. Fai doppio clic su **`start.bat`**
-4. Apri il browser su **http://localhost:8000**
+### 🪟 Windows
+1. Install **Python 3.13** from [python.org](https://www.python.org/downloads/) *(check "Add Python to PATH")*
+2. Download and extract the project
+3. Double-click **`start.bat`**
+4. Open your browser to **http://localhost:8000**
 
-### Linux / macOS
+### 🐧 Linux / macOS
 ```bash
-git clone https://github.com/tuo-utente/EMLyzer.git
+git clone https://github.com/0verwrite/EMLyzer.git
 cd EMLyzer
 chmod +x start.sh
 ./start.sh
 ```
-Poi apri **http://localhost:8000**
 
-> La prima esecuzione scarica le dipendenze Python (~2 minuti). Le esecuzioni successive partono in pochi secondi.
+Then open **http://localhost:8000**
+
+> ⏱️ **First run** downloads and installs dependencies (~2-5 minutes). Subsequent runs start in seconds.
 
 ---
 
-## 🖼️ Cosa fa
+## 🎯 What It Does
 
 ```
-Email (.eml / .msg / testo incollato)
+Email (.eml / .msg / plain text)
          │
          ▼
 ┌─────────────────────────────────────────────┐
-│  Analisi Header     → SPF/DKIM/DMARC,       │
-│                       mismatch identità,    │
-│                       percorso SMTP         │
+│  📧 Header Analysis    → SPF/DKIM/DMARC,    │
+│                          identity mismatch,  │
+│                          SMTP routing        │
 │                                             │
-│  Analisi Body       → pattern phishing,     │
-│                       link offuscati,       │
-│                       HTML nascosto, NLP    │
+│  📝 Body Analysis      → phishing patterns, │
+│                          obfuscated links,   │
+│                          hidden HTML, NLP   │
 │                                             │
-│  Analisi URL        → IP diretti,           │
-│                       shortener, Punycode,  │
-│                       età dominio (WHOIS)   │
+│  🔗 URL Analysis       → direct IPs,        │
+│                          shorteners,         │
+│                          Punycode, domain    │
+│                          age (WHOIS)        │
 │                                             │
-│  Analisi Allegati   → hash, macro VBA,      │
-│                       JavaScript in PDF     │
+│  📎 Attachment Analysis → hashes, VBA      │
+│                          macros, JS in PDF  │
 │                                             │
-│  Reputazione        → AbuseIPDB, VirusTotal,│
-│                       OpenPhish, PhishTank, │
-│                       Shodan, URLhaus,      │
-│                       ThreatFox, crt.sh,   │
-│                       MalwareBazaar,       │
-│                       CIRCL Passive DNS,   │
-│                       GreyNoise, URLScan,  │
-│                       Pulsedive, CriminalIP│
-│                       SecurityTrails,      │
-│                       Hybrid Analysis      │
+│  🌐 Reputation Checks  → AbuseIPDB,        │
+│                          VirusTotal,        │
+│                          OpenPhish, PhishTank
+│                          Shodan, URLhaus... │
 └─────────────────────────────────────────────┘
          │
          ▼
-  Risk Score 0–100 + Report .docx editabile
+    📊 Risk Score 0–100 + 📄 Editable .docx Report
 ```
 
 ---
 
-## 🔧 Versione
+## ✨ Key Features
 
-**v0.15.1** — Bugfix release: Fixed campaign detection to include visible HTML text (Silvercrest and other campaigns now correctly detected), fixed NLP score consistency (both backend and frontend now use standard mathematical rounding), removed duplicate emoji from campaign UI, cleaned debug logging. All 119 tests passing, production-ready.
-
-**v0.15.0** — Python 3.11–3.13, 119 test automatici, Windows + Linux. Phishing Detection Improvements: Language Mismatch Detector, Domain Mismatch Detector, Storage CDN Blocklist, Known Campaign Detection (13 campaigns), Brand Spoofing Detector (25 brands). Production-ready with zero technical debt.
+- 🔍 **Complete email analysis** — Headers, body, URLs, attachments
+- 🧠 **AI-powered phishing detection** — Machine learning classifier (Random Forest)
+- 🌐 **Multi-language support** — Italian 🇮🇹 and English 🇬🇧
+- 🛡️ **19 reputation services** — AbuseIPDB, VirusTotal, crt.sh, Shodan, and more
+- 📄 **Editable reports** — Generate professional Word (.docx) documents
+- 🎨 **Modern web UI** — Clean, responsive interface (React 19 + Vite)
+- 💾 **Offline-first** — No cloud dependencies, local SQLite database
+- 🆓 **Free & open-source** — MIT license, MIT licensed dependencies only
+- 🚀 **Fast analysis** — Email analyzed in seconds, not minutes
+- 📱 **Cross-platform** — Windows, macOS, Linux
 
 ---
 
-## 📄 Licenza
+## 🔧 Version
 
-Distribuito sotto licenza **MIT**. Consulta il file [LICENSE](LICENSE) per i dettagli.
+**v0.15.1** — 🐛 Bugfix release: Campaign detection now includes visible HTML text (Silvercrest and other campaigns correctly detected), NLP score consistency fixed (both backend and frontend use standard mathematical rounding), removed duplicate emoji, cleaned debug logging. All 119 tests passing ✅, production-ready.
+
+📖 **See full version history** → [CHANGELOG.md](./CHANGELOG.md)
+
+---
+
+## 📋 System Requirements
+
+- **Python** 3.11–3.13 (3.13 recommended ⭐)
+- **RAM** 512 MB minimum (1 GB recommended)
+- **Disk** 500 MB for installation
+- **Browser** Chrome, Firefox, Safari, or Edge (90+)
+
+> [!IMPORTANT]
+> ✅ For complete requirements, see [REQUIREMENTS.md](docs/REQUIREMENTS.md)
+
+---
+
+## 🚀 Getting Started
+
+### 1️⃣ Install Requirements
+Follow [INSTALLATION.md](docs/INSTALLATION.md) for step-by-step instructions.
+
+### 2️⃣ Configure (Optional)
+Set up optional reputation services in [CONFIGURATION.md](docs/CONFIGURATION.md).
+
+### 3️⃣ Start Analyzing
+Learn the interface in [USAGE.md](docs/USAGE.md).
+
+### 💻 For Developers
+Explore the API in [API.md](docs/API.md).
+
+---
+
+## 🏗️ Architecture
+
+| Layer | Technology | Notes |
+|---|---|---|
+| **Backend** | Python 3.13, FastAPI, SQLAlchemy async | REST API + email analysis engine |
+| **Frontend** | React 19, Vite 8, no external UI libs | Responsive web dashboard |
+| **Database** | SQLite (local) | No external DB required |
+| **Analysis** | scikit-learn NLP, dnspython, beautifulsoup4 | Phishing detection + URL parsing |
+| **Reports** | python-docx | Editable Word documents |
+
+---
+
+## 📊 Test Suite
+
+✅ **119 automated tests** — all passing, zero technical debt
+
+- Unit tests for all analyzers
+- Integration tests for API routes
+- Reputation service mocking
+- CI/CD on every commit (GitHub Actions)
+
+Run locally:
+```bash
+./run_tests.sh    # Linux/macOS
+run_tests.bat     # Windows
+```
+
+---
+
+## 🔐 Privacy & Security
+
+- 🛡️ **No cloud dependencies** — Everything runs locally
+- 🔒 **No telemetry** — Zero data collection
+- 📁 **Local SQLite** — Your data stays on your machine
+- 🔓 **Open source** — Fully auditable code
+- ⚡ **Offline capable** — Works without internet (except reputation services)
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit changes with clear messages
+4. Push to your fork
+5. Open a Pull Request to `develop` branch
+
+> [!NOTE]
+> 📖 All PRs should target the **`develop`** branch, not `main`.
+
+---
+
+## 📜 License
+
+Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
+
+---
+
+## 🙋 Support
+
+- 📖 **Documentation:** See [docs/](docs/) folder
+- 🐛 **Report issues:** [GitHub Issues](https://github.com/0verwrite/EMLyzer/issues)
+- 💬 **Questions:** Open a [GitHub Discussion](https://github.com/0verwrite/EMLyzer/discussions)
+
+---
+
+## 👨‍💻 Credits
+
+Developed by **Graziano Mariella**
+
+Distributed with MIT License · [View License](LICENSE)
+
+---
+
+*Ready to get started?* → [Installation Guide](docs/INSTALLATION.md)

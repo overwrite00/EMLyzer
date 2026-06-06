@@ -1,30 +1,30 @@
 # Changelog
 
-Tutte le modifiche significative al progetto sono documentate in questo file.
-Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
+All significant changes to this project are documented in this file.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
 ## [Unreleased] — Next Release
 
-### Roadmap (priorità bassa)
+### Roadmap (Low Priority)
 
-Questa sezione raccoglie tutto ciò che è pianificato ma non ancora implementato.
-Le funzionalità sono ordinate per priorità di implementazione.
+This section collects all planned but not yet implemented features.
+Features are ordered by implementation priority.
 
-#### Infrastruttura (priorità bassa)
+#### Infrastructure (Low Priority)
 
-- [ ] **PostgreSQL** — supporto database alternativo a SQLite per deployment multi-utente
-- [ ] **Sistema plugin** — architettura modulare per aggiungere connettori e analizzatori senza modificare il core
-- [ ] **Regole YARA** — rilevamento pattern negli allegati tramite regole YARA personalizzabili
-- [ ] **Integrazione SIEM** — export in formato compatibile con SIEM (CEF, JSON strutturato, syslog)
-- [ ] **Sandbox esterna opzionale** — invio allegati a servizi sandbox (Cuckoo, Any.run) come plugin opzionale
+- [ ] **PostgreSQL** — Alternative database support to SQLite for multi-user deployments
+- [ ] **Plugin System** — Modular architecture for adding connectors and analyzers without modifying core
+- [ ] **YARA Rules** — Pattern detection in attachments via customizable YARA rules
+- [ ] **SIEM Integration** — Export in SIEM-compatible formats (CEF, structured JSON, syslog)
+- [ ] **Optional External Sandbox** — Send attachments to sandbox services (Cuckoo, Any.run) as optional plugin
 
 ---
 
 ## [0.15.1] — 2026-06-06
 
-### Risolto — Campaign Detection & NLP Score Consistency (Bugfix Release)
+### Fixed — Campaign Detection & NLP Score Consistency (Bugfix Release)
 
 #### Campaign Detection Improvements
 - **Root Cause**: Campaign matching ignored visible HTML text (only used plain text + CSS-hidden content)
@@ -56,7 +56,7 @@ Le funzionalità sono ordinate per priorità di implementazione.
 
 ## [0.15.0] — 2026-06-05
 
-### Aggiunto — Phishing Detection Improvements (6 Features)
+### Added — Phishing Detection Improvements (6 Features)
 
 #### Language Mismatch Detector (v0.15)
 - Detects unauthorized/compromised account emails via unexpected language
@@ -104,7 +104,7 @@ Le funzionalità sono ordinate per priorità di implementazione.
 - **frontend/package.json**: Version 0.14.8 → 0.15.0
 
 ### Testing
-- ✅ **119/119 test PASS** — Zero regressions
+- ✅ **119/119 tests PASS** — Zero regressions
 - ✅ **Language detection**: Portuguese email to Italian user correctly flagged as +20 risk
 - ✅ **Campaign detection**: Silvercrest, INPS, PagoPA campaigns recognized
 - ✅ **Brand spoofing**: 25 brands validated against official domains
@@ -114,52 +114,52 @@ Le funzionalità sono ordinate per priorità di implementazione.
 
 ## [0.14.8] — 2026-05-21
 
-### Risolto — Code Cleanup & Production Stability (PHASE 1 + PHASE 2 + PHASE 3)
+### Fixed — Code Cleanup & Production Stability (PHASE 1 + PHASE 2 + PHASE 3)
 
-**PHASE 1: 4 Critical Bugs (ALTA)**
+**PHASE 1: 4 Critical Bugs (HIGH)**
 - **Transaction Race Condition** (analysis.py:239-243)
-  - Rimosso `await db.flush()` intermedio dopo delete che lasciava il DB in stato inconsistente
-  - Delete + Add ora eseguiti in singola transazione atomica
-  - Previene data loss se commit fallisce dopo flush
+  - Removed `await db.flush()` intermediate call that left DB in inconsistent state
+  - Delete + Add now executed in single atomic transaction
+  - Prevents data loss if commit fails after flush
 
 - **Pattern Matching Duplication** (body_analyzer.py:195-231)
-  - Consolidate 3 blocchi identici (90+ linee) in helper function `_count_pattern_matches()`
-  - Riducono complessità e migliorano manutenibilità
-  - Comportamento identico, file size -40 linee
+  - Consolidated 3 identical blocks (90+ lines) into `_count_pattern_matches()` helper function
+  - Reduces complexity and improves maintainability
+  - Identical behavior, file size -40 lines
 
 - **O(n²) Jaccard Clustering** (campaign_detector.py:208)
-  - Aggiunta documentazione performance e warning per dataset >10k email
-  - ~1k email: ~2-3s, ~5k email: ~30-60s, >10k: può timeout
-  - Future optimization: MinHash per O(n log n)
+  - Added performance documentation and warning for dataset >10k emails
+  - ~1k emails: ~2-3s, ~5k emails: ~30-60s, >10k: may timeout
+  - Future optimization: MinHash for O(n log n)
 
 - **Background Task Silent Failures** (reputation.py:597-611)
-  - Verificato logging per errori in fase 2 reputazione (già in place)
-  - Nessun silent failure nei reputation checks
+  - Verified logging for phase 2 reputation errors (already in place)
+  - No silent failures in reputation checks
 
-**PHASE 2: 4 High-Impact Quality Issues (MEDIA)**
+**PHASE 2: 4 High-Impact Quality Issues (MEDIUM)**
 - **N+1 Query in Bulk Delete** (analysis.py:123-128)
-  - PRIMA: loop con `db.get()` per ogni job_id → 100 jobs = 100 query
-  - DOPO: batch query con `.where(id.in_(valid_ids))` → 1 query
+  - BEFORE: loop with `db.get()` for each job_id → 100 jobs = 100 queries
+  - AFTER: batch query with `.where(id.in_(valid_ids))` → 1 query
   - Performance: O(n) → O(1)
 
 - **Version Sync** (package.json → config.py)
-  - Frontend version era hardcoded '0.0.0'
-  - Aggiornata a 0.14.8 per consistency con backend
+  - Frontend version was hardcoded '0.0.0'
+  - Updated to 0.14.8 for consistency with backend
 
 - **Vite Chunk Filename Conflict** (vite.config.js)
-  - PRIMA: entryFileNames e chunkFileNames entrambi su 'assets/index.js' → conflitto
-  - DOPO: chunks su 'assets/[name]-[hash].js' per nomi distinti
+  - BEFORE: entryFileNames and chunkFileNames both on 'assets/index.js' → conflict
+  - AFTER: chunks on 'assets/[name]-[hash].js' for distinct names
 
 - **Startup Error Handling** (main.py lifespan)
-  - Aggiunto try-except su `await init_db()`
-  - Previene crash silenzioso con messaggio diagnostico chiaro
+  - Added try-except on `await init_db()`
+  - Prevents silent crash with clear diagnostic message
 
 ### Testing
-- ✅ **119/119 test PASS** — Zero regressions
-- ✅ **Syntax verified** — Tutti file modificati compilano senza errori
-- ✅ **Performance** — bulk_delete O(1), pattern matching -40 linee
+- ✅ **119/119 tests PASS** — Zero regressions
+- ✅ **Syntax verified** — All modified files compile without errors
+- ✅ **Performance** — bulk_delete O(1), pattern matching -40 lines
 
-**PHASE 3: 6 Code Quality Documentation Issues (BASSA)**
+**PHASE 3: 6 Code Quality Documentation Issues (LOW)**
 - **Reporting module docstrings** (docx_reporter.py)
   - `_add_heading()`: explain alignment + usage
   - `_add_kv()`: explain key-value formatting with font size consistency
@@ -190,7 +190,7 @@ Le funzionalità sono ordinate per priorità di implementazione.
   - `_extract_ip_from_received()`: explain 5 regex groups (IPv4/IPv6 variants)
   - `_parse_received_chain()`: RFC 5321 hop ordering explanation, attack detection
 
-**PHASE 3 (Continued): Additional Code Quality Improvements (BASSA)**
+**PHASE 3 (Continued): Additional Code Quality Improvements (LOW)**
 - **Reputation connector docstrings** (connectors.py)
   - `check_ip_spamhaus()`: Document Spamhaus DROP blocklist behavior, feed caching, no API key required
   - `check_hash_malwarebazaar()`: Document malware database lookup, confidence interpretation, auth key requirements
@@ -232,92 +232,92 @@ Le funzionalità sono ordinate per priorità di implementazione.
   - Verified all rate limit intervals and timeout values have explanatory comments
   - Ensures all hardcoded numeric limits have clear rationale
 
-### Impatto
-- **Completati 22 BASSA issues** su 22 per zero technical debt
-- **Eliminati 14 problemi critici e ad alto impatto** (ALTA + MEDIA)
-- **Migliorata production stability** e manutenibilità del codice
-- **Ridotta complessità algoritmica** (N+1 → O(1) bulk delete, O(n²) warning)
-- **Code duplication eliminata**: pattern matching consolidato (-40 linee), result distribution (-25 linee)
-- **Database transactions ora atomic** — delete+add in singola transazione, rollback su errore
-- **Error handling completo**: startup errors, background task logging, HTTP error messages
-- **Documentazione API completa**: JSDoc frontend, docstring connectors, magic number rationale
-- **Configurazione self-service**: .env.example con setup instructions per tutte 19 API
+### Impact
+- **Completed 22 LOW issues** out of 22 for zero technical debt
+- **Eliminated 14 critical and high-impact issues** (HIGH + MEDIUM)
+- **Improved production stability** and code maintainability
+- **Reduced algorithmic complexity** (N+1 → O(1) bulk delete, O(n²) warning)
+- **Eliminated code duplication**: pattern matching consolidated (-40 lines), result distribution (-25 lines)
+- **Database transactions now atomic** — delete+add in single transaction, rollback on error
+- **Complete error handling**: startup errors, background task logging, HTTP error messages
+- **Complete API documentation**: JSDoc frontend, docstring connectors, magic number rationale
+- **Self-service configuration**: .env.example with setup instructions for all 19 APIs
 - **Code cleanliness**: import organization, unused imports removed, modern Python 3.10+ type hints
-- **All 119 tests PASSING** — Zero regressions dopo 20 commit di miglioramenti
+- **All 119 tests PASSING** — Zero regressions after 20 commits of improvements
 
 ---
 
 ## [0.14.7] — 2026-05-21
 
-### Corretto
-- **CRITICO: domain_results field mancante in ReputationSummary** — I risultati dei servizi di dominio (crt.sh, CIRCL Passive DNS, SecurityTrails) non venivano salvati nel DB perché mancava il campo `domain_results` nella dataclass. Inoltre, questi servizi usavano `entity_type="url"` anziché `"domain"`, causando che i risultati finissero nel bucket `url_results` per sbaglio. Corretto:
-  - Aggiunto campo `domain_results: list[ReputationResult]` a `ReputationSummary`
-  - Corretto `entity_type` da "url" a "domain" in `check_domain_crtsh`, `check_domain_circl_pdns`, `check_domain_securitytrails`
-  - Aggiornato append logic in `run_fast_checks()`, `run_slow_checks()`, `run_reputation_checks()` per gestire il kind "domain"
-  - Aggiornato `_dict_to_summary()` in reputation.py per ricostruire `domain_results` dal dict serializzato
+### Fixed
+- **CRITICAL: domain_results field missing in ReputationSummary** — Results from domain services (crt.sh, CIRCL Passive DNS, SecurityTrails) were not saved to DB because `domain_results` field was missing from dataclass. Additionally, these services used `entity_type="url"` instead of `"domain"`, causing results to end up in the wrong bucket. Fixed:
+  - Added `domain_results: list[ReputationResult]` field to `ReputationSummary`
+  - Corrected `entity_type` from "url" to "domain" in `check_domain_crtsh`, `check_domain_circl_pdns`, `check_domain_securitytrails`
+  - Updated append logic in `run_fast_checks()`, `run_slow_checks()`, `run_reputation_checks()` to handle "domain" kind
+  - Updated `_dict_to_summary()` in reputation.py to reconstruct `domain_results` from serialized dict
 
-- **Pulsedive HTTP 429 rate limit handling** — Pulsedive ritornava HTTP 429 (too many requests) e veniva segnalato come errore generico. Ora:
-  - Aumentato rate interval da 2.5s a 5.0s per Pulsedive (free tier: 10 req/day con possibili limiti per-minute aggressivi)
-  - Aumentato timeout da 12s a 15s per Pulsedive
-  - Gestione speciale HTTP 429: segnalato come "skipped" anziché "error" con messaggio diagnostico chiaro
-  - Messaggio aiuta l'utente: "rate limit superato (quota giornaliera o temporanea). Riprova tra qualche minuto"
+- **Pulsedive HTTP 429 rate limit handling** — Pulsedive returned HTTP 429 (too many requests) and was reported as generic error. Now:
+  - Increased rate interval from 2.5s to 5.0s for Pulsedive (free tier: 10 req/day with possible aggressive per-minute limits)
+  - Increased timeout from 12s to 15s for Pulsedive
+  - Special HTTP 429 handling: reported as "skipped" instead of "error" with clear diagnostic message
+  - Message helps user: "rate limit exceeded (daily quota or temporary). Retry in a few minutes"
 
-- **crt.sh timeout** — Aumentato REQUEST_TIMEOUT_INFO da 5s a 8s perché crt.sh può richiedere fino a 8 secondi per rispondere su query di domini new/sospetti
+- **crt.sh timeout** — Increased REQUEST_TIMEOUT_INFO from 5s to 8s because crt.sh can take up to 8 seconds to respond on queries for new/suspicious domains
 
-### Validazione
-- **119/119 test PASS**: Nessuna regressione nel test suite completo
-- **Domain results now stored correctly**: crt.sh, CIRCL, SecurityTrails hanno ora sezione dedicata `domain_results` nei risultati salvati
-- **Pulsedive rate limit properly handled**: HTTP 429 segnalato come "skipped" con messaggio diagnostico, retry automatico via backoff exponential
+### Validation
+- **119/119 tests PASS**: No regressions in full test suite
+- **Domain results now stored correctly**: crt.sh, CIRCL, SecurityTrails now have dedicated `domain_results` section in saved results
+- **Pulsedive rate limit properly handled**: HTTP 429 reported as "skipped" with diagnostic message, automatic retry via exponential backoff
 
-### Impatto
-- Analisti ora ricevono risultati completi da servizi di dominio (crt.sh, CIRCL, SecurityTrails)
-- Pulsedive non causa più errori "hard" quando supera rate limit temporaneo
-- crt.sh non fallisce più su timeout per domini lenti
-- Visibility migliorata su quali servizi sono stati skipped e perché
+### Impact
+- Analysts now receive complete results from domain services (crt.sh, CIRCL, SecurityTrails)
+- Pulsedive no longer causes "hard" errors when exceeding temporary rate limit
+- crt.sh no longer fails on timeout for slow domains
+- Improved visibility on which services were skipped and why
 
 ---
 
 ## [0.14.6] — 2026-05-21
 
-### Aggiunto
-- **Complete domain integration in reputation pipeline** (CRITICAL INFRASTRUCTURE): Implementato pieno supporto per estrazione e passaggio domini dai reputation analyzer ai servizi di reputazione domain-specific.
-  - **4-tuple returns**: _extract_indicators() e _extract_priority_indicators() ritornano ora (ips, urls, hashes, domains) invece di 3-tuple
-  - **Domain passing**: Domini passati da reputation.py a run_fast_checks() e run_slow_checks()
-  - **Domain processing in _build_flat_tasks()**: Nuovo loop per processare domini estratti (lines 2009-2020)
-  - **Hard caps enforced**: Max 2 domini per SLOW services (SecurityTrails quota: 50/month)
-  - **Services receiving domains**: crt.sh, CIRCL Passive DNS, SecurityTrails ora ricevono domini come parametri invece che re-estrarli da URL
+### Added
+- **Complete domain integration in reputation pipeline** (CRITICAL INFRASTRUCTURE): Implemented full support for domain extraction and passing from reputation analyzer to domain-specific reputation services.
+  - **4-tuple returns**: _extract_indicators() and _extract_priority_indicators() now return (ips, urls, hashes, domains) instead of 3-tuple
+  - **Domain passing**: Domains passed from reputation.py to run_fast_checks() and run_slow_checks()
+  - **Domain processing in _build_flat_tasks()**: New loop to process extracted domains (lines 2009-2020)
+  - **Hard caps enforced**: Max 2 domains for SLOW services (SecurityTrails quota: 50/month)
+  - **Services receiving domains**: crt.sh, CIRCL Passive DNS, SecurityTrails now receive domains as parameters instead of re-extracting them from URLs
 
-### Validazione
-- **119/119 test PASS**: Nessuna regressione nel test suite completo
-- **Domain extraction validation**: 5/5 test PASS su pipeline di estrazione (FAST: 3 domini, SLOW: 2 domini con hard cap)
-- **Architecture validation**: 4-tuple returns validati, hard caps verificati (4 URL, 2 domini), CDN filtering confermato
+### Validation
+- **119/119 tests PASS**: No regressions in full test suite
+- **Domain extraction validation**: 5/5 tests PASS on extraction pipeline (FAST: 3 domains, SLOW: 2 domains with hard cap)
+- **Architecture validation**: 4-tuple returns validated, hard caps verified (4 URL, 2 domains), CDN filtering confirmed
 
-### Impatto
-- Architettura di reputazione ora completa e coerente: tutti i 19 servizi ricevono input service-specific corretto
-- Eliminato code duplication: domini non più re-estratti internamente a _build_flat_tasks()
-- Miglioramento di efficienza: estrazione domains una sola volta, utilizzo intelligente quota expensive services
+### Impact
+- Reputation architecture now complete and consistent: all 19 services receive service-specific correct input
+- Eliminated code duplication: domains no longer re-extracted internally to _build_flat_tasks()
+- Efficiency improvement: domain extraction done once, intelligent quota usage for expensive services
 
 ---
 
 ## [0.14.5] — 2026-05-21
 
-### Corretto
-- **IP extraction from Received headers**: Aggiornato regex `_IP_IN_RECEIVED_RE` per estrarre IP da parentheses `(137.184.34.4)` oltre che da square brackets `[137.184.34.4]`. Ora cattura correttamente sender IP da Received headers in formato email standard.
-- **X-Sender-IP fallback**: Aggiunto fallback a header `X-Sender-IP` quando `X-Originating-IP` è assente. Risolve problema dove sample-1.eml (Bradesco phishing) aveva solo X-Sender-IP.
-- **URLScan.io HTTP 403 "custom sort value" error**: Rimosso parametro `sort` dal request quando si ritenta dopo HTTP 403. URLScan.io non consente custom sort values senza API key valida. Fallback ora usa ricerca pubblica base.
+### Fixed
+- **IP extraction from Received headers**: Updated regex `_IP_IN_RECEIVED_RE` to extract IP from parentheses `(137.184.34.4)` in addition to square brackets `[137.184.34.4]`. Now correctly captures sender IP from Received headers in standard email format.
+- **X-Sender-IP fallback**: Added fallback to header `X-Sender-IP` when `X-Originating-IP` is absent. Resolves issue where sample-1.eml (Bradesco phishing) had only X-Sender-IP.
+- **URLScan.io HTTP 403 "custom sort value" error**: Removed `sort` parameter from request when retrying after HTTP 403. URLScan.io does not allow custom sort values without valid API key. Fallback now uses base public search.
 
 ### Debugging
-- **Comprehensive indicator logging**: Aggiunto debug logging completo in reputation.py per tracciare extraction di IPs, URLs, hashes per FAST services e SLOW services. Mostra:
-  - IPs estratti da header_indicators (received_hops) e x_originating_ip
-  - URLs estratti da url_indicators
-  - Indicatori selettivi per rate-limited services
-  - Valori effettivi passati ai servizi di reputazione
-- **Logging implementazione**: Aggiunta logger import e debug print statements per visibility completa del flusso.
+- **Comprehensive indicator logging**: Added complete debug logging in reputation.py to trace IP, URL, hash extraction for FAST and SLOW services. Shows:
+  - IPs extracted from header_indicators (received_hops) and x_originating_ip
+  - URLs extracted from url_indicators
+  - Selective indicators for rate-limited services
+  - Actual values passed to reputation services
+- **Logging implementation**: Added logger import and debug print statements for full flow visibility.
 
 ### Testing
-- ✅ Sender IP 137.184.34.4 now extracted e checked da reputation services
+- ✅ Sender IP 137.184.34.4 now extracted and checked by reputation services
 - ✅ IPv6 addresses from Received headers now properly extracted
-- ✅ URLScan.io no longer returns HTTP 400/403 errors — querying 3 URLs correctly
+- ✅ URLScan.io no longer returns HTTP 400/403 errors — correctly querying 3 URLs
 - ✅ X-Originating-IP now populated from X-Sender-IP fallback
 - ✅ All 19 reputation services working with correct indicators
 
@@ -325,534 +325,533 @@ Le funzionalità sono ordinate per priorità di implementazione.
 
 ## [0.14.4] — 2026-05-21
 
-### Corretto
-- **URLScan.io HTTP 400 error**: Aggiunto `html.unescape()` nell'URL analyzer per decodificare entità HTML (&amp; → &, &quot; → ", etc.) in URL estratti da corpo HTML. Previene HTTP 400 "Bad Request" quando URLScan.io riceve URL con entità encoded.
-- **URLScan.io HTTP 403 fallback**: Implementato fallback authentication method per HTTP 403 (retry con query param `?key=...` invece di header `API-Key:`). Migliora compatibilità con diverse configurazioni URLScan.io.
-- **Enhanced error handling**: Aggiunto logging diagnostico completo per richieste URLScan.io (URL, query, auth method, response body su errore). Facilita troubleshooting.
-- **Improved error messages**: Differenziati messaggi di errore HTTP 403 con/senza API key configurata. Utenti ricevono suggerimenti specifici per risolvere problemi.
+### Fixed
+- **URLScan.io HTTP 400 error**: Added `html.unescape()` in URL analyzer to decode HTML entities (&amp; → &, &quot; → ", etc.) in URLs extracted from HTML body. Prevents HTTP 400 "Bad Request" when URLScan.io receives URLs with encoded entities.
+- **URLScan.io HTTP 403 fallback**: Implemented fallback authentication method for HTTP 403 (retry with query param `?key=...` instead of header `API-Key:`). Improves compatibility with different URLScan.io configurations.
+- **Enhanced error handling**: Added complete diagnostic logging for URLScan.io requests (URL, query, auth method, response body on error). Facilitates troubleshooting.
+- **Improved error messages**: Differentiated error messages for HTTP 403 with/without API key configured. Users receive specific suggestions to resolve issues.
 
-### Aggiunto
-- **Health check endpoint**: Nuovo endpoint `GET /api/reputation/test-urlscan` per diagnosticare connettività URLScan.io, validazione API key, e suggerimenti di configurazione. Ritorna: connectivity, api_key_configured, api_key_valid, system_info, suggestions.
+### Added
+- **Health check endpoint**: New endpoint `GET /api/reputation/test-urlscan` to diagnose URLScan.io connectivity, validate API key, and provide configuration suggestions. Returns: connectivity, api_key_configured, api_key_valid, system_info, suggestions.
 
 ### Testing
-- ✅ Tutti i 119 test passano
-- ✅ 3 sample email analizzate: risk score 75.0, 70.6, 45.3
-- ✅ Tutti 19 servizi reputazione verificati e funzionanti
-- ✅ URLScan.io: No more HTTP 400/403 errors (stato: not_applicable per email non sospette, clean per email legittime)
+- ✅ All 119 tests pass
+- ✅ 3 sample emails analyzed: risk score 75.0, 70.6, 45.3
+- ✅ All 19 reputation services verified and working
+- ✅ URLScan.io: No more HTTP 400/403 errors (status: not_applicable for non-suspicious emails, clean for legitimate emails)
 
 ---
 
 ## [0.14.3] — 2026-05-20
 
-### Aggiunto
-- **Rilevamento phishing portoghese (Portoghese/Brasiliano)**: espansione patterns body analyzer con 23 nuovi regex per urgenza/CTA/credenziali specifici della lingua portoghese. Inclusi pattern bancari Bradesco, Caixa, Itaú, e-commerce Shopee/Mercado Livre, autorità fiscale, frodi credential harvesting.
-- **Dataset NLP portoghese**: estensione dataset training NLP da 106 a 143 campioni con 37 nuove frasi portoghesi (19 phishing + 18 legittime). Migliora confidenza classificazione per email brasiliane.
-- **Analisi email HTML-only**: fix: estrazione testo da HTML quando body_text è vuoto. L'analizzatore body ora decodifica HTML e estrae il testo semplice con BeautifulSoup se la parte plain-text è < 50 caratteri.
-- **Evidence pattern visibility**: aggiunta visibilità degli specifici pattern rilevati nei finding. Ogni finding body_analyzer ora mostra gli esempi effettivi dei pattern matched (es. "Rilevati pattern urgenti: expirando, urgência").
+### Added
+- **Portuguese phishing detection**: Expanded body analyzer patterns with 23 new regex for Portuguese-specific urgency/CTA/credentials. Includes banking patterns (Bradesco, Caixa, Itaú), e-commerce (Shopee/Mercado Livre), tax authority, credential harvesting fraud.
+- **Portuguese NLP dataset**: Extended NLP training dataset from 106 to 143 samples with 37 new Portuguese phrases (19 phishing + 18 legitimate). Improves classification confidence for Brazilian emails.
+- **HTML-only email analysis**: Fix: Extract text from HTML when body_text is empty. Body analyzer now decodes HTML and extracts plain text with BeautifulSoup if plain-text part is < 50 characters.
+- **Evidence pattern visibility**: Added visibility of specific detected patterns in findings. Each body_analyzer finding now shows actual pattern examples (e.g., "Detected urgency patterns: expirando, urgência").
 
-### Corretto
-- **CodeQL security alert**: rimosso riferimento a variabili derivate da API key nel logging URLScan.io error. Il log ora contiene solo l'URL richiesto, non dati derivati dalla chiave API.
+### Fixed
+- **CodeQL security alert**: Removed reference to API-key-derived variables in URLScan.io error logging. Log now contains only the requested URL, not data derived from API key.
 
 ### Testing
-- ✅ Tutti i 119 test passano senza regressioni
-- ✅ sample-1.eml risk score migliorato: 48/100 → 75/100 (CRITICO)
-- ✅ Pattern rilevati per email portoghese con evidence visibili all'analista
+- ✅ All 119 tests pass without regressions
+- ✅ sample-1.eml risk score improved: 48/100 → 75/100 (CRITICAL)
+- ✅ Patterns detected for Portuguese email with evidence visible to analyst
 
 ---
 
 ## [0.14.2] — 2026-05-20
 
-### Corretto
-- **Database error handling**: aggiunto try-except attorno a `db.add()` e `await db.commit()` in `POST /api/analysis/{job_id}` per gestire errori di connessione/constraint in modo robusto. La funzione ora fa rollback automatico e restituisce HTTP 500 con messaggio di errore al client.
-- **Logging imports optimization**: spostati tutti gli import di logging a livello di modulo (top-level) in `header_analyzer.py`, `body_analyzer.py`, `url_analyzer.py`, `attachment_analyzer.py`. Evita ricreazioni ripetute del logger e migliora le performance.
-- **URL analyzer exception logging**: aggiunto logging dettagliato nei handler di eccezioni per batch timeout e fallimenti per-URL. Facilita il debugging dei timeout di rete.
-- **LanguageTool exception logging**: aggiunto logging con dettagli dell'eccezione quando il servizio non è disponibile.
-- **NLP serialization type safety**: corretto body_indicators["nlp"] per restituire `{}` (empty dict) invece di `None` quando nlp_result è falsy. Garantisce coerenza nella struttura JSON serializzata.
+### Fixed
+- **Database error handling**: Added try-except around `db.add()` and `await db.commit()` in `POST /api/analysis/{job_id}` to handle connection/constraint errors robustly. Function now auto-rollsback and returns HTTP 500 with error message to client.
+- **Logging imports optimization**: Moved all logging imports to module-level (top-level) in `header_analyzer.py`, `body_analyzer.py`, `url_analyzer.py`, `attachment_analyzer.py`. Avoids repeated logger recreations and improves performance.
+- **URL analyzer exception logging**: Added detailed exception logging in batch timeout and per-URL failure handlers. Facilitates network timeout debugging.
+- **LanguageTool exception logging**: Added exception logging with details when service is unavailable.
+- **NLP serialization type safety**: Fixed body_indicators["nlp"] to return `{}` (empty dict) instead of `None` when nlp_result is falsy. Guarantees consistency in serialized JSON structure.
 
 ### Testing
-- ✅ Tutti i 119 test passano senza regressioni
-- ✅ Code review comprehensiva completata con Opus agent
-- ✅ Tutti i CRITICAL e MEDIUM priority issues risolti
+- ✅ All 119 tests pass without regressions
+- ✅ Code review completed with Opus agent
+- ✅ All CRITICAL and MEDIUM priority issues resolved
 
 ---
 
 ## [0.14.1] — 2026-04-20
 
-### Corretto
-- **Aggiornamento informazioni piani gratuiti servizi reputazione**: i limiti pubblicati in v0.12.0 per 5 servizi erano diventati obsoleti. Aggiornati commenti in `config.py`, `.env.example`, `_SERVICE_DEFS` in `connectors.py`, `ServicePreview` in `TabReputation.jsx` e tutta la documentazione:
-  - **GreyNoise Community**: 100 req/g → ~50 ricerche/settimana (community tier)
-  - **URLScan.io**: 100 req/h → 1.000 ricerche/g con chiave (ricerca pubblica senza chiave con limiti ridotti)
-  - **Pulsedive**: 30 req/min → **10 req/g** (riduzione significativa da marzo 2024)
-  - **Criminal IP**: "free tier" generica → "free con crediti limitati"
-  - **SecurityTrails**: 50 req/mese free → **NESSUN PIANO FREE** (solo trial temporaneo; da ~$11k/anno)
-- Aggiunta sezione `⚠️ Nota sui piani gratuiti (aggiornamento 2025)` in `docs/CONFIGURAZIONE.md` con tabella riepilogativa dello stato attuale.
-- Aggiunta prominente avviso in `docs/CONFIGURAZIONE.md` che SecurityTrails non offre più un piano gratuito stabile.
+### Fixed
+- **Updated reputation service free tier information**: Limits published in v0.12.0 for 5 services became obsolete. Updated comments in `config.py`, `.env.example`, `_SERVICE_DEFS` in `connectors.py`, `ServicePreview` in `TabReputation.jsx` and all documentation:
+  - **GreyNoise Community**: 100 req/day → ~50 searches/week (community tier)
+  - **URLScan.io**: 100 req/h → 1,000 searches/day with key (public search without key with reduced limits)
+  - **Pulsedive**: 30 req/min → **10 req/day** (significant reduction since March 2024)
+  - **Criminal IP**: "free tier" generic → "free with limited credits"
+  - **SecurityTrails**: 50 req/month free → **NO FREE PLAN** (only temporary trial; ~$11k/year)
+- Added prominent section "⚠️ Note on Free Tiers (2025 Update)" in Configuration Guide with summary table of current status.
+- Added prominent warning in Configuration Guide that SecurityTrails no longer offers stable free plan.
 
 ---
 
 ## [0.14.0] — 2026-04-20
 
-### Aggiunto
-- **Rilevamento omoglifi Unicode**: nuova funzione `_check_homoglyphs` in `body_analyzer.py` con mappa inline di 39 caratteri Cirillici e Greci visivamente identici ai latini. Finding HIGH se ≥3 occorrenze, LOW se 1-2. Evidence mostra i caratteri sospetti trovati. Nessuna dipendenza esterna.
-- **Switch NLP: Naive Bayes → Logistic Regression**: il classificatore NLP passa da `MultinomialNB` a `LogisticRegression + MaxAbsScaler`. Migliore calibrazione delle probabilità, gestione ottimizzata di feature correlate. `MaxAbsScaler` necessario per input sparse TF-IDF. Estrazione top features aggiornata: usa `clf.coef_[0]` (coefficienti positivi = predice phishing) invece di `feature_log_prob_[1]`.
-- **Dataset NLP espanso**: da ~65 a ~165 campioni. Nuove categorie phishing (label=1): banking italiano (UniCredit, Intesa, PosteItaliane, INPS), Microsoft/Office365, sextortion, prize/419 fraud, rimborso fiscale, malware lure. Nuove categorie legittime (label=0): email HR (ferie, buste paga), notifiche GitHub, ricevute e-commerce, email italiane quotidiane, supporto tecnico. Bilanciamento ~50/50.
-- **LanguageTool grammar checker** (opzionale): nuova funzione `_check_languagetool` in `body_analyzer.py`. Se `LANGUAGETOOL_API_URL` è configurato in `.env`, analizza il corpo email (max 5000 caratteri). ≥5 errori grammaticali → finding MEDIUM "Possibili errori grammaticali". Silenzioso se il servizio non è disponibile o l'URL è vuoto.
-- Nuova chiave di configurazione `LANGUAGETOOL_API_URL` in `config.py` e `.env.example`.
-- 9 nuovi test in `TestBodyAnalyzerV14`.
+### Added
+- **Unicode homoglyph detection**: New function `_check_homoglyphs` in `body_analyzer.py` with inline map of 39 Cyrillic and Greek characters visually identical to Latin. Finding HIGH if ≥3 occurrences, LOW if 1-2. Evidence shows suspicious characters found. No external dependencies.
+- **NLP Switch: Naive Bayes → Logistic Regression**: Classifier passes from `MultinomialNB` to `LogisticRegression + MaxAbsScaler`. Better probability calibration, optimized handling of correlated features. `MaxAbsScaler` required for sparse TF-IDF input. Top features extraction updated: uses `clf.coef_[0]` (positive coefficients = predicts phishing) instead of `feature_log_prob_[1]`.
+- **Expanded NLP dataset**: From ~65 to ~165 samples. New phishing categories (label=1): Italian banking (UniCredit, Intesa, PosteItaliane, INPS), Microsoft/Office365, sextortion, prize/419 fraud, tax refund, malware lure. New legitimate categories (label=0): HR email (vacation, payslips), GitHub notifications, e-commerce receipts, daily Italian email, technical support. ~50/50 balance.
+- **LanguageTool grammar checker** (optional): New function `_check_languagetool` in `body_analyzer.py`. If `LANGUAGETOOL_API_URL` configured in `.env`, analyzes email body (max 5000 chars). ≥5 grammar errors → finding MEDIUM "Possible grammar errors". Silent if service unavailable or URL empty.
+- New configuration key `LANGUAGETOOL_API_URL` in `config.py` and `.env.example`.
+- 9 new tests in `TestBodyAnalyzerV14`.
 
 ---
 
 ## [0.13.0] — 2026-04-20
 
-### Aggiunto
-- **List-Unsubscribe header analysis**: rileva link di unsubscribe con dominio diverso dal mittente (MEDIUM), URL HTTP non sicuro (LOW), IP diretto (HIGH) e formato malformato (LOW). Finding INFO per email bulk legittime con header corretto.
-- **X-Campaign-ID header analysis**: finding INFO se il campo è presente; finding LOW aggiuntivo se manca il List-Unsubscribe (segnale di bulk email non conforme).
-- **ARC chain validation**: verifica sequenza `i=` degli header `ARC-Seal`. Finding HIGH se `cv=fail` (possibile manomissione in transito), MEDIUM se la sequenza è incompleta, INFO se la catena è valida. Nessun finding se ARC è assente (è opzionale).
-- **Sezione Campagne nel report .docx** (§7): al momento della generazione del report, i cluster di campagna rilevati che includono l'email vengono inclusi nel documento Word con cluster_id, tipo similarità, conteggio email, risk score massimo, prima/ultima osservazione.
-- Nuovi campi `ParsedEmail`: `arc_seal_raw`, `arc_message_signature_raw`, `arc_authentication_results_raw` (lista header multipli per hop ARC).
-- 16 nuovi test in `TestHeaderAnalyzerV13`.
+### Added
+- **List-Unsubscribe header analysis**: Detects unsubscribe link with different domain than sender (MEDIUM), HTTP unsecured URL (LOW), direct IP (HIGH), malformed format (LOW). INFO finding for legitimate bulk emails with correct header.
+- **X-Campaign-ID header analysis**: INFO finding if field present; additional LOW finding if List-Unsubscribe missing (signal of non-compliant bulk email).
+- **ARC chain validation**: Verifies sequence `i=` in `ARC-Seal` headers. Finding HIGH if `cv=fail` (possible tampering in transit), MEDIUM if sequence incomplete, INFO if chain valid. No finding if ARC absent (optional).
+- **Campaigns section in .docx report** (§7): At report generation time, campaign clusters containing the email are included in Word document with cluster_id, similarity type, email count, max risk score, first/last observation.
+- New `ParsedEmail` fields: `arc_seal_raw`, `arc_message_signature_raw`, `arc_authentication_results_raw` (list of multiple headers per ARC hop).
+- 16 new tests in `TestHeaderAnalyzerV13`.
 
 ---
 
 ## [0.12.0] — 2026-04-20
 
-### Aggiunto
-- **GreyNoise Community**: classifica IP come `malicious`, `benign` o `unknown`. Distingue scanner innocui (crawlers, ricercatori) da attori malevoli, riducendo i falsi positivi. Richiede `GREYNOISE_API_KEY` (100 req/g free). Fase FAST.
-- **URLScan.io**: ricerca scansioni esistenti per URL/domini nel database urlscan.io. Mostra verdetto, score e tag dell'ultima scansione disponibile. `URLSCAN_API_KEY` opzionale (ricerca pubblica disponibile anche senza chiave). Fase FAST.
-- **Pulsedive**: threat intel aggregata per IP e URL. Risk level `none`/`low`/`medium`/`high`/`critical` con risk factors dettagliati. Richiede `PULSEDIVE_API_KEY` (30 req/min free). Fase FAST.
-- **Criminal IP**: score rischio IP 0-4 (Safe/Low/Medium/High/Critical) con geolocalizzazione. Richiede `CRIMINALIP_API_KEY` (free tier). Fase FAST.
-- **SecurityTrails**: DNS attuale per domini — record A, MX, NS. Servizio informativo (icona ℹ️, come ASN Lookup e Shodan). Richiede `SECURITYTRAILS_API_KEY` (50 req/mese free). Fase FAST.
-- **Hybrid Analysis** (CrowdStrike Falcon): ricerca hash allegati nel database sandbox. `threat_level` 0-2 (no threat/suspicious/malicious) con verdict, tipo file e tag. Richiede `HYBRID_ANALYSIS_API_KEY` (gratuito con registrazione). Fase FAST.
+### Added
+- **GreyNoise Community**: Classifies IP as `malicious`, `benign`, or `unknown`. Distinguishes innocent scanners (crawlers, researchers) from malicious actors, reducing false positives. Requires `GREYNOISE_API_KEY` (100 req/day free). FAST phase.
+- **URLScan.io**: Searches existing scans for URL/domains in urlscan.io database. Shows verdict, score, tags from latest available scan. `URLSCAN_API_KEY` optional (public search available without key). FAST phase.
+- **Pulsedive**: Aggregated threat intel for IP and URL. Risk level `none`/`low`/`medium`/`high`/`critical` with detailed risk factors. Requires `PULSEDIVE_API_KEY` (30 req/min free). FAST phase.
+- **Criminal IP**: IP risk score 0-4 (Safe/Low/Medium/High/Critical) with geolocation. Requires `CRIMINALIP_API_KEY` (free tier). FAST phase.
+- **SecurityTrails**: Current DNS for domains — A, MX, NS records. Informational service (ℹ️ icon, like ASN Lookup and Shodan). Requires `SECURITYTRAILS_API_KEY` (50 req/month free). FAST phase.
+- **Hybrid Analysis** (CrowdStrike Falcon): Searches attachment hash in database sandbox. `threat_level` 0-2 (no threat/suspicious/malicious) with verdict, file type, tags. Requires `HYBRID_ANALYSIS_API_KEY` (free with registration). FAST phase.
 
 ---
 
 ## [0.11.0] — 2026-04-19
 
-### Aggiunto
-- **CIRCL Passive DNS**: nuovo servizio reputazione informativo per IP e domini. Interroga `pdns.circl.lu` per lo storico di risoluzione DNS: per un IP mostra i domini che vi hanno puntato storicamente; per un dominio mostra gli IP a cui ha risolto e i record A/AAAA/MX/NS/CNAME. Gratuito con registrazione (CIRCL_API_KEY in formato `username:password`). Fase FAST, classificato come informativo (icona ℹ️ nel frontend, come ASN Lookup e Shodan InternetDB).
+### Added
+- **CIRCL Passive DNS**: New informational reputation service for IP and domains. Queries `pdns.circl.lu` for DNS resolution history: for an IP shows domains that historically pointed to it; for a domain shows IPs it resolved to and A/AAAA/MX/NS/CNAME records. Free with registration (CIRCL_API_KEY in format `username:password`). FAST phase, classified as informational (ℹ️ icon like ASN Lookup and Shodan InternetDB).
 
 ---
 
 ## [0.10.3] — 2026-04-18
 
-### Aggiunto
-- **Localizzazione script di avvio**: `start.sh`, `start.bat`, `run_tests.sh` e `run_tests.bat` rilevano automaticamente la lingua del sistema operativo (Windows UI culture / `$LANG`) e mostrano tutti i messaggi in italiano o in inglese. Nessuna modifica al file `.env` necessaria.
-- **Completamento i18n API backend**: tutti gli endpoint FastAPI (`upload`, `analysis`, `report`, `reputation`, `settings`) usano ora `t()` da `utils/i18n.py` invece di stringhe hardcoded in italiano. Le risposte di errore rispettano il parametro `LANGUAGE` del file `.env`.
+### Added
+- **Startup script localization**: `start.sh`, `start.bat`, `run_tests.sh`, `run_tests.bat` auto-detect OS language (Windows UI culture / `$LANG`) and show all messages in Italian or English. No `.env` file modification needed.
+- **Complete backend API i18n**: All FastAPI endpoints (`upload`, `analysis`, `report`, `reputation`, `settings`) now use `t()` from `utils/i18n.py` instead of hardcoded Italian strings. Error responses respect `LANGUAGE` parameter in `.env`.
 
-### Aggiornato
-- **python-multipart 0.0.26** (da 0.0.22): compatibile con FastAPI 0.135.2 e Starlette 1.0.0 (`>=0.0.18`).
+### Updated
+- **python-multipart 0.0.22 → 0.0.26**: Compatible with FastAPI 0.135.2 and Starlette 1.0.0 (`>=0.0.18`).
 
 ---
 
 ## [0.10.2] — 2026-04-14
 
-### Sicurezza
-- **pytest aggiornato a 9.0.3** (da 9.0.2): fix privilege escalation su UNIX via directory `/tmp/pytest-of-{user}` con permessi scrivibili da altri utenti locali (Dependabot alert #10, GHSA-jfh8-c2jp-jmjq)
-- **follow-redirects aggiornato a 1.16.0** (da 1.15.11): fix leak di header di autenticazione personalizzati verso host cross-domain durante redirect HTTP; dipendenza transitiva di axios nel frontend (Dependabot alert #11, CVE-2025-46566)
+### Security
+- **pytest upgraded to 9.0.3** (from 9.0.2): Fix privilege escalation on UNIX via `/tmp/pytest-of-{user}` directory with world-writable permissions (Dependabot alert #10, GHSA-jfh8-c2jp-jmjq)
+- **follow-redirects upgraded to 1.16.0** (from 1.15.11): Fix leak of custom auth headers to cross-domain hosts during HTTP redirects; transitive dependency of axios in frontend (Dependabot alert #11, CVE-2025-46566)
 
 ---
 
 ## [0.10.1] — 2026-04-13
 
-### Corretto
-- **Timeout analisi su email con molti URL**: email con 40+ URL (es. newsletter HTML con immagini CDN da paypalobjects.com) causavano timeout di 60s nel frontend perché la query WHOIS veniva eseguita per ogni URL invece che per dominio unico. Con 42 URL dallo stesso dominio `paypalobjects.com` venivano eseguite 42 query WHOIS identiche (8s ognuna). Aggiunta cache WHOIS pre-calcolata per dominio unico in `analyze_urls()`: il tempo passa da 60s+ a ~12-15s (7 query invece di 42 per l'email di test)
-- **Timeout frontend per `runAnalysis` e `analyzeManual`**: aumentato da 60s a 300s nel bundle e in `client.js` per garantire che email complesse completino l'analisi senza errore "timeout of 60000ms exceeded"
+### Fixed
+- **Analysis timeout on emails with many URLs**: Emails with 40+ URLs (e.g., HTML newsletters with CDN images from paypalobjects.com) caused 60s frontend timeout because WHOIS query was executed per URL instead of per unique domain. With 42 URLs from same domain `paypalobjects.com`, 42 identical WHOIS queries executed (8s each). Added pre-calculated WHOIS cache per unique domain in `analyze_urls()`: time drops from 60s+ to ~12-15s (7 queries instead of 42 for test email)
+- **Frontend timeout for `runAnalysis` and `analyzeManual`**: Increased from 60s to 300s in bundle and `client.js` to ensure complex emails complete analysis without "timeout of 60000ms exceeded" error
 
 ---
 
 ## [0.10.0] — 2026-04-13
 
-### Aggiunto
-- **Visualizzazione contenuto email nel tab Body**: nuova sezione "Contenuto email" che mostra il testo plain-text dell'email nello stesso stile della sezione "HTML nascosto" (sfondo scuro, font mono, scroll a 300px); caricato dinamicamente via `GET /api/analysis/{id}/body`
-- **Anteprima HTML sicura nel tab Body**: nuova sezione "Anteprima HTML" con toggle espandi/comprimi che renderizza il corpo HTML dell'email in un `<iframe sandbox="" referrerPolicy="no-referrer">` con contenuto sanitizzato; i link sono disabilitati (`href="#"`, `pointer-events:none`), le immagini sostituite con GIF 1×1 trasparente, il CSS inline filtrato con allowlist di proprietà sicure
-- **Endpoint `GET /api/analysis/{job_id}/body`**: nuovo endpoint che ri-parsa il file email caricato e restituisce `body_text` (max 50.000 caratteri) e `body_html_sanitized` (HTML sanitizzato pronto per iframe srcdoc)
-- **`_sanitize_email_html()`**: helper di sanitizzazione con bleach (allowlist tag), `CSSSanitizer` con allowlist proprietà CSS, sostituzione img src con placeholder GIF, disabilitazione href, wrapper HTML con CSP `default-src 'none'`
-- **Dipendenza `tinycss2`**: aggiunta a `requirements.txt` per supportare `bleach.css_sanitizer.CSSSanitizer` e filtrare il CSS inline in modo sicuro (fix `NoCssSanitizerWarning`)
+### Added
+- **Email content visualization in Body tab**: New "Email Content" section showing email plain-text in same dark-background monospace style as "Hidden HTML" section (300px scroll); loaded dynamically via `GET /api/analysis/{id}/body`
+- **Safe HTML preview in Body tab**: New "HTML Preview" section with expand/collapse toggle rendering email HTML body in `<iframe sandbox="" referrerPolicy="no-referrer">` with sanitized content; links disabled (`href="#"`, `pointer-events:none`), images replaced with 1×1 transparent GIF, inline CSS filtered with allowlist of safe properties
+- **Endpoint `GET /api/analysis/{job_id}/body`**: New endpoint re-parses uploaded email file and returns `body_text` (max 50,000 chars) and `body_html_sanitized` (HTML sanitized for iframe srcdoc)
+- **`_sanitize_email_html()`**: Sanitization helper with bleach (tag allowlist), `CSSSanitizer` with CSS property allowlist, img src replacement with placeholder GIF, href disabling, HTML wrapper with CSP `default-src 'none'`
+- **Dependency `tinycss2`**: Added to `requirements.txt` to support `bleach.css_sanitizer.CSSSanitizer` and safely filter inline CSS (fixes `NoCssSanitizerWarning`)
 
 ---
 
 ## [0.9.4] — 2026-04-12
 
-### Corretto
-- **Servizi reputazione bloccati "in elaborazione"**: quando `_extract_priority_indicators()` non trova indicatori SLOW (nessun IP da `received_hops`, nessun URL sospetto), i placeholder creati da `run_fast_checks()` per AbuseIPDB/VirusTotal/crt.sh venivano salvati nel DB con `reputation_phase=complete` senza essere rimossi. Aggiunta `finalize_fast_only()` che pulisce i placeholder e ricalcola il `service_registry` prima del salvataggio → i servizi mostrano correttamente "➖ Non applicabile" anziché restare bloccati in "⏳ In elaborazione"
+### Fixed
+- **Reputation services stuck "in processing"**: When `_extract_priority_indicators()` found no SLOW indicators (no IP from `received_hops`, no suspicious URL), placeholders created by `run_fast_checks()` for AbuseIPDB/VirusTotal/crt.sh were saved to DB with `reputation_phase=complete` without being removed. Added `finalize_fast_only()` that cleans placeholders and recalculates `service_registry` before saving → services correctly show "➖ Not applicable" instead of stuck "⏳ In processing"
 
-### Aggiunto
-- **Cache su disco per Spamhaus DROP e OpenPhish**: i feed locali vengono salvati in `backend/data/cache/` con TTL 24h (Spamhaus) e 12h (OpenPhish); all'avvio successivo vengono letti da disco senza ri-scaricare; se il download fallisce ma esiste una cache scaduta viene usata come fallback
-- **Diagnostica indicatori analizzati**: il campo `slow_indicators` viene ora incluso in `reputation_results`; il tab Reputazione mostra gli IP/URL/hash passati ai servizi avanzati, oppure un avviso "Nessun indicatore ad alta priorità" quando i servizi avanzati non vengono attivati
+### Added
+- **Disk cache for Spamhaus DROP and OpenPhish**: Local feeds saved in `backend/data/cache/` with 24h TTL (Spamhaus) and 12h (OpenPhish); on next startup read from disk without re-downloading; if download fails but stale cache exists used as fallback
+- **Analyzed indicators diagnostics**: `slow_indicators` field now included in `reputation_results`; Reputation tab shows IP/URL/hash passed to advanced services, or "No high-priority indicators" message when advanced services not activated
 
 ---
 
 ## [0.9.3] — 2026-04-11
 
-### Sicurezza
-- **urllib3 2.6.0 → 2.6.3**: fix CVE decompression-bomb bypass when following HTTP redirects (streaming API); versione 2.6.0 non sufficiente per questo alert
-- **axios ^1.13.6 → ^1.15.0**: fix due CVE CRITICAL (cloud metadata header injection + NO_PROXY SSRF); entrambe non applicabili nel contesto browser-only di EMLyzer, ma constraint aggiornato per chiudere gli alert GitHub
+### Security
+- **urllib3 2.6.0 → 2.6.3**: Fix CVE decompression-bomb bypass when following HTTP redirects (streaming API); version 2.6.0 not sufficient for this alert
+- **axios ^1.13.6 → ^1.15.0**: Fix two CRITICAL CVE (cloud metadata header injection + NO_PROXY SSRF); both inapplicable in EMLyzer browser-only context, but constraint updated to close GitHub alerts
 
 ---
 
 ## [0.9.2] — 2026-04-11
 
-### Sicurezza
-- **urllib3 2.5.0 → 2.6.0**: fix CVE unbounded decompression chain e streaming decompression DoS (CWE-409); la libreria è dipendenza transitiva di `requests` usato nei connettori reputazione
-- **vite ^8.0.1 → ^8.0.5**: fix CVE `server.fs.deny` bypass e `.map` traversal nel dev server (impatto solo sviluppo, non produzione)
-- **axios**: analizzato — NON vulnerabile nel contesto EMLyzer (uso browser-only, `NO_PROXY` è variabile Node.js non applicabile al browser)
+### Security
+- **urllib3 2.5.0 → 2.6.0**: Fix CVE unbounded decompression chain and streaming decompression DoS (CWE-409); library is transitive dependency of `requests` used in reputation connectors
+- **vite ^8.0.1 → ^8.0.5**: Fix CVE `server.fs.deny` bypass and `.map` traversal in dev server (dev impact only, not production)
+- **axios**: Analyzed — NOT vulnerable in EMLyzer context (browser-only usage, `NO_PROXY` is Node.js variable not applicable to browser)
 
 ---
 
 ## [0.9.1] — 2026-04-10
 
-### Corretto
-- **Encoding soggetti con byte UTF-8 grezzi**: aggiunto `_decode_header_raw_fallback()` — quando `compat32` produce U+FFFD per header con byte non-ASCII non-RFC2047 (es. `ü` come `\xc3\xbc` diretto), il parser legge i byte grezzi dell'header e decodifica come UTF-8 poi Windows-1252; si applica a tutti gli header (`Subject`, `From`, `To`, ecc.) e al dizionario `raw_headers`
+### Fixed
+- **Encoding subjects with raw UTF-8 bytes**: Added `_decode_header_raw_fallback()` — when `compat32` produces U+FFFD for non-ASCII header without RFC2047 wrapper (e.g., `ü` as `\xc3\xbc` raw), parser reads raw header bytes and decodes as UTF-8 then Windows-1252; applies to all headers (`Subject`, `From`, `To`, etc.) and `raw_headers` dict
 
 ---
 
 ## [0.9.0] — 2026-04-10
 
-### Aggiunto
-- **Eliminazione massiva analisi**: selezione multipla con checkbox nella lista analisi; barra azioni flottante con conteggio, eliminazione selezionati e deselezione; limite 100 analisi per richiesta
-- **Endpoint `POST /api/analysis/bulk-delete`**: elimina più analisi in una singola richiesta (DB + file email + report .docx)
-- **Pulizia file su eliminazione singola**: l'endpoint `DELETE /api/analysis/{job_id}` ora rimuove anche il file `.eml`/`.msg` da `uploads/` e il report `.docx` da `reports/`
+### Added
+- **Bulk deletion of analyses**: Multi-select with checkboxes in analysis list; floating action bar with count, delete selected, deselect; max 100 analyses per request
+- **Endpoint `POST /api/analysis/bulk-delete`**: Deletes multiple analyses in single request (DB + email file + .docx report)
+- **File cleanup on single deletion**: Endpoint `DELETE /api/analysis/{job_id}` now removes `.eml`/`.msg` file from `uploads/` and .docx report from `reports/`
 
-### Corretto
-- **Encoding header multi-valore**: `get_headers()` nel parser ora decodifica correttamente gli encoded-words RFC 2047 (prima restituivano token grezzi `=?...?=`)
-- **Serializzazione JSON non-ASCII**: aggiunto `ensure_ascii=False` a `_dataclass_to_dict()` per preservare emoji e caratteri accentati nella risposta API
-- **Raw headers con surrogate escapes**: il dizionario `raw_headers` ora gestisce i byte UTF-8 grezzi della policy compat32 senza produrre caratteri corrotti
+### Fixed
+- **Multi-value header encoding**: `get_headers()` in parser now correctly decodes RFC 2047 encoded-words (previously returned raw `=?...?=` tokens)
+- **JSON non-ASCII serialization**: Added `ensure_ascii=False` to `_dataclass_to_dict()` to preserve emoji and accented characters in API response
+- **Raw headers with surrogate escapes**: `raw_headers` dict now handles raw UTF-8 bytes from compat32 policy without producing corrupted characters
 
 ---
 
 ## [0.8.2] — 2026-04-08
 
 ### Fixed
-- **Email subject encoding**: decodifica RFC 2047 riscritta con fallback graceful per emoji, charset esotici e caratteri non-ASCII (UTF-8 → Latin-1 → Windows-1252); sostituisce `make_header()` che lanciava eccezioni su charset misti
-- **Raw UTF-8 headers**: aggiunto surrogate-escape recovery in `_decode_rfc2047` — gestisce header con byte UTF-8 grezzi (senza wrapper `=?...?=`) che la policy `compat32` di Python codifica come surrogates; fix per soggetti come `cartão` che venivano mostrati come `cart??o`
-- **To/CC header decoding**: anche i campi To e CC ora decodificano correttamente gli encoded-words RFC 2047
-- **Allineamento colonne tabella**: aggiunto `gap: 8` all'intestazione della tabella analisi, che mancava rispetto alle righe dati causando disallineamento visivo
-- **NaN in colonna `#`**: rimossa iniezione errata del div numero-riga nel componente `AnalysisDetail`; il div corretto rimane nel map della lista analisi
+- **Email subject encoding**: RFC 2047 decode rewritten with graceful fallback for emoji, exotic charsets, non-ASCII chars (UTF-8 → Latin-1 → Windows-1252); replaces `make_header()` that threw exceptions on mixed charsets
+- **Raw UTF-8 headers**: Added surrogate-escape recovery in `_decode_rfc2047` — handles headers with raw UTF-8 bytes (without `=?...?=` wrapper) that compat32 policy encodes as surrogates; fix for subjects like `cartão` that displayed as `cart??o`
+- **To/CC header decoding**: To and CC fields now correctly decode RFC 2047 encoded-words
+- **Table column alignment**: Added `gap: 8` to analysis table header, missing vs. data rows causing visual misalignment
+- **NaN in `#` column**: Removed incorrect div number-row injection in `AnalysisDetail` component; correct div remains in analysis list map
 
 ---
 
 ## [0.8.1] — 2026-04-08
 
-### Corretto
-- **DELETE rimuoveva file fisici**: l'endpoint `DELETE /api/analysis/{job_id}` cancellava anche il file `.eml`/`.msg` da `uploads/` e il report `.docx` da `reports/`. Comportamento corretto: si elimina solo il record DB; i file fisici restano per poter essere rianalizzati
-- **WHOIS disabilitato per default nella UI**: il checkbox WHOIS in UploadZone era impostato a `false` anziché `true`; il backend aveva già il default corretto (`do_whois=True`)
-- **Import fuori ordine in `analysis.py`**: gli import SQLAlchemy erano collocati dopo la definizione di `NotesUpdate`; spostati in cima al file
-- **Import prima del docstring in `attachment_analyzer.py`**: `from utils.i18n import t` era la prima riga del file, prima del docstring di modulo; spostato dopo
+### Fixed
+- **DELETE removed physical files**: Endpoint `DELETE /api/analysis/{job_id}` deleted `.eml`/`.msg` files from `uploads/` and .docx reports from `reports/`. Corrected behavior: only remove DB record; keep physical files for re-analysis
+- **WHOIS disabled in UI by default**: WHOIS checkbox in UploadZone was set to `false` instead of `true`; backend already had correct default (`do_whois=True`)
+- **Import ordering in `analysis.py`**: SQLAlchemy imports were placed after `NotesUpdate` definition; moved to top of file
+- **Import before docstring in `attachment_analyzer.py`**: `from utils.i18n import t` was first line before module docstring; moved after
 
 ---
 
 ## [0.8.0] — 2026-04-08
 
-### Aggiunto
-- **Crediti sviluppatore**: footer discreto in fondo alla home page con "Sviluppato da Graziano Mariella · Distribuito con licenza MIT"
-- **Colonna numerazione `#`**: la lista analisi mostra ora il numero riga assoluto (basato sulla pagina corrente) nella prima colonna
-- **Paginazione migliorata**: aggiunto selettore "email per pagina" (10/25/50/100) accanto ai filtri; aggiunta navigazione rapida con pulsanti prima pagina `«` e ultima pagina `»` oltre ai già presenti `← Prec` e `Succ →`
-- **WHOIS abilitato di default**: `do_whois=True` in `url_analyzer.py`, `analysis.py` e nei client `runAnalysis`/`analyzeManual`
-- **Eliminazione analisi**: pulsante 🗑 per riga nella lista; al clic mostra conferma e rimuove il record dal DB; se l'analisi eliminata è quella aperta in dettaglio, il pannello si chiude automaticamente
-- **Endpoint `DELETE /api/analysis/{job_id}`**: rimuove il record da SQLite (i file fisici restano in `uploads/` e `reports/`)
+### Added
+- **Developer credits**: Discrete footer at bottom of home page with "Developed by Graziano Mariella · Distributed under MIT License"
+- **Row numbering column `#`**: Analysis list shows absolute row number (based on current page) in first column
+- **Improved pagination**: Added "emails per page" selector (10/25/50/100) next to filters; added quick navigation buttons first page `«` and last page `»` plus existing `← Prev` and `Next →`
+- **WHOIS enabled by default**: `do_whois=True` in `url_analyzer.py`, `analysis.py` and client `runAnalysis`/`analyzeManual`
+- **Analysis deletion**: 🗑 button per row in list; click shows confirmation and removes record from DB; if deleted analysis is open in detail, panel auto-closes
+- **Endpoint `DELETE /api/analysis/{job_id}`**: Removes record from SQLite (physical files stay in `uploads/` and `reports/`)
 
 ---
 
 ## [0.7.0] — 2026-04-07
 
-### Corretto
-- **Versione frontend errata**: `start.bat` aveva la versione fallback hardcoded a `0.6.1`; aggiornata a `0.7.0`
-- **ThreatFox `illegal_search_term`**: lo status restituito da ThreatFox per URL con formato non riconosciuto veniva mostrato come `Status: illegal_search_term` invece di essere trattato come "non trovato". Aggiunto alla lista dei casi non-malevoli insieme a `no_result` (variante singolare di `no_results`)
-- **ThreatFox `no_result`**: variante singolare del campo `query_status` ora gestita come `no_results`
+### Fixed
+- **Incorrect frontend version**: `start.bat` had fallback version hardcoded to `0.6.1`; updated to `0.7.0`
+- **ThreatFox `illegal_search_term`**: Status returned by ThreatFox for unrecognized URL format displayed as `Status: illegal_search_term` instead of treated as "not found". Added to non-malicious list alongside `no_result` (singular variant of `no_results`)
+- **ThreatFox `no_result`**: Singular variant of `query_status` field now handled as `no_results`
 
-### Aggiunto
-- **Motivo fallimento SPF/DKIM/DMARC**: quando un controllo non passa, la sezione di dettaglio mostra ora una riga "Motivo" che spiega il perché:
-  - **SPF**: testo estratto dalla parentesi in `Authentication-Results` o `Received-SPF` (es. "domain of user@bad.com does not designate 1.2.3.4 as permitted sender")
-  - **DKIM**: "Verifica firma fallita" quando la chiave DNS esiste ma la firma è invalida; se la chiave è assente il motivo è già evidente dalla riga DNS key (✗ non trovata); testo da parentesi `Authentication-Results` (es. "bad signature") se disponibile
-  - **DMARC**: sintesi degli allineamenti falliti (es. "Allineamento fallito: SPF=fail, DKIM=fail")
-  - 3 nuovi campi in `AuthDetail`: `spf_failure_reason`, `dkim_failure_reason`, `dmarc_failure_reason`
-  - 3 nuove chiavi di traduzione it/en: `header.auth_detail_failure_reason`, `header.auth_detail_dkim_fail_key`, `header.auth_detail_dkim_fail_sig`
+### Added
+- **SPF/DKIM/DMARC failure reason**: When check doesn't pass, detail section now shows "Reason" line explaining why:
+  - **SPF**: Text extracted from parenthesis in `Authentication-Results` or `Received-SPF` (e.g., "domain of user@bad.com does not designate 1.2.3.4 as permitted sender")
+  - **DKIM**: "Signature verification failed" when DNS key exists but signature invalid; if key absent reason already evident from DNS key line (✗ not found); text from `Authentication-Results` parenthesis if available (e.g., "bad signature")
+  - **DMARC**: Summary of failed alignments (e.g., "Alignment failed: SPF=fail, DKIM=fail")
+  - 3 new fields in `AuthDetail`: `spf_failure_reason`, `dkim_failure_reason`, `dmarc_failure_reason`
+  - 3 new translation keys it/en: `header.auth_detail_failure_reason`, `header.auth_detail_dkim_fail_key`, `header.auth_detail_dkim_fail_sig`
 
-### Aggiunto (dalla sessione precedente)
-- **SPF/DKIM/DMARC verboso con verifica DNS indipendente**: la sezione Autenticazione mostra ora tutti i sotto-campi di ciascun protocollo, analoghi a quelli di MXToolbox
-  - **SPF**: client IP, Envelope-From, record TXT DNS (`v=spf1 …`) con query live su `dnspython`
-  - **DKIM**: per ogni firma `DKIM-Signature` — selettore, algoritmo, canonicalization, header firmati, body hash (bh=), esistenza chiave pubblica DNS (`selector._domainkey.domain`)
-  - **DMARC**: From domain, policy (p=) con codifica colore (reject=verde, quarantine=arancione, none=grigio), sp=, adkim=, aspf=, pct=, rua=, record TXT DNS (`v=DMARC1 …`)
-  - La verifica DNS è **sempre attiva** (non opzionale) con timeout 2s/query: 3–5 query per email, max ~3s totali
-  - Rileva contraddizioni tra `Authentication-Results` e DNS reali (utile contro header `spf=pass` contraffatti)
-  - Tutti i dati memorizzati automaticamente in `header_indicators.auth_detail` (JSON) — nessun cambio schema DB
-- **Nuovo dataclass `AuthDetail`** in `header_analyzer.py`: 16 campi strutturati per SPF/DKIM/DMARC, serializzato da `_dataclass_to_dict()`
-- **Parsing `DKIM-Signature`**: `email_parser.py` ora raccoglie tutti gli header `DKIM-Signature` presenti nell'email (campo `dkim_signatures_raw`) e il primo `Received-SPF` grezzo
-- **Fix bug `Received-SPF`**: regex precedente `r"=(\S+)"` con keyword vuota matchava il primo `=` qualsiasi; sostituito con `r"^(\w+)"` che estrae correttamente il primo token (pass/fail/softfail)
-- **23 nuove chiavi di traduzione** it/en per tutti i sotto-campi auth (`header.auth_detail_*`)
-- **UI aggiornata**: ogni riga SPF/DKIM/DMARC nel tab Header espone i sotto-campi in una griglia compatta sempre visibile (no click) con label + valore monospaciato
+### Added (from previous session)
+- **Verbose SPF/DKIM/DMARC with independent DNS verification**: Authentication section now shows all sub-fields of each protocol, analogous to MXToolbox
+  - **SPF**: client IP, Envelope-From, DNS TXT record (`v=spf1 …`) with live query on `dnspython`
+  - **DKIM**: per each `DKIM-Signature` — selector, algorithm, canonicalization, headers signed, body hash (bh=), public key DNS existence (`selector._domainkey.domain`)
+  - **DMARC**: From domain, policy (p=) with color-coding (reject=green, quarantine=orange, none=gray), sp=, adkim=, aspf=, pct=, rua=, DNS TXT record (`v=DMARC1 …`)
+  - DNS verification **always active** (not optional) with 2s timeout/query: 3–5 queries per email, max ~3s total
+  - Detects contradictions between `Authentication-Results` and actual DNS (useful against forged `spf=pass` headers)
+  - All data automatically stored in `header_indicators.auth_detail` (JSON) — no DB schema change
+- **New `AuthDetail` dataclass** in `header_analyzer.py`: 16 fields structured for SPF/DKIM/DMARC, serialized via `_dataclass_to_dict()`
+- **`DKIM-Signature` parsing**: `email_parser.py` now collects all present `DKIM-Signature` headers (field `dkim_signatures_raw`) and first `Received-SPF` raw
+- **Fix `Received-SPF` bug**: Previous regex `r"=(\S+)"` with empty keyword matched first `=` any; replaced with `r"^(\w+)"` correctly extracting first token (pass/fail/softfail)
+- **23 new translation keys** it/en for all auth sub-fields (`header.auth_detail_*`)
+- **Updated UI**: Each SPF/DKIM/DMARC row in Header tab exposes sub-fields in compact always-visible grid (no click) with label + monospace value
 
 ---
 
 ## [0.6.1] — 2026-04-06
 
-### Corretto
-- **URLhaus e ThreatFox richiedono API key**: abuse.ch ha reso obbligatoria l'autenticazione per tutti i propri servizi (stessa ondata di MalwareBazaar, fase completata a giugno 2025). Entrambi i connettori restituivano HTTP 401. Aggiunta chiave unificata `ABUSECH_API_KEY` che copre URLhaus, ThreatFox **e** MalwareBazaar (stesso portale `auth.abuse.ch`, gratuito). Header `Auth-Key` aggiunto alle chiamate HTTP. Senza chiave i servizi mostrano correttamente stato `skipped` (🔑) invece di errore 401
-- **Retrocompatibilità MalwareBazaar**: `MALWAREBAZAAR_API_KEY` ancora accettata come fallback; i nuovi utenti devono usare solo `ABUSECH_API_KEY`
-- `ServicePreview` e `_build_service_registry` aggiornati: URLhaus e ThreatFox ora classificati come `requires_key: true`
+### Fixed
+- **URLhaus and ThreatFox require API key**: abuse.ch made authentication mandatory for all services (same wave as MalwareBazaar, completed June 2025). Both returned HTTP 401. Added unified `ABUSECH_API_KEY` covering URLhaus, ThreatFox **and** MalwareBazaar (same `auth.abuse.ch` portal, free). Header `Auth-Key` added to HTTP calls. Without key services correctly show `skipped` status (🔑) instead of 401 error
+- **MalwareBazaar backward compatibility**: `MALWAREBAZAAR_API_KEY` still accepted as fallback; new users should use only `ABUSECH_API_KEY`
+- `ServicePreview` and `_build_service_registry` updated: URLhaus and ThreatFox now classified as `requires_key: true`
 
 ---
 
 ## [0.6.0] — 2026-04-06
 
-### Aggiunto
-- **Shodan InternetDB** — nuovo servizio reputazione IP (fase FAST): porte aperte, CVE, tag e hostname per ogni IP pubblico estratto dall'email. Gratuito, no API key, endpoint JSON pubblico `https://internetdb.shodan.io/{ip}`. Classificato come servizio informativo (ℹ️) nella UI e nel report .docx; segnala come malevolo se i tag includono `malware`, `c2`, `compromised`, `botnet`
-- **Abuse.ch URLhaus** — nuovo servizio reputazione URL (fase FAST): controlla ogni URL nel database URLhaus di abuse.ch. Gratuito, no API key. Segnala URL attivi come `malware_download` o con status `online` con confidence 95%. Stesso ecosistema di MalwareBazaar
-- **ThreatFox** (abuse.ch) — nuovo servizio reputazione multi-tipo (fase FAST): controlla IP, URL e hash SHA256 nel database IOC di ThreatFox. Gratuito, no API key. Riporta nome malware, tipo minaccia e livello di confidenza per ogni IOC trovato. Tre connettori distinti: `check_ip_threatfox`, `check_url_threatfox`, `check_hash_threatfox`
-- Totale servizi reputazione: da 9 a 12
+### Added
+- **Shodan InternetDB** — New IP reputation service (FAST phase): open ports, CVE, tags, hostname per public IP extracted from email. Free, no API key, public JSON endpoint `https://internetdb.shodan.io/{ip}`. Classified as informational service (ℹ️) in UI and .docx report; reports as malicious if tags include `malware`, `c2`, `compromised`, `botnet`
+- **abuse.ch URLhaus** — New URL reputation service (FAST phase): checks each URL in URLhaus abuse.ch database. Free, no API key. Reports active URLs as `malware_download` or status `online` with 95% confidence. Same abuse.ch ecosystem as MalwareBazaar
+- **ThreatFox** (abuse.ch) — New multi-type reputation service (FAST phase): checks IP, URL, SHA256 hash in ThreatFox IOC database. Free, no API key. Reports malware name, threat type, confidence for each IOC found. Three distinct connectors: `check_ip_threatfox`, `check_url_threatfox`, `check_hash_threatfox`
+- Total reputation services: 9 → 12
 
 ---
 
 ## [0.5.0] — 2026-04-03
 
-### Corretto
-- Shutdown CTRL+C su Linux con Python 3.13: `loop._default_executor` non esiste su alcune implementazioni del loop asyncio (variante C di CPython 3.13, uvloop). Sostituito con `getattr(loop, "_default_executor", None)` che restituisce `None` invece di sollevare `AttributeError`, con blocco `try/except` aggiuntivo per sicurezza. Su Windows il comportamento rimane invariato
+### Fixed
+- Shutdown CTRL+C on Linux with Python 3.13: `loop._default_executor` doesn't exist on some implementations of asyncio event loop (variant C of CPython 3.13, uvloop). Replaced with `getattr(loop, "_default_executor", None)` returning `None` instead of raising `AttributeError`, with additional try/except block for safety. Windows behavior unchanged
 
 ---
 
 ## [0.4.9] — 2026-04-03
 
-### Migliorato
-- `scorer.py`: floor deterministici estesi ad allegati e body (`_compute_floors` ora riceve anche `attachment_result`)
-  - Allegato con finding **HIGH** (macro VBA, MIME mismatch) → score ≥ 25 (MEDIUM), indipendentemente da header e body
-  - Allegato con finding **CRITICAL** (eseguibile camuffato, macro in PDF) → score ≥ 40
-  - Body con 2+ finding HIGH indipendenti (form nascosto + JS + NLP) → score ≥ 30
-  - Prima questi casi ricadevano in LOW perché il peso allegati (10%) non era sufficiente da solo
+### Improved
+- `scorer.py`: Deterministic floors extended to attachments and body (`_compute_floors` now receives `attachment_result`)
+  - Attachment with **HIGH** finding (VBA macros, MIME mismatch) → score ≥ 25 (MEDIUM), regardless of header and body
+  - Attachment with **CRITICAL** finding (disguised executable, macro in PDF) → score ≥ 40
+  - Body with 2+ independent HIGH findings (hidden form + JS + NLP) → score ≥ 30
+  - Previously these cases fell to LOW because attachment weight (10%) insufficient alone
 
 ---
 
 ## [0.4.8] — 2026-04-03
 
-### Modificato
-- `scorer.py`: algoritmo di scoring riscritto con **normalizzazione adattiva** e **floor deterministici** (issue GitHub)
-  - **Normalizzazione adattiva**: il punteggio è calcolato dividendo per la somma dei pesi dei soli moduli con contenuto rilevante (header e body sempre; url solo se l'email ha URL; allegati solo se ha allegati). Prima i moduli assenti abbassavano artificialmente il punteggio: un'email con header falsificati e NLP al 53% otteneva 10/100 LOW invece di MEDIUM
-  - **Pesi rivisti**: header=0.35, body=0.35, url=0.20, attachment=0.10 — header e body pesano di più perché sempre presenti e più affidabili per il phishing
-  - **Floor deterministici**: soglie minime garantite in presenza di indicatori critici: 1 finding HIGH header → ≥20; HIGH header + NLP≥50% → ≥35; 3+ finding HIGH → ≥45; URL risk≥75 → ≥20
-  - Caso della issue: email con mismatch From/Return-Path (HIGH) + NLP 53% (MEDIUM) ora classificata MEDIUM 35/100 invece di LOW 10/100
+### Changed
+- `scorer.py`: Scoring algorithm rewritten with **adaptive normalization** and **deterministic floors** (GitHub issue)
+  - **Adaptive normalization**: Score calculated dividing by sum of weights of only relevant modules (header and body always; url only if email has URLs; attachments only if has attachments). Previously absent modules artificially lowered score: email with falsified header and NLP 53% got 10/100 LOW instead of MEDIUM
+  - **Weights revised**: header=0.35, body=0.35, url=0.20, attachment=0.10 — header and body weighted higher since always present and more reliable for phishing
+  - **Deterministic floors**: Minimum score guarantees with critical indicators: 1 HIGH header finding → ≥20; HIGH header + NLP≥50% → ≥35; 3+ HIGH findings → ≥45; URL risk≥75 → ≥20
+  - Issue case: email with From/Return-Path mismatch (HIGH) + NLP 53% (MEDIUM) now classified MEDIUM 35/100 instead of LOW 10/100
 
 ---
 
 ## [0.4.7] — 2026-04-03
 
-### Migliorato
-- `email_parser.py`: parsing di SPF/DKIM/DMARC ora robusto su email con header `Authentication-Results` multipli (un header per ogni MTA intermedio). Aggiunto helper `get_headers()` basato su `msg.get_all()`. Rinominata `_extract_auth_result(str)` in `_extract_auth_results(list[str])` che legge `values[-1]` — l'ultimo header aggiunto, cioè quello del server di ricezione finale, che è il più affidabile per la verifica di autenticità. ([proposta GitHub](https://github.com))
+### Improved
+- `email_parser.py`: SPF/DKIM/DMARC parsing now robust on emails with multiple `Authentication-Results` headers (one header per intermediate MTA). Added helper `get_headers()` based on `msg.get_all()`. Renamed `_extract_auth_result(str)` to `_extract_auth_results(list[str])` reading `values[-1]` — last header added, i.e., final receiving server result, most reliable for authenticity verification.
 
 ---
 
 ## [0.4.6] — 2026-04-03
 
-### Corretto
-- **Banner API key prima dell'analisi**: `ServicePreview` ora carica lo stato reale da `GET /api/settings/reputation_keys` via `useEffect` al mount — non dipende più dal `service_registry` (assente prima dell'analisi). Tutti i servizi con chiave mostrano "API key configurata" o "API key non configurata" in base al file `.env` effettivo
-- **Scheda Reputazione non si aggiornava**: `GET /api/analysis/{job_id}` non includeva `reputation_results` nella risposta — il polling del frontend riceveva una struttura senza dati di reputazione e non poteva mai rilevare `reputation_phase === 'complete'`. Aggiunto `reputation_results: record.reputation_results` in `_build_response_from_record`
-- **SQLAlchemy JSON mutation**: aggiunto `flag_modified(record, "reputation_results")` prima di ogni `commit()` che modifica il campo JSON, per forzare SQLAlchemy a tracciare la modifica con SQLite
-- Background task usa `asyncio.get_running_loop()` invece di `get_event_loop()` (deprecato in Python 3.10+)
-- Polling intervallo ridotto da 8s a 5s; in caso di errore background viene comunque salvato `reputation_phase="complete"` per fermare il polling
+### Fixed
+- **API key banner before analysis**: `ServicePreview` now loads actual state from `GET /api/settings/reputation_keys` via `useEffect` on mount — doesn't depend on `service_registry` (absent before analysis). All services with key show "API key configured" or "API key not configured" based on actual `.env` file
+- **Reputation tab didn't update**: `GET /api/analysis/{job_id}` didn't include `reputation_results` in response — frontend polling received structure without data and couldn't detect `reputation_phase === 'complete'`. Added `reputation_results: record.reputation_results` in `_build_response_from_record`
+- **SQLAlchemy JSON mutation**: Added `flag_modified(record, "reputation_results")` before every `commit()` modifying JSON field, to force SQLAlchemy track mutation with SQLite
+- Background task uses `asyncio.get_running_loop()` instead of deprecated `get_event_loop()` (deprecated in Python 3.10+)
+- Polling interval reduced from 8s to 5s; on background error `reputation_phase="complete"` saved anyway to stop polling
 
 ---
 
 ## [0.4.5] — 2026-04-02
 
-### Corretto
-- AbuseIPDB e VirusTotal mostravano "Non applicabile" invece di "In elaborazione": `slow_skips` in `run_fast_checks` generava nomi errati (`"Ip Abuseipdb"`, `"Ip Virustotal"`) che `_build_service_registry` non riconosceva. Aggiunta mappa `_FN_TO_SOURCE` con i nomi corretti (`"AbuseIPDB"`, `"VirusTotal"`, `"crt.sh"`). Stesso bug nella pulizia dei placeholder in `run_slow_checks`
-- Aggiunto stato `"pending"` (⏳) per i servizi SLOW in elaborazione background, distinto da `"not_applicable"` (➖) per i servizi non pertinenti
-- `_build_service_registry` ora riconosce `skip_reason` contenente "in elaborazione" e assegna stato `pending` invece di `not_applicable`
+### Fixed
+- AbuseIPDB and VirusTotal showed "Not applicable" instead of "In processing": `slow_skips` in `run_fast_checks` generated wrong names (`"Ip Abuseipdb"`, `"Ip Virustotal"`) that `_build_service_registry` didn't recognize. Added `_FN_TO_SOURCE` map with correct names (`"AbuseIPDB"`, `"VirusTotal"`, `"crt.sh"`). Same bug in phase 2 placeholder cleanup
+- Added `"pending"` status (⏳) for SLOW services in-progress, distinct from `"not_applicable"` (➖) for irrelevant services
+- `_build_service_registry` now recognizes `skip_reason` containing "in processing" and assigns `pending` instead of `not_applicable`
 
 ---
 
 ## [0.4.4] — 2026-04-02
 
-### Corretto
-- Polling infinito: il frontend confrontava `reputation_results` (sempre presente dalla fase 1) invece di un campo dedicato; aggiunto `reputation_phase` ("fast" / "complete") nel JSON salvato nel DB — il polling si ferma solo quando la fase 2 ha completato o non aveva entità da processare
-- Scheda Reputazione non si aggiornava con i risultati di AbuseIPDB/VirusTotal: conseguenza diretta del polling infinito che non riconosceva il completamento
-- Messaggio "Non applicabile" per AbuseIPDB/VirusTotal con chiave configurata ma email senza IP pubblici: testo cambiato da "nessun IP nei Received header" a "nessun IP pubblico in questa email"
+### Fixed
+- Infinite polling: Frontend compared `reputation_results` (always present from phase 1) instead of dedicated field; added `reputation_phase` ("fast" / "complete") in saved JSON — polling stops only when phase 2 complete or no entities to process
+- Reputation tab didn't update with AbuseIPDB/VirusTotal results: Direct consequence of infinite polling not recognizing completion
 
 ---
 
 ## [0.4.3] — 2026-04-02
 
-### Aggiunto
-- Polling automatico nella scheda Reputazione: quando VirusTotal o AbuseIPDB sono in elaborazione background, il frontend interroga `GET /api/analysis/{job_id}` ogni 8s e aggiorna i risultati senza ricaricare la pagina
-- `_extract_priority_indicators()`: estrae solo gli IP interni all'email (received_hops + X-Originating-IP, non i resolved_ip degli URL) e solo URL con indicatori di rischio per i servizi SLOW, con hard cap a 4 URL per rispettare il limite 4/min di VirusTotal
+### Added
+- Automatic polling in Reputation tab: When VirusTotal or AbuseIPDB running background, frontend queries `GET /api/analysis/{job_id}` every 8s and updates results without page reload
+- `_extract_priority_indicators()`: Extracts only IP internal to email (received_hops + X-Originating-IP, not resolved_ip from URLs) and only risky URL for SLOW services, with hard cap 4 URLs respecting VirusTotal 4/min limit
 
-### Modificato
-- Banner "chiave .env" → "API key configurata" (verde) o "API key non configurata" (arancione) in base allo stato reale dal `service_registry`
-- crt.sh spostato in `_SLOW_SERVICES` (background): con molti URL il rate limit 2.5s serializzato causava timeout nella fase fast
-- Messaggio "non applicabile" reso più preciso: Redirect Chain → "nessun URL shortener o HTTP", crt.sh → "in elaborazione (background)"
+### Changed
+- Banner "key in .env" → "API key configured" (green) or "API key not configured" (orange) based on actual `service_registry` state
+- crt.sh moved to `_SLOW_SERVICES` (background): Many URL serialized 2.5s rate limit caused timeout in fast phase
+- "Not applicable" message more precise: Redirect Chain → "no URL shortener or HTTP", crt.sh → "in processing (background)"
 
-### Corretto
-- Redirect Chain usava `_http_get_with_retry()` che non supporta `allow_redirects`/`stream`; ripristinato `requests.get()` diretto con `_rate_limit()` esplicito
+### Fixed
+- Redirect Chain used `_http_get_with_retry()` not supporting `allow_redirects`/`stream`; restored direct `requests.get()` with explicit `_rate_limit()`
 
 ---
 
 ## [0.4.2] — 2026-04-01
 
-### Corretto
-- Timeout "servizi non hanno risposto nel tempo previsto": crt.sh (2.5s rate × N domini) era in _FAST_SERVICES causando timeout con 8+ URL; spostato in _SLOW_SERVICES (background)
-- Redirect Chain: `_http_get_with_retry()` non supporta `allow_redirects`/`stream`; sostituito con `requests.get()` diretto
-- Timeout fase 1 portato da 25s a 50s (rimane sotto il timeout axios di 60s)
-- Tempo effettivo fase 1 con 3 IP + 8 URL: ~2s (era 20s+)
+### Fixed
+- Timeout "services didn't respond in time": crt.sh (2.5s rate × N domains) in _FAST_SERVICES caused timeout with 8+ URLs; moved to _SLOW_SERVICES (background)
+- Redirect Chain: `_http_get_with_retry()` doesn't support `allow_redirects`/`stream`; replaced with direct `requests.get()`
+- Phase 1 timeout raised from 25s to 50s (under axios 60s timeout)
+- Actual phase 1 time with 3 IP + 8 URL: ~2s (was 20s+)
 
 ---
 
 ## [0.4.1] — 2026-04-01
 
-### Corretto
-- CTRL+C non torna immediatamente al prompt (Windows): alla chiusura, `threading._shutdown()` chiamava `join()` sui thread del `ThreadPoolExecutor` della fase 2 (VirusTotal/AbuseIPDB potenzialmente attivi per decine di secondi), causando blocco e `KeyboardInterrupt`. Fix: tutti i pool usano `shutdown(wait=False, cancel_futures=True)` in un blocco `finally`, e il lifespan FastAPI chiude esplicitamente l'executor di default di asyncio allo shutdown
+### Fixed
+- CTRL+C doesn't return to prompt immediately (Windows): On shutdown, `threading._shutdown()` called `join()` on ThreadPoolExecutor threads of phase 2 (VirusTotal/AbuseIPDB potentially active for tens of seconds), blocking input and `KeyboardInterrupt`. Fix: all pools use `shutdown(wait=False, cancel_futures=True)` in `finally` block, and FastAPI lifespan explicitly closes default asyncio executor on shutdown
 
 ---
 
 ## [0.4.0] — 2026-04-01
 
-### Modificato
-- Sistema reputazione riscritto con architettura a **due fasi** per eliminare definitivamente il timeout:
-  - **Fase 1** (`POST /api/reputation/{job_id}`): servizi fast (Spamhaus, ASN, OpenPhish, crt.sh, PhishTank, Redirect Chain, MalwareBazaar) — risposta garantita in < 15s indipendentemente dal numero di entità
-  - **Fase 2** (background automatico): VirusTotal e AbuseIPDB eseguiti dopo la risposta, senza bloccare il browser; il DB viene aggiornato quando terminano
-  - Frontend: banner ⏳ nella scheda Reputazione quando la fase 2 è in elaborazione
-- `connectors.py`: aggiunta classificazione `_FAST_SERVICES` / `_SLOW_SERVICES`, funzioni `run_fast_checks()` e `run_slow_checks()`
+### Changed
+- Reputation system rewritten with **two-phase architecture** eliminating timeout definitively:
+  - **Phase 1** (`POST /api/reputation/{job_id}`): fast services (Spamhaus, ASN, OpenPhish, crt.sh, PhishTank, Redirect Chain, MalwareBazaar) — response guaranteed < 15s regardless of entity count
+  - **Phase 2** (automatic background): VirusTotal and AbuseIPDB run after response, non-blocking for browser; DB updated when complete
+  - Frontend: ⏳ banner in Reputation tab when phase 2 in-progress
+- `connectors.py`: Added `_FAST_SERVICES` / `_SLOW_SERVICES` classification, `run_fast_checks()` and `run_slow_checks()` functions
 
 ---
 
 ## [0.3.9] — 2026-04-01
 
-### Corretto
-- Messaggio `Error trying to connect to socket: closing socket - [WinError 10054]` definitivamente eliminato dalla console: la causa reale era `python-whois` (non uvicorn) che usa `logger.error()` quando un server WHOIS chiude il socket TCP dopo la risposta (comportamento RFC normale). Fix a tre livelli: (1) `_NoiseFilter` installato su tutti i logger coinvolti (`whois`, `whois.whois`, `uvicorn.*`, root) e sul `lastResort` handler di Python sia all'import che nel lifespan; (2) `setLevel(CRITICAL)` su entrambi i logger whois durante ogni chiamata WHOIS; (3) filtro installato anche sugli handler degli stessi logger
+### Fixed
+- Message `Error trying to connect to socket: closing socket - [WinError 10054]` permanently eliminated from console: Root cause was `python-whois` (not uvicorn) using `logger.error()` when WHOIS server closes TCP socket after response (RFC normal behavior). Fix at three levels: (1) `_NoiseFilter` installed on all involved loggers (`whois`, `whois.whois`, `uvicorn.*`, root) and Python `lastResort` handler at import and lifespan; (2) `setLevel(CRITICAL)` on both whois loggers during each WHOIS call; (3) Filter installed on their handlers too
 
 ---
 
 ## [0.3.8] — 2026-04-01
 
-### Modificato
-- Sistema reputazione completamente riscritto per robustezza e compatibilità Windows/Linux:
-  - Rate limiter thread-safe: `threading.Lock` per connettore invece di dict non protetto; nessuna race condition con chiamate concorrenti
-  - Intervalli configurati per servizio: VirusTotal 15.5s, crt.sh 2.5s, AbuseIPDB 1.1s, MalwareBazaar 0.7s
-  - Helper `_http_get_with_retry()` e `_http_post_with_retry()`: retry con backoff esponenziale (2s, 4s) su 429/502/503/504; legge l'header `Retry-After` sui 429
-  - Tutti i connettori aggiornati per usare gli helper (nessuna chiamata `requests.get/post` diretta)
-  - Pool flat ridotto a 16 worker (era 32) per evitare spike di rete
-  - Timeout route reputazione portato a 90s per accomodare la serializzazione VirusTotal
+### Changed
+- Reputation system completely rewritten for robustness and Windows/Linux compatibility:
+  - Thread-safe rate limiter: `threading.Lock` per connector instead of unprotected dict; no race condition with concurrent calls
+  - Service-specific intervals: VirusTotal 15.5s, crt.sh 2.5s, AbuseIPDB 1.1s, MalwareBazaar 0.7s
+  - Helper `_http_get_with_retry()` and `_http_post_with_retry()`: retry with exponential backoff (2s, 4s) on 429/502/503/504; reads `Retry-After` header on 429
+  - All connectors updated to use helpers (no direct `requests.get/post` calls)
+  - Flat pool reduced to 16 workers (was 32) to avoid network spikes
+  - Reputation route timeout raised to 90s for VirusTotal serialization
 
 ---
 
 ## [0.3.7] — 2026-04-01
 
-### Modificato
-- Ordine hop nella catena SMTP invertito: hop 1 = mittente originale, hop N = server di destinazione (prima era al contrario)
-- Filtro WinError 10054 spostato nel lifespan FastAPI: viene installato dopo che uvicorn configura i propri handler, coprendo tutti i logger incluso `uvicorn.protocols.http`
+### Changed
+- SMTP hop order in chain reversed: hop 1 = original sender, hop N = destination server (previously reversed)
+- WinError 10054 filter moved to FastAPI lifespan: installed after uvicorn configures handlers, covering all loggers including `uvicorn.protocols.http`
 
-### Corretto
-- Header email con encoded words RFC 2047 (`=?UTF-8?Q?...?=`) non venivano decodificati: `From`, `Subject` e altri campi mostravano la forma raw invece di `🔒 Massimiliano Dal Cero <...>`
-- crt.sh: errore HTTP 429 (rate limit) ora mostra "troppe richieste, riprova tra qualche minuto" invece di un errore generico
+### Fixed
+- Email headers with RFC 2047 encoded words (`=?UTF-8?Q?...?=`) weren't decoded: `From`, `Subject` and others showed raw form instead of `🔒 Massimiliano Dal Cero <...>`
+- crt.sh: HTTP 429 (rate limit) error now shows "too many requests, retry in a few minutes" instead of generic error
 
 ---
 
 ## [0.3.6] — 2026-04-01
 
-### Aggiunto
-- Supporto IPv6 nei Received header: `_extract_ip_from_received()` riconosce `[IPv6:addr]`, `[addr]` e IPv4; `_is_private_ip()` usa `ipaddress` stdlib
-- Filtro log per WinError 10054 in `main.py`: l'errore `WSAECONNRESET` di uvicorn su Windows non compare più nei log (comportamento TCP normale, non un errore applicativo)
+### Added
+- IPv6 support in Received headers: `_extract_ip_from_received()` recognizes `[IPv6:addr]`, `[addr]`, IPv4; `_is_private_ip()` uses `ipaddress` stdlib
+- Log filter for WinError 10054 in `main.py`: uvicorn's `WSAECONNRESET` error on Windows no longer appears in logs (normal TCP behavior, not app error)
 
-### Modificato
-- Parallelizzazione reputazione riscritta: da executor annidati a un **unico pool flat** (`_build_flat_tasks` + `run_reputation_checks`) — tutti i task (entità × servizi) partono contemporaneamente su un unico `ThreadPoolExecutor`; compatibile con Windows senza overhead di creazione thread
-- Timeout globale route reputazione ridotto da 55s a 35s
-- `_is_public_ip()` gestisce il prefisso `IPv6:` e `is_unspecified`
+### Changed
+- Reputation parallelization rewritten: from nested executors to single **flat pool** (`_build_flat_tasks` + `run_reputation_checks`) — all tasks (entity × service) start together on single `ThreadPoolExecutor`; Windows-compatible without thread creation overhead
+- Global reputation route timeout reduced from 55s to 35s
+- `_is_public_ip()` handles `IPv6:` prefix and `is_unspecified`
 
-### Corretto
-- IPv6 SMTP nei Received header non venivano estratti né mostrati nella catena hop
-- IPv6 non venivano inviati ai servizi di reputazione
-- Timeout 504 frequente su Windows: executor annidati causavano overhead significativo sulla creazione di thread
+### Fixed
+- IPv6 SMTP in Received headers not extracted nor shown in hop chain
+- IPv6 not sent to reputation services
+- Timeout 504 frequent on Windows: nested executors overhead on thread creation
 
 ---
 
 ## [0.3.5] — 2026-03-30
 
-### Aggiunto
-- Nuovi servizi (Spamhaus DROP, ASN Lookup, crt.sh, Redirect Chain) inclusi nel report Word
-- Auto-compilazione frontend in `start.sh` / `start.bat` se il bundle è assente e Node.js disponibile
+### Added
+- New services (Spamhaus DROP, ASN Lookup, crt.sh, Redirect Chain) included in Word report
+- Auto-frontend compilation in `start.sh` / `start.bat` if bundle missing and Node.js available
 
-### Modificato
-- Bundle frontend con nome fisso (`index.js` / `index.css`), sovrascrivibile senza eliminare i vecchi file
-- Check reputazione ora paralleli (`ThreadPoolExecutor`) e non bloccanti per FastAPI; timeout globale 50s
-- Versione letta da `config.py` in tutti i file che la espongono (User-Agent, report Word, navbar, metadati FastAPI, script di avvio)
+### Changed
+- Frontend bundle with fixed name (`index.js` / `index.css`), overwriteable without deleting old files
+- Reputation checks now parallel (`ThreadPoolExecutor`) and non-blocking for FastAPI; global timeout 50s
+- Version read from `config.py` in all files exposing it (User-Agent, Word report, navbar, FastAPI metadata, startup scripts)
 
-### Corretto
+### Fixed
 - Circular import in `connectors.py`
-- Timeout 60s del browser durante il check reputazione
-- Errori 502/503/504 di crt.sh mostrati come stacktrace; ora retry automatico con messaggio utente
-- Nomi campi errati nel report Word (`url` → `original_url`, `is_ip` → `is_ip_address`)
+- Browser 60s timeout during reputation check
+- crt.sh errors 502/503/504 shown as stacktrace; now auto-retry with user message
+- Wrong field names in Word report (`url` → `original_url`, `is_ip` → `is_ip_address`)
 
 ---
 
 ## [0.3.4] — 2026-03-29
 
-### Aggiunto
-- Nuovi servizi reputazionali gratuiti: Spamhaus DROP, ASN Lookup (ipinfo.io), crt.sh, Redirect Chain
-- Estrazione completa degli indicatori: X-Originating-IP, IP diretti negli URL, IP risolti via DNS, link offuscati — tutti inviati ai servizi con deduplicazione
-- UI: pill con conteggio entità analizzate (IP / URL / Hash), icone distinte per servizi informativi (ℹ️)
+### Added
+- New free reputation services: Spamhaus DROP, ASN Lookup (ipinfo.io), crt.sh, Redirect Chain
+- Complete indicator extraction: X-Originating-IP, direct IP in URLs, resolved IP via DNS, obfuscated links — all sent to services with deduplication
+- UI: pill with analyzed entity count (IP / URL / Hash), distinct icons for informational services (ℹ️)
 
-### Corretto
-- `x_originating_ip` non estratto (colonna diretta del record, non dentro `header_indicators`)
-- IP diretti negli URL mai inviati ad AbuseIPDB (campo `is_ip_address` ignorato)
+### Fixed
+- `x_originating_ip` not extracted (direct column of record, not inside `header_indicators`)
+- Direct IP in URLs never sent to AbuseIPDB (field `is_ip_address` ignored)
 
 ---
 
 ## [0.3.3] — 2026-03-28
 
-### Modificato
-- MalwareBazaar richiede ora API key obbligatoria; aggiunto `MALWAREBAZAAR_API_KEY`
+### Changed
+- MalwareBazaar now requires mandatory API key; added `MALWAREBAZAAR_API_KEY`
 
-### Corretto
-- Stato "Pulito" mostrato anche in presenza di errori di connessione
+### Fixed
+- "Clean" status shown even with connection errors
 
 ---
 
 ## [0.3.2] — 2026-03-26
 
-### Corretto
-- Checkbox WHOIS ignorata (dipendenza mancante in `useCallback`)
-- URL e badge WHOIS vuoti riaprendo analisi dallo storico (nomi campi errati nella risposta GET)
+### Fixed
+- WHOIS checkbox ignored (missing dependency in `useCallback`)
+- URL and WHOIS badge empty reopening analysis from history (wrong field names in response)
 
 ---
 
 ## [0.3.1] — 2026-03-25
 
-### Aggiunto
-- Badge età dominio negli URL (🔴 < 30gg, 🟡 30–90gg, ✅ > 90gg)
-- Documentazione completa (README, installazione, utilizzo, configurazione, API)
+### Added
+- Domain age badges in URLs (🔴 < 30d, 🟡 30–90d, ✅ > 90d)
+- Complete documentation (README, installation, usage, configuration, API)
 
-### Modificato
-- Rinominato il progetto in **EMLyzer**
+### Changed
+- Renamed project to **EMLyzer**
 
-### Corretto
-- Dati WHOIS calcolati ma mai inclusi nella risposta API
+### Fixed
+- WHOIS data calculated but never included in API response
 
 ---
 
 ## [0.3.0] — 2026-03-20
 
-### Aggiunto
-- Note dell'analista (area testo libera, salvata nel DB, inclusa nel report)
-- Checkbox WHOIS opzionale nell'upload
-- Classificatore NLP (Naive Bayes + TF-IDF) per probabilità phishing
-- Filtro, ricerca e paginazione nella lista analisi; esportazione CSV
-- Rilevamento campagne malevole (clustering per body hash, subject, Campaign-ID, dominio)
-- Suite di test ampliata a 94
+### Added
+- Analyst notes (free-text area, saved in DB, included in report)
+- Optional WHOIS checkbox in upload
+- NLP classifier (Naive Bayes + TF-IDF) for phishing probability
+- Analysis list: filter, search, pagination; CSV export
+- Malicious campaign detection (clustering by body hash, subject, Campaign-ID, domain)
+- Test suite expanded to 94
 
 ---
 
 ## [0.2.0] — 2026-03-10
 
-### Aggiunto
-- Localizzazione italiano/inglese con pulsante IT/EN
-- Input manuale sorgente email (incolla header + body)
-- Connettore VirusTotal completo (IP, URL, hash)
-- Registro stato servizi reputazione nella UI
+### Added
+- Italian/English localization with IT/EN button
+- Manual email source input (paste header + body)
+- Complete VirusTotal connector (IP, URL, hash)
+- Reputation service status registry in UI
 
-### Corretto
-- `lxml` sostituito con `html.parser` (nessuna dipendenza da Visual C++ su Windows)
-- Compatibilità SQLAlchemy, pytest-asyncio, rimosso `--reload` su Windows
+### Fixed
+- `lxml` replaced with `html.parser` (no Visual C++ dependency on Windows)
+- SQLAlchemy, pytest-asyncio compatibility, removed `--reload` on Windows
 
 ---
 
 ## [0.1.0] — 2026-03-01
 
-### Aggiunto
-- Prima release pubblica: parser `.eml`/`.msg`, analisi header/body/URL/allegati, risk score, reputazione (AbuseIPDB, OpenPhish, PhishTank, MalwareBazaar), report `.docx`, dashboard web, SQLite, cross-platform, 52 test
+### Added
+- First public release: `.eml`/`.msg` parser, header/body/URL/attachment analysis, risk score, reputation (AbuseIPDB, OpenPhish, PhishTank, MalwareBazaar), .docx report, web dashboard, SQLite, cross-platform, 52 tests
