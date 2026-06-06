@@ -456,11 +456,11 @@ if r.status_code != 200:
 
 ## 📚 More Information
 
-- **Usage Guide:** [UTILIZZO.md](./UTILIZZO.md)
-- **Configuration:** [CONFIGURAZIONE.md](./CONFIGURAZIONE.md)
-- **Installation:** [INSTALLAZIONE.md](./INSTALLAZIONE.md)
+- **Usage Guide:** [USAGE.md](./USAGE.md)
+- **Configuration:** [CONFIGURATION.md](./CONFIGURATION.md)
+- **Installation:** [INSTALLATION.md](./INSTALLATION.md)
 - **Interactive Docs:** http://localhost:8000/docs (when server running)
 
 ---
 
-*← [Usage Guide](./UTILIZZO.md) | [Requirements](./REQUISITI.md)*
+*← [Usage Guide](./USAGE.md) | [Requirements](./REQUIREMENTS.md)*

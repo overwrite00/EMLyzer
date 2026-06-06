@@ -3,7 +3,7 @@
 Step-by-step instructions for installing EMLyzer on Windows, macOS, and Linux.
 
 > [!IMPORTANT]
-> 💻 **Prerequisites:** Review [REQUISITI.md](./REQUISITI.md) before starting.
+> 💻 **Prerequisites:** Review [REQUIREMENTS.md](./REQUIREMENTS.md) before starting.
 
 ---
 
@@ -335,10 +335,10 @@ To upgrade to a newer version:
 
 ## ✅ What's Next?
 
-- **First time?** → Learn the basics in [UTILIZZO.md](./UTILIZZO.md)
-- **Need API keys?** → [CONFIGURAZIONE.md](./CONFIGURAZIONE.md)
+- **First time?** → Learn the basics in [USAGE.md](./USAGE.md)
+- **Need API keys?** → [CONFIGURATION.md](./CONFIGURATION.md)
 - **Developer?** → [API.md](./API.md)
 
 ---
 
-*← [Requirements](./REQUISITI.md) | Next: [Usage →](./UTILIZZO.md)*
+*← [Requirements](./REQUIREMENTS.md) | Next: [Usage →](./USAGE.md)*

@@ -3,7 +3,7 @@
 Learn how to analyze suspicious emails, interpret results, and generate professional reports.
 
 > [!TIP]
-> 💡 **First time?** Start with the [Installation](./INSTALLAZIONE.md) and [Configuration](./CONFIGURAZIONE.md) guides first.
+> 💡 **First time?** Start with the [Installation](./INSTALLATION.md) and [Configuration](./CONFIGURATION.md) guides first.
 
 ---
 
@@ -258,7 +258,7 @@ AbuseIPDB, VirusTotal, crt.sh
 | ✅ | Clean | Analyzed, no threats found |
 | 🔴 | **MALICIOUS** | Found in threat database |
 | ⏳ | In progress | SLOW service running (auto-updates) |
-| 🔑 | Key missing | API key not configured (see [Configuration](./CONFIGURAZIONE.md)) |
+| 🔑 | Key missing | API key not configured (see [Configuration](./CONFIGURATION.md)) |
 | ➖ | Not applicable | Active but email has no entities of this type |
 | ⚠️ | Error | Service connection problem |
 
@@ -272,7 +272,7 @@ AbuseIPDB, VirusTotal, crt.sh
 - 🟢 **crt.sh** — TLS certificates for domain
 
 **Services requiring API key:**
-See [Configuration Guide](./CONFIGURAZIONE.md) for setup instructions.
+See [Configuration Guide](./CONFIGURATION.md) for setup instructions.
 
 ---
 
@@ -451,10 +451,10 @@ or `LANGUAGE=en`, then restart.
 
 ## ✅ What's Next?
 
-- **Need API keys?** → [Configuration Guide](./CONFIGURAZIONE.md)
+- **Need API keys?** → [Configuration Guide](./CONFIGURATION.md)
 - **Using the API?** → [API Reference](./API.md)
-- **Having issues?** → [Requirements & Troubleshooting](./REQUISITI.md)
+- **Having issues?** → [Requirements & Troubleshooting](./REQUIREMENTS.md)
 
 ---
 
-*← [Configuration](./CONFIGURAZIONE.md) | [API →](./API.md)*
+*← [Configuration](./CONFIGURATION.md) | [API →](./API.md)*

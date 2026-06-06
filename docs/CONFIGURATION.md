@@ -366,10 +366,10 @@ For professional use with large analysis volumes.
 
 ## ✅ What's Next?
 
-- **Ready to analyze?** → [Usage Guide](./UTILIZZO.md)
+- **Ready to analyze?** → [Usage Guide](./USAGE.md)
 - **Developer?** → [API Reference](./API.md)
-- **Need help?** → [Troubleshooting](./REQUISITI.md#-troubleshooting)
+- **Need help?** → [Troubleshooting](./REQUIREMENTS.md#-troubleshooting)
 
 ---
 
-*← [Installation](./INSTALLAZIONE.md) | Next: [Usage →](./UTILIZZO.md)*
+*← [Installation](./INSTALLATION.md) | Next: [Usage →](./USAGE.md)*

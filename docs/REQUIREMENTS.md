@@ -3,7 +3,7 @@
 Complete system requirements and prerequisites for deploying EMLyzer on Windows, macOS, and Linux.
 
 > [!TIP]
-> 🚀 **New to EMLyzer?** Start with the [Installation Guide](./INSTALLAZIONE.md) after reviewing requirements here.
+> 🚀 **New to EMLyzer?** Start with the [Installation Guide](./INSTALLATION.md) after reviewing requirements here.
 
 ---
 
@@ -49,7 +49,7 @@ Expected output: `Python 3.13.x`
 
 > [!WARNING]
 > ⚠️ If you have Python 3.10 or earlier, you must upgrade before proceeding.
-> See [Installation Guide → Python 3.13](./INSTALLAZIONE.md#1-installare-python-313)
+> See [Installation Guide → Python 3.13](./INSTALLATION.md#1-install-python-313)
 
 ---
 
@@ -198,7 +198,7 @@ Email threat intelligence is **completely optional**. No registration required f
 - 🟠 Criminal IP, Pulsedive, Hybrid Analysis, Shodan InternetDB
 
 > [!TIP]
-> 💡 For detailed setup of any reputation service, see [Configuration Guide](./CONFIGURAZIONE.md)
+> 💡 For detailed setup of any reputation service, see [Configuration Guide](./CONFIGURATION.md)
 
 ---
 
@@ -225,9 +225,9 @@ Email threat intelligence is **completely optional**. No registration required f
 
 ## 🚀 Next Steps
 
-1. **🆕 New to EMLyzer?** → [Installation Guide](./INSTALLAZIONE.md)
-2. **⚙️ Already installed?** → [Configuration Guide](./CONFIGURAZIONE.md)
-3. **📖 Ready to analyze?** → [Usage Guide](./UTILIZZO.md)
+1. **🆕 New to EMLyzer?** → [Installation Guide](./INSTALLATION.md)
+2. **⚙️ Already installed?** → [Configuration Guide](./CONFIGURATION.md)
+3. **📖 Ready to analyze?** → [Usage Guide](./USAGE.md)
 4. **💻 Developer?** → [API Reference](./API.md)
 
 ---
@@ -241,7 +241,7 @@ Email threat intelligence is **completely optional**. No registration required f
 1. Open Command Prompt (Win + R → `cmd`)
 2. Type: `python --version`
 3. If not found, Python is not installed or not in PATH
-4. Solution: [Install Python 3.13](./INSTALLAZIONE.md#1-installare-python-313)
+4. Solution: [Install Python 3.13](./INSTALLATION.md#1-install-python-313)
 
 **macOS / Linux:**
 1. Open Terminal
@@ -255,10 +255,10 @@ Email threat intelligence is **completely optional**. No registration required f
 
 No. Python 3.11+ is required. Some dependencies don't support 3.10.
 
-**Solution:** Upgrade to Python 3.13 following the [Installation Guide](./INSTALLAZIONE.md).
+**Solution:** Upgrade to Python 3.13 following the [Installation Guide](./INSTALLATION.md).
 
 </details>
 
 ---
 
-*← [README](../README.md) | Next: [INSTALLAZIONE →](./INSTALLAZIONE.md)*
+*← [README](../README.md) | Next: [INSTALLATION →](./INSTALLATION.md)*
