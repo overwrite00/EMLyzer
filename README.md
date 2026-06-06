@@ -33,7 +33,7 @@ EMLyzer analyzes suspicious emails by uploading `.eml` or `.msg` files, or pasti
 
 ### 🐧 Linux / macOS
 ```bash
-git clone https://github.com/0verwrite/EMLyzer.git
+git clone https://github.com/overwrite00/EMLyzer.git
 cd EMLyzer
 chmod +x start.sh
 ./start.sh
@@ -194,8 +194,8 @@ Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
 ## 🙋 Support
 
 - 📖 **Documentation:** See [docs/](docs/) folder
-- 🐛 **Report issues:** [GitHub Issues](https://github.com/0verwrite/EMLyzer/issues)
-- 💬 **Questions:** Open a [GitHub Discussion](https://github.com/0verwrite/EMLyzer/discussions)
+- 🐛 **Report issues:** [GitHub Issues](https://github.com/overwrite00/EMLyzer/issues)
+- 💬 **Questions:** Open a [GitHub Discussion](https://github.com/overwrite00/EMLyzer/discussions)
 
 ---
 
