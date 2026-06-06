@@ -15,10 +15,10 @@ EMLyzer permette di analizzare un'email sospetta caricando il file `.eml` o `.ms
 
 | 📄 Document | 📝 Purpose |
 |---|---|
-| [📋 REQUISITI.md](docs/REQUISITI.md) | System requirements and prerequisites |
-| [🚀 INSTALLAZIONE.md](docs/INSTALLAZIONE.md) | Step-by-step installation guide |
-| [⚙️ CONFIGURAZIONE.md](docs/CONFIGURAZIONE.md) | Environment setup and API keys |
-| [📖 UTILIZZO.md](docs/UTILIZZO.md) | How to use the application |
+| [📋 REQUIREMENTS.md](docs/REQUIREMENTS.md) | System requirements and prerequisites |
+| [🚀 INSTALLATION.md](docs/INSTALLATION.md) | Step-by-step installation guide |
+| [⚙️ CONFIGURATION.md](docs/CONFIGURATION.md) | Environment setup and API keys |
+| [📖 USAGE.md](docs/USAGE.md) | How to use the application |
 | [📡 API.md](docs/API.md) | REST API reference for developers |
 
 ---
@@ -111,20 +111,20 @@ Email (.eml / .msg / plain text)
 - **Browser** Chrome, Firefox, Safari, or Edge (90+)
 
 > [!IMPORTANT]
-> ✅ For complete requirements, see [REQUISITI.md](docs/REQUISITI.md)
+> ✅ For complete requirements, see [REQUISITI.md](docs/REQUIREMENTS.md)
 
 ---
 
 ## 🚀 Getting Started
 
 ### 1️⃣ Install Requirements
-Follow [INSTALLAZIONE.md](docs/INSTALLAZIONE.md) for step-by-step instructions.
+Follow [INSTALLAZIONE.md](docs/INSTALLATION.md) for step-by-step instructions.
 
 ### 2️⃣ Configure (Optional)
-Set up optional reputation services in [CONFIGURAZIONE.md](docs/CONFIGURAZIONE.md).
+Set up optional reputation services in [CONFIGURAZIONE.md](docs/CONFIGURATION.md).
 
 ### 3️⃣ Start Analyzing
-Learn the interface in [UTILIZZO.md](docs/UTILIZZO.md).
+Learn the interface in [UTILIZZO.md](docs/USAGE.md).
 
 ### 💻 For Developers
 Explore the API in [API.md](docs/API.md).
@@ -208,4 +208,4 @@ Distributed with MIT License · [View License](LICENSE)
 
 ---
 
-*Ready to get started?* → [Installation Guide](docs/INSTALLAZIONE.md)
+*Ready to get started?* → [Installation Guide](docs/INSTALLATION.md)
