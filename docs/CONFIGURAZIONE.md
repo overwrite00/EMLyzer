@@ -1,322 +1,375 @@
-# Configurazione
+# ⚙️ Configuration — EMLyzer
 
-Questa guida spiega come personalizzare EMLyzer tramite il file `.env`.
+Customize EMLyzer by configuring the `.env` file and optional reputation services.
 
----
-
-## Il file .env
-
-All'avvio, `start.bat` / `start.sh` crea automaticamente `backend/.env`.
-Aprilo con qualsiasi editor di testo (Blocco Note su Windows, nano/gedit su Linux).
-
-**Percorso:**
-- Windows: `EMLyzer\backend\.env`
-- Linux/macOS: `EMLyzer/backend/.env`
-
-> Il file inizia con un punto — su Windows attiva "Mostra elementi nascosti" se non lo vedi.
-
-> Dopo ogni modifica riavvia il programma per applicare le modifiche.
+> [!TIP]
+> 💡 **Reputation services are completely optional.** EMLyzer works perfectly without them for core email analysis.
 
 ---
 
-## Impostazioni disponibili
+## 📂 The .env File
 
-### DEBUG
+On first run, `start.bat` / `start.sh` automatically creates `backend/.env`.
+
+Edit it with any text editor (Notepad on Windows, nano/gedit on Linux).
+
+### 📍 File Locations
+
+- **Windows:** `EMLyzer\backend\.env`
+- **Linux/macOS:** `EMLyzer/backend/.env`
+
+> [!NOTE]
+> The file starts with a dot — on Windows, enable "Show hidden files" if you don't see it.
+
+> [!IMPORTANT]
+> After editing, restart the application to apply changes.
+
+---
+
+## ⚙️ Basic Settings
+
+### 🐛 DEBUG
 ```env
 DEBUG=false
 ```
-Mostra log tecnici dettagliati. Lascia `false` per uso normale.
+Shows detailed technical logs. Keep `false` for normal use.
 
 ---
 
-### MAX_UPLOAD_SIZE_MB
+### 📦 MAX_UPLOAD_SIZE_MB
 ```env
 MAX_UPLOAD_SIZE_MB=25
 ```
-Dimensione massima file email caricabili in MB.
+Maximum email file size in MB.
 
 ---
 
-### LANGUAGE
+### 🌐 LANGUAGE
 ```env
 LANGUAGE=it
 ```
-Lingua dell'interfaccia: `it` (italiano) o `en` (English).
-Puoi cambiare anche dal pulsante IT/EN nell'interfaccia. Per renderla permanente, modifica questo file.
+Interface language: `it` (Italian) or `en` (English).
+
+You can also change this from the IT/EN button in the app. Modify this file to make it permanent.
 
 ---
 
-## Configurare le API key per la reputazione
+## 🌐 Reputation Services (Optional)
 
-I servizi di reputazione sono **completamente opzionali**.
-Funzionano senza chiave: **Spamhaus DROP**, **ASN Lookup**, **Shodan InternetDB**, **OpenPhish**, **Redirect Chain**, **crt.sh**.
-Richiedono registrazione gratuita: **CIRCL Passive DNS**, **PhishTank**, **URLhaus/ThreatFox/MalwareBazaar** (abuse.ch).
-Richiedono account con piano free: **AbuseIPDB**, **VirusTotal**.
+Threat intelligence services are **completely optional**. Services work without API keys:
 
-> ⚠️ **MalwareBazaar**, **URLhaus** e **ThreatFox** richiedono una API key abuse.ch. Registrati su [auth.abuse.ch](https://auth.abuse.ch/) (gratuito) e aggiungi `ABUSECH_API_KEY` nel file `.env` — una sola chiave copre tutti e tre i servizi.
+✅ **Always free (no registration):**
+- Spamhaus DROP
+- ASN Lookup
+- Shodan InternetDB
+- OpenPhish
+- Redirect Chain
+- crt.sh
+
+📋 **Free with registration:**
+- CIRCL Passive DNS
+- PhishTank
+- abuse.ch services (URLhaus/ThreatFox/MalwareBazaar)
+
+💰 **Free tier available:**
+- AbuseIPDB
+- VirusTotal
+- GreyNoise Community
+- URLScan.io
+- Criminal IP
+- Pulsedive
+- Hybrid Analysis
 
 ---
 
-> ⚠️ **Nota sui piani gratuiti (aggiornamento 2025)**
->
-> I piani gratuiti dei servizi di threat intelligence cambiano nel tempo. Verifica sempre il sito ufficiale prima di configurare una chiave.
->
-> | Servizio | Stato piano free |
-> |---|---|
-> | **GreyNoise Community** | ✅ Free — ~50 ricerche/settimana (community tier) |
-> | **URLScan.io** | ✅ Free — 1.000 ricerche/g con chiave; search pubblico senza chiave |
-> | **Pulsedive** | ⚠️ Free ridotto — **10 req/giorno** (era 30/min prima di marzo 2024) |
-> | **Criminal IP** | ⚠️ Free con crediti — crediti iniziali limitati (verifica limiti aggiornati sul sito) |
-> | **SecurityTrails** | ❌ **Nessun piano free** — solo trial temporaneo; prezzi enterprise da ~$11k/anno |
+## 📡 Configuring Each Service
 
----
+<details open>
+<summary><strong>⚠️ Important: Free Tier Status (2025 Update)</strong></summary>
 
-### AbuseIPDB
+Threat intel free plans change frequently. Always verify on the official website before configuring:
 
-Controlla la reputazione degli IP trovati negli header.
+| 🌐 Service | 📊 Free Tier Status |
+|---|---|
+| **GreyNoise Community** | ✅ Free — ~50 searches/week |
+| **URLScan.io** | ✅ Free — 1,000 searches/day with key |
+| **Pulsedive** | ⚠️ Reduced — **10 req/day** (was 30/min before Mar 2024) |
+| **Criminal IP** | ⚠️ Free with limited credits |
+| **SecurityTrails** | ❌ **No free plan** — enterprise only (~$11k/year) |
 
-**Come registrarsi:**
-1. Vai su [https://www.abuseipdb.com](https://www.abuseipdb.com)
-2. Clicca **"Sign Up"** e crea un account gratuito
-3. Vai su **"Account"** → **"API"** → copia la chiave
+</details>
+
+### 🔴 AbuseIPDB
+
+Checks reputation of IPs found in email headers.
+
+**How to register:**
+1. Go to [abuseipdb.com](https://www.abuseipdb.com)
+2. Click **"Sign Up"** → create free account
+3. Go to **"Account"** → **"API"** → copy key
 
 ```env
-ABUSEIPDB_API_KEY=incolla_qui_la_tua_chiave
+ABUSEIPDB_API_KEY=your_api_key_here
 ```
-**Limite gratuito:** 1.000 richieste al giorno.
+
+**Free limit:** 1,000 requests/day
 
 ---
 
-### VirusTotal
+### 🦠 VirusTotal
 
-Analizza IP, URL e hash con oltre 70 motori antivirus.
+Analyzes IP, URL, and hash against 70+ antivirus engines.
 
-**Come registrarsi:**
-1. Vai su [https://www.virustotal.com](https://www.virustotal.com)
-2. Clicca **"Join our community"** e crea un account gratuito
-3. Clicca sul tuo nome → **"API key"** → copia
+**How to register:**
+1. Go to [virustotal.com](https://www.virustotal.com)
+2. Click **"Join our community"** → create free account
+3. Click your profile → **"API key"** → copy
 
 ```env
-VIRUSTOTAL_API_KEY=incolla_qui_la_tua_chiave
+VIRUSTOTAL_API_KEY=your_api_key_here
 ```
-**Limite gratuito:** 4 richieste al minuto, 500 al giorno.
-EMLyzer attende automaticamente 15 secondi tra richieste consecutive.
+
+**Free limit:** 4 requests/minute, 500/day.  
+EMLyzer automatically waits 15 seconds between requests.
 
 ---
 
-### PhishTank
+### 🎣 PhishTank
 
-Database URL phishing verificati dalla community.
+Verified phishing URL database from the community.
 
-**Come registrarsi:**
-1. Vai su [https://www.phishtank.com/register.php](https://www.phishtank.com/register.php)
-2. Crea un account gratuito
-3. Vai su [https://www.phishtank.com/api_register.php](https://www.phishtank.com/api_register.php)
-4. Registra l'applicazione → copia la chiave
+**How to register:**
+1. Go to [phishtank.com/register.php](https://www.phishtank.com/register.php)
+2. Create free account
+3. Go to [phishtank.com/api_register.php](https://www.phishtank.com/api_register.php)
+4. Register app → copy key
 
 ```env
-PHISHTANK_API_KEY=incolla_qui_la_tua_chiave
+PHISHTANK_API_KEY=your_api_key_here
 ```
-**Limite gratuito:** 1.000 richieste al giorno.
+
+**Free limit:** 1,000 requests/day
 
 ---
 
-### CIRCL Passive DNS
+### 🔍 CIRCL Passive DNS
 
-Storico delle risoluzioni DNS per IP e domini: mostra quali nomi di dominio hanno puntato a un IP e quali IP un dominio ha storicamente risolto. Servizio **informativo** (non emette giudizi malevolo/pulito), utile per la threat intelligence e per tracciare l'infrastruttura di un attaccante.
+Historical DNS resolution for IP and domains: shows which domains pointed to an IP, and which IPs a domain resolved to historically.
 
-**Come registrarsi:**
-1. Vai su [https://www.circl.lu/pdns/](https://www.circl.lu/pdns/)
-2. Clicca **"Request access"** e compila il modulo (è gratuito)
-3. Riceverai username e password via email
-4. Inserisci le credenziali nel formato `username:password`
+**How to register:**
+1. Go to [circl.lu/pdns](https://www.circl.lu/pdns/)
+2. Click **"Request access"** → fill form (free)
+3. Receive username and password via email
+4. Insert credentials in format `username:password`
 
 ```env
 CIRCL_API_KEY=tuo_username:tua_password
 ```
 
-> **Esempio:** se lo username è `mario.rossi@example.com` e la password è `abc123`, scrivi:
+> **Example:** if username is `mario.rossi@example.com` and password is `abc123`:
 > `CIRCL_API_KEY=mario.rossi@example.com:abc123`
 
-**Limite:** nessun limite ufficiale dichiarato; EMLyzer applica un rate limit conservativo di 2 req/s.
+**Limit:** No official limit declared; EMLyzer applies conservative 2 req/s rate limit
 
 ---
 
-### GreyNoise Community
+### 🔮 GreyNoise Community
 
-Classifica un IP come `malicious`, `benign` o `unknown`. Distingue i normali scanner di internet (crawlers, ricercatori di sicurezza) dagli attori malevoli, riducendo significativamente i falsi positivi nell'analisi degli header SMTP.
+Classifies IP as `malicious`, `benign`, or `unknown`. Distinguishes normal internet scanners from malicious actors, reducing false positives.
 
-**Come registrarsi:**
-1. Vai su [https://www.greynoise.io/](https://www.greynoise.io/)
-2. Clicca **"Sign Up"** e crea un account gratuito
-3. Nella dashboard vai su **"Account"** → **"API Keys"** → copia la chiave
+**How to register:**
+1. Go to [greynoise.io](https://www.greynoise.io/)
+2. Click **"Sign Up"** → create free account
+3. Dashboard → **"Account"** → **"API Keys"** → copy
 
 ```env
-GREYNOISE_API_KEY=incolla_qui_la_tua_chiave
+GREYNOISE_API_KEY=your_api_key_here
 ```
 
-**Limite gratuito:** ~50 ricerche/settimana (community tier).
+**Free limit:** ~50 searches/week (community tier)
 
 ---
 
-### URLScan.io
+### 📡 URLScan.io
 
-Ricerca scansioni esistenti per URL e domini nel database di urlscan.io. Mostra il verdetto (`malicious`/`benign`) dell'ultima scansione disponibile con score e tag.
+Searches existing scans for URLs and domains in urlscan.io database. Shows verdict (`malicious`/`benign`), score, and tags.
 
-> **Nota:** la ricerca funziona anche **senza API key** (accesso pubblico con limiti ridotti). La chiave aumenta il limite a 1.000 ricerche/giorno e sblocca funzioni avanzate.
+> **Note:** Works without API key (public search with reduced limits). Key increases limit to 1,000 searches/day.
 
-**Come registrarsi (opzionale):**
-1. Vai su [https://urlscan.io/user/signup](https://urlscan.io/user/signup)
-2. Crea un account gratuito
-3. Vai su **"Settings"** → **"API Keys"** → copia la chiave
+**How to register (optional):**
+1. Go to [urlscan.io/user/signup](https://urlscan.io/user/signup)
+2. Create free account
+3. Go to **"Settings"** → **"API Keys"** → copy
 
 ```env
-URLSCAN_API_KEY=incolla_qui_la_tua_chiave
+URLSCAN_API_KEY=your_api_key_here
 ```
 
-**Limite gratuito:** 1.000 ricerche/giorno con chiave; accesso pubblico senza chiave con limiti ridotti.
+**Free limit:** 1,000 searches/day with key; public access without key with reduced limits
 
 ---
 
-### Pulsedive
+### ⚡ Pulsedive
 
-Threat intelligence aggregata per IP e URL: assegna un livello di rischio (`none`/`low`/`medium`/`high`/`critical`) con i fattori di rischio specifici rilevati.
+Aggregated threat intelligence for IP and URL: assigns risk level (`none`/`low`/`medium`/`high`/`critical`) with specific risk factors.
 
-> ⚠️ **Attenzione:** a partire da **marzo 2024** il piano free è stato ridotto a **10 richieste al giorno** (era 30 req/min). Con email che contengono molti URL o IP, la quota può essere esaurita rapidamente.
+> [!WARNING]
+> ⚠️ **Important:** Since **March 2024**, free tier reduced to **10 requests/day** (was 30/min). Large emails with many URLs can exhaust quota quickly.
 
-**Come registrarsi:**
-1. Vai su [https://pulsedive.com/](https://pulsedive.com/)
-2. Crea un account gratuito
-3. Vai su **"Dashboard"** → **"API"** → copia la chiave
+**How to register:**
+1. Go to [pulsedive.com](https://pulsedive.com/)
+2. Create free account
+3. Go to **"Dashboard"** → **"API"** → copy key
 
 ```env
-PULSEDIVE_API_KEY=incolla_qui_la_tua_chiave
+PULSEDIVE_API_KEY=your_api_key_here
 ```
 
-**Limite gratuito:** 10 richieste al giorno (ridotto da marzo 2024).
+**Free limit:** 10 requests/day (reduced from March 2024)
 
 ---
 
-### Criminal IP
+### 🚨 Criminal IP
 
-Score di rischio IP su scala 0-4 (Safe / Low / Medium / High / Critical) con geolocalizzazione. Particolarmente efficace per rilevare IP di C&C e infrastrutture botnet.
+IP risk score 0-4 (Safe/Low/Medium/High/Critical) with geolocation. Effective for C&C and botnet infrastructure.
 
-**Come registrarsi:**
-1. Vai su [https://www.criminalip.io/](https://www.criminalip.io/)
-2. Clicca **"Sign Up"** e crea un account gratuito
-3. Vai su **"My Information"** → **"API Key"** → copia la chiave
+**How to register:**
+1. Go to [criminalip.io](https://www.criminalip.io/)
+2. Click **"Sign Up"** → create free account
+3. Go to **"My Information"** → **"API Key"** → copy
 
 ```env
-CRIMINALIP_API_KEY=incolla_qui_la_tua_chiave
+CRIMINALIP_API_KEY=your_api_key_here
 ```
 
-**Limite gratuito:** free tier con crediti iniziali limitati. Il piano usa un sistema a crediti — verifica i limiti aggiornati sul sito ufficiale.
+**Free limit:** Free tier with limited credits. Uses credit system — check official site for current limits.
 
 ---
 
-### SecurityTrails
+### 🛣️ SecurityTrails
 
-DNS attuale per domini: record A, MX, NS. Servizio **informativo** (come ASN Lookup e Shodan), utile per tracciare l'infrastruttura del mittente.
+Current DNS records for domains (A, MX, NS). Informational service.
 
-> ❌ **SecurityTrails non offre più un piano gratuito.** È disponibile solo un trial temporaneo (2.500 query/mese). I piani a pagamento partono da circa $11.000/anno (prezzi enterprise).
+> [!CAUTION]
+> ❌ **SecurityTrails no longer offers a free plan.** Only temporary trial available (2,500 queries/month). Paid plans start ~$11,000/year (enterprise).
 >
-> Se non hai una licenza enterprise o un trial attivo, lascia `SECURITYTRAILS_API_KEY` vuota — EMLyzer funziona correttamente senza questo servizio.
+> If you don't have enterprise license or active trial, leave `SECURITYTRAILS_API_KEY` empty — EMLyzer works perfectly without it.
 
-**Come attivare il trial:**
-1. Vai su [https://securitytrails.com/app/account](https://securitytrails.com/app/account)
-2. Crea un account e attiva il trial
-3. Vai su **"Account"** → **"API Key"** → copia la chiave
+**To activate trial:**
+1. Go to [securitytrails.com/app/account](https://securitytrails.com/app/account)
+2. Create account and activate trial
+3. Go to **"Account"** → **"API Key"** → copy
 
 ```env
-SECURITYTRAILS_API_KEY=incolla_qui_la_tua_chiave
+SECURITYTRAILS_API_KEY=your_api_key_here
 ```
 
-**Limite:** solo trial temporaneo (2.500 query/mese); nessun piano free stabile.
+**Limit:** Temporary trial only (2,500 queries/month); no stable free plan
 
 ---
 
-### Hybrid Analysis (CrowdStrike Falcon)
+### 🔬 Hybrid Analysis (CrowdStrike Falcon)
 
-Ricerca hash degli allegati nel database della sandbox Falcon. Restituisce il verdict (`no specific threat`/`suspicious`/`malicious`), il tipo di file e i tag comportamentali rilevati durante l'analisi.
+Searches attachment hashes in Falcon sandbox database. Returns verdict (`no threat`/`suspicious`/`malicious`), file type, and behavioral tags.
 
-**Come registrarsi:**
-1. Vai su [https://www.hybrid-analysis.com/signup](https://www.hybrid-analysis.com/signup)
-2. Compila il modulo (è gratuito con registrazione)
-3. Una volta approvato, vai su **"Profile"** → **"API key"** → copia la chiave
+**How to register:**
+1. Go to [hybrid-analysis.com/signup](https://www.hybrid-analysis.com/signup)
+2. Fill form (free with registration)
+3. Once approved, go to **"Profile"** → **"API key"** → copy
 
 ```env
-HYBRID_ANALYSIS_API_KEY=incolla_qui_la_tua_chiave
+HYBRID_ANALYSIS_API_KEY=your_api_key_here
 ```
 
-**Limite:** gratuito con registrazione (limiti aggiornati sul sito).
+**Free limit:** Free with registration (limits on official site)
 
 ---
 
-## Esempio di .env completo
+### 🧭 abuse.ch (URLhaus, ThreatFox, MalwareBazaar)
+
+One API key covers three services:
+- **URLhaus** — malware URL database
+- **ThreatFox** — IOC database (IP, URL, malware hash)
+- **MalwareBazaar** — malware sample hash database
+
+**How to register:**
+1. Go to [auth.abuse.ch](https://auth.abuse.ch/)
+2. Create free account
+3. Copy your API key
 
 ```env
+ABUSECH_API_KEY=your_api_key_here
+```
+
+> **Note:** If you have `MALWAREBAZAAR_API_KEY` from an older version, it still works for MalwareBazaar. But `ABUSECH_API_KEY` is preferred and covers URLhaus and ThreatFox too.
+
+---
+
+## 📋 Complete .env Example
+
+```env
+# Basic settings
 DEBUG=false
 MAX_UPLOAD_SIZE_MB=25
 LANGUAGE=it
 
+# Reputation services (optional)
 ABUSEIPDB_API_KEY=abc123def456ghi789jkl012
 VIRUSTOTAL_API_KEY=xyz987uvw654rst321opq098
 PHISHTANK_API_KEY=qrs111tuvw222xyz333abc444
 ABUSECH_API_KEY=mnb555opr666stu777vwx888
-CIRCL_API_KEY=tuo_username:tua_password
+CIRCL_API_KEY=username:password
 GREYNOISE_API_KEY=abc111def222ghi333jkl444
+URLSCAN_API_KEY=jkl888mno999pqr000stu111
 PULSEDIVE_API_KEY=mno555pqr666stu777vwx888
 CRIMINALIP_API_KEY=yz1112abc3334def5556ghi7
-SECURITYTRAILS_API_KEY=jkl888mno999pqr000stu111
-HYBRID_ANALYSIS_API_KEY=vwx222yz3334abc5556def77
+SECURITYTRAILS_API_KEY=vwx222yz3334abc5556def77
+HYBRID_ANALYSIS_API_KEY=abc555def666ghi777jkl888
 ```
 
 ---
 
-### abuse.ch — URLhaus, ThreatFox e MalwareBazaar
+## 🔐 Security
 
-Una sola chiave copre tre servizi:
-- **URLhaus** — database URL malware
-- **ThreatFox** — database IOC (IP, URL, hash malware)
-- **MalwareBazaar** — hash allegati nel database campioni malware
+<details>
+<summary><strong>🔒 Protecting your .env file</strong></summary>
 
-**Come registrarsi:**
-1. Vai su [https://auth.abuse.ch/](https://auth.abuse.ch/)
-2. Crea un account gratuito
-3. Nella pagina account copia la tua API key
+- ✅ **Don't commit to GitHub** — `.gitignore` excludes it automatically
+- ✅ **Don't share via email or chat**
+- ✅ **If a key is compromised, regenerate it** on the service website
+- ✅ **Use strong, unique passwords** for each service
+- ✅ **Rotate keys periodically** (at least annually)
 
-```env
-ABUSECH_API_KEY=incolla_qui_la_tua_chiave
-```
-
-> Hai già `MALWAREBAZAAR_API_KEY` da una versione precedente? Continua a funzionare per MalwareBazaar, ma `ABUSECH_API_KEY` è preferita e copre anche URLhaus e ThreatFox.
+</details>
 
 ---
 
-## Database PostgreSQL (avanzato)
+## 🗄️ Advanced: PostgreSQL Database
 
-Per uso professionale con grandi volumi di analisi.
+For professional use with large analysis volumes.
 
-> Per uso personale SQLite (predefinito) è sufficiente.
+> [!NOTE]
+> For personal use, SQLite (default) is sufficient.
 
-1. Installa PostgreSQL e crea un database dedicato
-2. Installa il driver:
-   - Windows: `.venv\Scripts\pip install asyncpg`
-   - Linux: `.venv/bin/pip install asyncpg`
-3. Aggiungi al `.env`:
-
-```env
-DATABASE_URL=postgresql+asyncpg://utente:password@localhost/openmail_db
-```
-
----
-
-## Sicurezza del file .env
-
-- **Non caricarlo su GitHub** — il `.gitignore` lo esclude automaticamente
-- **Non condividerlo** via email o chat
-- Se una chiave è compromessa, rigenerala sul sito del servizio
+**Steps:**
+1. Install PostgreSQL and create dedicated database
+2. Install driver:
+   ```bash
+   pip install asyncpg
+   ```
+3. Add to `.env`:
+   ```env
+   DATABASE_URL=postgresql+asyncpg://user:password@localhost/emlyzer_db
+   ```
 
 ---
 
-*Torna a → [Utilizzo](UTILIZZO.md) | [API REST](API.md)*
+## ✅ What's Next?
+
+- **Ready to analyze?** → [Usage Guide](./UTILIZZO.md)
+- **Developer?** → [API Reference](./API.md)
+- **Need help?** → [Troubleshooting](./REQUISITI.md#-troubleshooting)
+
+---
+
+*← [Installation](./INSTALLAZIONE.md) | Next: [Usage →](./UTILIZZO.md)*

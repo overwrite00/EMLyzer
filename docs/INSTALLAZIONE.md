@@ -1,63 +1,56 @@
-# Guida all'installazione — EMLyzer
+# 🚀 Installation Guide — EMLyzer
 
-Questa guida ti accompagna passo dopo passo dall'installazione di Python fino al primo avvio dell'applicazione, sia su Windows che su Linux/macOS.
+Step-by-step instructions for installing EMLyzer on Windows, macOS, and Linux.
 
----
-
-## Indice
-
-1. [Installare Python 3.13](#1-installare-python-313)
-   - [Windows](#windows)
-   - [Linux (Ubuntu / Debian)](#linux-ubuntu--debian)
-   - [macOS](#macos)
-2. [Scaricare EMLyzer](#2-scaricare-emlyzer)
-   - [Scarica come archivio ZIP / TAR](#scarica-come-archivio-zip--tar)
-   - [Clona con Git (alternativa)](#clona-con-git-alternativa)
-3. [Primo avvio](#3-primo-avvio)
-   - [Windows](#windows-1)
-   - [Linux / macOS](#linux--macos)
-4. [Cosa succede al primo avvio](#4-cosa-succede-al-primo-avvio)
-5. [Verifica che funzioni](#5-verifica-che-funzioni)
-6. [Risolvere problemi comuni](#6-risolvere-problemi-comuni)
+> [!IMPORTANT]
+> 💻 **Prerequisites:** Review [REQUISITI.md](./REQUISITI.md) before starting.
 
 ---
 
-## 1. Installare Python 3.13
+## 📋 Table of Contents
 
-### Windows
+1. [🐍 Install Python 3.13](#1-install-python-313)
+   - [🪟 Windows](#windows)
+   - [🐧 Linux (Ubuntu/Debian)](#linux-ubuntu--debian)
+   - [🍎 macOS](#macos)
+2. [⬇️ Download EMLyzer](#2-download-emlyzer)
+3. [▶️ First Run](#3-first-run)
+4. [✅ Verify Installation](#4-verify-installation)
+5. [🔧 Troubleshooting](#5-troubleshoot-common-problems)
 
-**Passo 1 — Scarica Python**
+---
 
-Vai su [https://www.python.org/downloads/](https://www.python.org/downloads/) e clicca sul pulsante giallo **"Download Python 3.13.x"** (la versione esatta potrebbe essere 3.13.1, 3.13.2 ecc. — qualunque 3.13.x va bene).
+## 1️⃣ Install Python 3.13
 
-**Passo 2 — Avvia l'installer**
+### 🪟 Windows
 
-Fai doppio clic sul file scaricato (es. `python-3.13.2-amd64.exe`).
+**Step 1️⃣ — Download Python**
 
-> ⚠️ **IMPORTANTE:** Prima di cliccare "Install Now", assicurati di spuntare la casella **"Add Python 3.13 to PATH"** in basso. Se non la spunti, il computer non troverà Python quando lo cerca.
+1. Go to [python.org/downloads](https://www.python.org/downloads/)
+2. Click the yellow **"Download Python 3.13.x"** button (latest 3.13.x version)
 
-Poi clicca **"Install Now"** e aspetta che finisca.
+**Step 2️⃣ — Run the Installer**
 
-**Passo 3 — Verifica**
+1. Double-click the downloaded file (e.g., `python-3.13.2-amd64.exe`)
+2. ⚠️ **CRITICAL:** Check the box **"Add Python 3.13 to PATH"** before installing
+   - If you skip this, Windows won't find Python later
+3. Click **"Install Now"** and wait for completion
 
-Apri il *Prompt dei comandi*: tasto `Windows` → scrivi `cmd` → Invio.
+**Step 3️⃣ — Verify**
 
-```
+Open Command Prompt (Win key → type `cmd` → Enter):
+
+```cmd
 python --version
 ```
 
-Dovresti vedere: `Python 3.13.x`
-
-Se hai più versioni di Python installate e vuoi usare specificatamente la 3.13, puoi anche usare:
-```
-py -3.13 --version
-```
+Expected output: `Python 3.13.x` ✅
 
 ---
 
-### Linux (Ubuntu / Debian)
+### 🐧 Linux (Ubuntu / Debian)
 
-**Ubuntu 24.04** include Python 3.12 di default. Per installare Python 3.13:
+**Ubuntu 24.04** includes Python 3.12 by default. Install Python 3.13:
 
 ```bash
 sudo apt update
@@ -67,190 +60,186 @@ sudo apt update
 sudo apt install python3.13 python3.13-venv -y
 ```
 
-Verifica:
+Verify:
 ```bash
 python3.13 --version
 ```
 
-Se stai usando **Ubuntu 22.04 o Debian 12**, il comando sopra funziona ugualmente.
+> [!NOTE]
+> 💡 Works on Ubuntu 20.04+, Debian 11+, and other Debian-based distros.
 
 ---
 
-### macOS
+### 🍎 macOS
 
-**Metodo consigliato — Homebrew:**
+**Using Homebrew (Recommended):**
 
-Se non hai Homebrew installato:
+If you don't have Homebrew:
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-Poi installa Python:
+Then install Python:
 ```bash
 brew install python@3.13
 ```
 
-Verifica:
+Verify:
 ```bash
 python3.13 --version
 ```
 
-**Alternativa — Installer ufficiale:**
+**Alternative — Download from python.org:**
 
-Scarica il pacchetto `.pkg` da [https://www.python.org/downloads/macos/](https://www.python.org/downloads/macos/) e segui le istruzioni.
-
----
-
-## 2. Scaricare EMLyzer
-
-### Scarica come archivio ZIP / TAR
-
-1. Vai alla pagina del progetto su GitHub
-2. Clicca sul pulsante verde **"Code"** → **"Download ZIP"**
-3. Estrai l'archivio in una cartella a tua scelta, ad esempio:
-   - **Windows:** `C:\Users\TuoNome\EMLyzer\`
-   - **Linux:** `/home/tuonome/EMLyzer/`
-
-Se hai ricevuto il file come `.tar.gz`:
-
-**Windows** — usa 7-Zip, WinRAR o il File Explorer di Windows 11 (supporta i .tar.gz nativamente).
-
-**Linux / macOS:**
-```bash
-tar -xzf EMLyzer_v0.14.3.tar.gz
-cd EMLyzer
-```
-
-### Clona con Git (alternativa)
-
-Se hai Git installato:
-
-```bash
-git clone https://github.com/tuo-utente/EMLyzer.git
-cd EMLyzer
-```
+1. Download `.pkg` from [python.org/downloads/macos](https://www.python.org/downloads/macos/)
+2. Run the installer and follow on-screen instructions
 
 ---
 
-## 3. Primo avvio
+## 2️⃣ Download EMLyzer
 
-### Windows
+### 📥 Option A: Download ZIP / TAR
 
-Apri la cartella `EMLyzer` con Esplora File.
+1. Go to the GitHub repository
+2. Click **"Code"** (green button) → **"Download ZIP"**
+3. Extract to a folder:
+   - **Windows:** `C:\Users\YourName\EMLyzer\`
+   - **Linux/macOS:** `~/EMLyzer/` or `/opt/EMLyzer/`
 
-Fai doppio clic su **`start.bat`**.
+**If you have .tar.gz:**
 
-Si aprirà una finestra nera (il Prompt dei comandi) che mostrerà i progressi:
+**Windows:** Use 7-Zip, WinRAR, or Windows 11 built-in .tar.gz support
+
+**Linux/macOS:**
+```bash
+tar -xzf EMLyzer_v0.15.1.tar.gz
+cd EMLyzer
+```
+
+### 🔗 Option B: Clone with Git
+
+If you have Git installed:
+
+```bash
+git clone https://github.com/0verwrite/EMLyzer.git
+cd EMLyzer
+```
+
+---
+
+## 3️⃣ First Run
+
+### 🪟 Windows
+
+1. Open File Explorer
+2. Navigate to your `EMLyzer` folder
+3. **Double-click `start.bat`**
+
+A black console window opens showing progress:
 
 ```
 ============================================
-  EMLyzer v0.14.3
+  EMLyzer v0.15.1
 ============================================
 
-[INFO] Python trovato:
+[INFO] Python found:
 Python 3.13.2
 
-[INFO] Creazione virtual environment...
-[INFO] Virtual environment creato.
+[INFO] Creating virtual environment...
+[INFO] Virtual environment created.
 
-[INFO] Installazione dipendenze (prima esecuzione: qualche minuto)...
-[INFO] Dipendenze OK.
+[INFO] Installing dependencies (first run: a few minutes)...
+[INFO] Dependencies OK.
 
 ============================================
-  Applicazione pronta
+  Application Ready
 ============================================
 
-  Apri il browser su:  http://localhost:8000
-  Documentazione API:  http://localhost:8000/docs
-  Lingua:              pulsante IT/EN in alto a destra
+  Open browser:        http://localhost:8000
+  API documentation:   http://localhost:8000/docs
+  Language:            IT/EN button (top right)
 
-  Premi CTRL+C per fermare
+  Press CTRL+C to stop
 ============================================
 ```
 
-> ⏱️ La **prima esecuzione** scarica e installa tutte le dipendenze: può richiedere **2-5 minuti** a seconda della velocità della connessione. Le esecuzioni successive partono in **pochi secondi**.
+> ⏱️ **First run takes 2-5 minutes** (downloading Python packages). Subsequent runs start in seconds.
 
-### Linux / macOS
+### 🐧 Linux / macOS
 
-Apri il terminale nella cartella del progetto ed esegui:
+Open Terminal in the project folder:
 
 ```bash
-chmod +x start.sh   # necessario solo la prima volta
+chmod +x start.sh   # Make executable (first time only)
 ./start.sh
 ```
 
-L'output sarà simile a quello Windows.
+Same output as Windows above.
 
 ---
 
-## 4. Cosa succede al primo avvio
+## 4️⃣ Verify Installation
 
-Lo script `start.bat` / `start.sh` esegue automaticamente questi passi:
+### 🌐 Open the Web Interface
 
-1. **Individua la versione di Python** più adatta (cerca 3.13, poi 3.12, poi 3.11)
-2. **Crea un virtual environment** isolato in `.venv/` — questo evita conflitti con altri programmi Python installati sul computer
-3. **Installa le dipendenze** nel virtual environment (non tocca il Python di sistema)
-4. **Crea il file `.env`** con la configurazione di default (copiato da `.env.example`)
-5. **Avvia il server web** sulla porta 8000
-
-Il virtual environment e le dipendenze vengono creati **una sola volta**. Le esecuzioni successive saltano questi passi e partono direttamente.
-
----
-
-## 5. Verifica che funzioni
-
-Dopo l'avvio, apri il browser e vai su:
+After the console shows "Application Ready", open your browser:
 
 **http://localhost:8000**
 
-Dovresti vedere l'interfaccia di EMLyzer con:
-- Una sezione "Analizza Email" con la zona di upload
-- Una sezione "Campagne Rilevate"
-- Una sezione "Analisi Recenti" (vuota inizialmente)
+You should see:
+- ✅ Email upload area
+- ✅ Recent analyses list
+- ✅ Campaign detection panel
+- ✅ IT/EN language selector (top right)
 
-Per verificare che il backend risponda correttamente, puoi anche aprire:
+### 🔍 Test the API
+
+Open this link in your browser to verify the backend:
 
 **http://localhost:8000/api/health**
 
-Dovresti vedere la risposta JSON:
+Expected response:
 ```json
-{"status": "ok", "version": "0.14.3", "app": "EMLyzer"}
+{"status": "ok", "version": "0.15.1", "app": "EMLyzer"}
 ```
 
 ---
 
-## 6. Risolvere problemi comuni
+## 5️⃣ Troubleshoot Common Problems
 
-### ❌ "Python non trovato nel PATH" (Windows)
+### ❌ "Python not found" (Windows)
 
-**Causa:** Python è installato ma la casella "Add Python to PATH" non era spuntata durante l'installazione.
+**Cause:** Python installed but "Add to PATH" wasn't checked
 
-**Soluzione:**
-1. Apri nuovamente l'installer di Python
-2. Clicca su "Modify" (o disinstalla e reinstalla)
-3. Assicurati di spuntare "Add Python 3.13 to PATH"
+**Solution:**
+1. Run Python installer again
+2. Click **"Modify"** (or uninstall and reinstall)
+3. ✅ Check **"Add Python 3.13 to PATH"**
+4. Click **"Install Now"**
 
-In alternativa, puoi aggiungere Python al PATH manualmente:
-- Cerca "Modifica le variabili d'ambiente" nel menu Start
-- In "Variabili di sistema" → "Path" → Aggiungi il percorso di Python (es. `C:\Users\TuoNome\AppData\Local\Programs\Python\Python313\`)
+**Alternative — Add to PATH manually:**
+1. Search "Edit environment variables" in Start menu
+2. Go to System variables → **"Path"**
+3. Add: `C:\Users\YourName\AppData\Local\Programs\Python\Python313\`
+4. Restart Command Prompt
 
 ---
 
-### ❌ "Installazione dipendenze fallita" — errore `lxml` o `scikit-learn`
+### ❌ Dependency Installation Failed (lxml or scikit-learn error)
 
-**Causa:** Stai usando Python 3.14 oppure mancano i compilatori C sul sistema.
+**Cause:** Using Python 3.14+ or missing C compiler
 
-**Soluzione:** Usa Python 3.13 come descritto in questo documento.
+**Solution:** Use Python 3.13 as described above
 
-Se hai più versioni di Python installate, lo script seleziona automaticamente quella giusta. Se il problema persiste, cancella il virtual environment e riprova:
+If you have multiple Python versions installed, the script auto-selects the correct one. If issues persist:
 
 **Windows:**
-```
+```cmd
 rmdir /s /q .venv
 start.bat
 ```
 
-**Linux:**
+**Linux/macOS:**
 ```bash
 rm -rf .venv
 ./start.sh
@@ -258,57 +247,56 @@ rm -rf .venv
 
 ---
 
-### ❌ "Porta 8000 già in uso"
+### ❌ "Port 8000 already in use"
 
-**Causa:** Un altro programma sta usando la porta 8000, oppure hai avviato EMLyzer due volte.
+**Cause:** Another program uses port 8000 or EMLyzer is running twice
 
-**Soluzione Windows:**
-```
+**Solution:**
+
+**Windows:**
+```cmd
 netstat -ano | findstr :8000
-taskkill /PID [numero_pid] /F
-```
-
-**Soluzione Linux:**
-```bash
-lsof -i :8000
-kill [numero_pid]
-```
-
-Poi riavvia `start.bat` / `start.sh`.
-
----
-
-### ❌ La finestra si chiude subito (Windows)
-
-**Causa:** Si è verificato un errore durante l'avvio e la finestra si è chiusa prima che potessi leggere il messaggio.
-
-**Soluzione:** Apri il Prompt dei comandi manualmente, naviga nella cartella e avvia lo script da lì:
-
-```
-cd C:\Users\TuoNome\EMLyzer
+taskkill /PID [number_from_above] /F
 start.bat
 ```
 
-In questo modo la finestra rimane aperta e puoi leggere il messaggio di errore.
+**Linux/macOS:**
+```bash
+lsof -i :8000
+kill [process_id]
+./start.sh
+```
 
 ---
 
-### ❌ Il browser mostra "Impossibile raggiungere il sito"
+### ❌ Console window closes immediately (Windows)
 
-**Causa:** Il server non è ancora partito, oppure si è fermato.
+**Cause:** Error during startup before you can read it
 
-**Soluzione:**
-1. Controlla che la finestra del terminale con `start.bat` / `start.sh` sia ancora aperta e in esecuzione
-2. Aspetta qualche secondo e ricarica la pagina
-3. Verifica di stare usando l'indirizzo corretto: **http://localhost:8000** (non https, non port 80)
+**Solution:**
+1. Open Command Prompt manually
+2. Navigate to project: `cd C:\Users\YourName\EMLyzer`
+3. Run: `start.bat`
+4. Now the window stays open and you can see the error
 
 ---
 
-### ❌ "Permission denied" su Linux/macOS
+### ❌ "Cannot reach the server" (browser)
 
-**Causa:** Lo script non ha i permessi di esecuzione.
+**Cause:** Server hasn't started or crashed
 
-**Soluzione:**
+**Solution:**
+1. Check console window is still open and showing "Application Ready"
+2. Wait a few seconds and refresh browser (F5)
+3. Verify correct URL: **http://localhost:8000** (not https, not port 80)
+
+---
+
+### ❌ "Permission denied" (Linux/macOS)
+
+**Cause:** Script lacks execute permission
+
+**Solution:**
 ```bash
 chmod +x start.sh run_tests.sh
 ./start.sh
@@ -316,32 +304,41 @@ chmod +x start.sh run_tests.sh
 
 ---
 
-## Fermare l'applicazione
+## 🛑 Stopping the Application
 
-Per fermare il server, nella finestra del terminale dove è in esecuzione:
+In the console window where the app is running:
 
-- **Tutti i sistemi:** premi `CTRL + C`
+**Press `CTRL + C`**
 
-La finestra mostrerà `[INFO] Server fermato.` e poi si chiuderà (su Windows chiede di premere un tasto).
+The window shows `[INFO] Server stopped.` and closes (Windows asks for confirmation).
 
 ---
 
-## Aggiornare EMLyzer
+## 🔄 Updating EMLyzer
 
-Per aggiornare a una nuova versione:
+To upgrade to a newer version:
 
-1. Scarica il nuovo archivio
-2. Estrai nella stessa cartella **sovrascrivendo i file** (i dati nel database vengono preservati)
-3. **Cancella il virtual environment** per forzare la reinstallazione delle dipendenze:
+1. Download the new version
+2. Extract to the **same folder**, overwriting files (database is preserved)
+3. **Delete the virtual environment** to force reinstalling dependencies:
 
    **Windows:** `rmdir /s /q .venv`
    
    **Linux:** `rm -rf .venv`
 
-4. Avvia normalmente con `start.bat` / `start.sh`
+4. Run `start.bat` / `start.sh` as usual
 
-> ⚠️ Non sovrascrivere il file `backend/.env` se hai configurato le chiavi API — contiene le tue personalizzazioni.
+> [!WARNING]
+> ⚠️ Don't overwrite `backend/.env` if you configured API keys — it contains your settings.
 
 ---
 
-*← [REQUISITI](REQUISITI.md) | Avanti: [UTILIZZO →](UTILIZZO.md)*
+## ✅ What's Next?
+
+- **First time?** → Learn the basics in [UTILIZZO.md](./UTILIZZO.md)
+- **Need API keys?** → [CONFIGURAZIONE.md](./CONFIGURAZIONE.md)
+- **Developer?** → [API.md](./API.md)
+
+---
+
+*← [Requirements](./REQUISITI.md) | Next: [Usage →](./UTILIZZO.md)*

@@ -1,411 +1,460 @@
-# Guida all'Utilizzo
+# 📖 Usage Guide — EMLyzer
 
-Questa guida spiega come analizzare email sospette, interpretare i risultati e generare report.
+Learn how to analyze suspicious emails, interpret results, and generate professional reports.
 
----
-
-## Indice
-
-- [Aprire l'interfaccia](#aprire-linterfaccia)
-- [Come caricare un'email](#come-caricare-unemail-da-analizzare)
-- [Interpretare il punteggio di rischio](#interpretare-il-punteggio-di-rischio)
-- [Le schede di analisi](#le-schede-di-analisi)
-- [Salvare le note dell'analista](#salvare-le-note-dellanalista)
-- [Generare il report Word](#generare-il-report-word)
-- [Lista analisi: ricerca e filtri](#lista-analisi-ricerca-e-filtri)
-- [Rilevamento campagne](#rilevamento-campagne)
-- [Cambiare la lingua](#cambiare-la-lingua)
-- [Esempi pratici](#esempi-pratici)
+> [!TIP]
+> 💡 **First time?** Start with the [Installation](./INSTALLAZIONE.md) and [Configuration](./CONFIGURAZIONE.md) guides first.
 
 ---
 
-## Aprire l'interfaccia
+## 📚 Table of Contents
 
-Dopo aver avviato il programma (`start.bat` su Windows / `./start.sh` su Linux), apri il browser su:
+1. [🌐 Open the Interface](#-open-the-interface)
+2. [📧 Upload & Analyze Email](#-upload--analyze-an-email)
+3. [📊 Understanding Risk Score](#-understanding-the-risk-score)
+4. [🔍 Analysis Tabs](#-the-analysis-tabs)
+5. [📝 Analyst Notes](#-save-analyst-notes)
+6. [📄 Generate Word Report](#-generate-word-report)
+7. [📋 Search & Filter](#-search-and-filter-analyses)
+8. [🕸 Campaign Detection](#-campaign-detection)
+9. [🌐 Change Language](#-change-language)
+10. [💡 Practical Examples](#-practical-examples)
+
+---
+
+## 🌐 Open the Interface
+
+After starting the application (`start.bat` on Windows / `./start.sh` on Linux), open your browser:
 
 **http://localhost:8000**
 
+You should see:
+- ✅ Email upload area
+- ✅ Campaign detection panel
+- ✅ Recent analyses list
+- ✅ Language selector (IT/EN, top right)
+
 ---
 
-## Come caricare un'email da analizzare
+## 📧 Upload & Analyze an Email
 
-### Modalità 1 — Carica un file .eml o .msg
+### 🔄 Option 1: Upload .eml or .msg File
 
-**Come esportare un'email come file:**
+**How to export email from your client:**
 
-| Client | Procedura |
+| 📧 Client | 📝 Instructions |
 |---|---|
-| **Gmail** | Apri l'email → tre puntini `⋮` → **"Scarica messaggio"** → salva `.eml` |
-| **Outlook desktop** | Seleziona l'email e trascinala sul desktop → crea `.msg` automaticamente |
-| **Outlook web** | Apri l'email → tre puntini → **"Visualizza sorgente"** → salva come `.eml` |
-| **Thunderbird** | Menu **File** → **Salva come** → **File** → salva come `.eml` |
-| **Apple Mail** | Menu **File** → **Salva come** → formato **Sorgente del messaggio** |
+| **Gmail** | Open email → three dots ⋮ → **"Download message"** → save `.eml` |
+| **Outlook desktop** | Drag email to desktop → creates `.msg` automatically |
+| **Outlook web** | Open email → three dots → **"View message source"** → save as `.eml` |
+| **Thunderbird** | Menu **File** → **Save As** → **File** → save as `.eml` |
+| **Apple Mail** | Menu **File** → **Save As** → format **Message Source** |
 
-**Come caricare:**
-- *Drag & drop:* trascina il file nella zona tratteggiata dell'interfaccia
-- *Clic:* clicca sulla zona → seleziona il file dal tuo computer
+**How to upload:**
+- **Drag & drop:** drag file into the dotted zone
+- **Click:** click zone → select file from your computer
 
-L'analisi parte automaticamente dopo il caricamento. Al termine si apre il pannello dei risultati.
-
----
-
-### Modalità 2 — Incolla il sorgente dell'email
-
-Utile quando non riesci a salvare il file.
-
-1. Clicca sulla scheda **"Incolla sorgente"**
-2. Nel tuo client email, visualizza il sorgente completo:
-   - **Gmail:** apri l'email → tre puntini → **"Mostra originale"** → seleziona tutto → copia
-   - **Outlook:** apri l'email → **File** → **Proprietà** → copia il contenuto
-3. Incolla nella grande area di testo
-4. Clicca **"🔍 Analizza sorgente"**
-
-Il testo deve iniziare con le intestazioni dell'email (righe tipo `From:`, `To:`, `Subject:`).
+Analysis starts automatically. Results panel opens when done.
 
 ---
 
-### Opzione WHOIS (analisi più approfondita)
+### 📝 Option 2: Paste Email Source
 
-La casella **"🌐 Abilita WHOIS (età dominio)"** è **attivata per default**.
+Useful when you can't save the file.
 
-Il programma interroga i server WHOIS per verificare quando è stato registrato ogni dominio trovato nell'email. Domini registrati da meno di 30 giorni sono un forte segnale di phishing.
+1. Click **"Paste source"** tab
+2. In your email client, get the complete source:
+   - **Gmail:** open email → three dots → **"Show original"** → select all → copy
+   - **Outlook:** open email → **File** → **Properties** → copy content
+3. Paste into the text area
+4. Click **"🔍 Analyze source"**
 
-Deselezionala solo se vuoi un'analisi più rapida e non ti interessa l'età dei domini.
-
-> ⚠️ Con WHOIS attivato l'analisi richiede 20–60 secondi in più.
+> [!NOTE]
+> Text must start with email headers (lines like `From:`, `To:`, `Subject:`).
 
 ---
 
-## Interpretare il punteggio di rischio
+### ⚙️ WHOIS Option (Domain Age Analysis)
 
-Ogni email riceve un **punteggio da 0 a 100** e un'**etichetta**:
+The **"🌐 Enable WHOIS (domain age)"** checkbox is **enabled by default**.
 
-| Etichetta | Punteggio | Cosa fare |
+The system queries WHOIS servers to verify when each domain in the email was registered. Domains registered < 30 days are a strong phishing signal.
+
+Uncheck only if you want faster analysis and don't care about domain age.
+
+> [!WARNING]
+> ⚠️ With WHOIS enabled, analysis takes 20–60 seconds longer.
+
+---
+
+## 📊 Understanding the Risk Score
+
+Every email gets a **0–100 score** and a **label**:
+
+| 🎨 Label | 📊 Score | 📝 Action |
 |---|---|---|
-| 🟢 **Basso** | 0–20 | Probabilmente legittima |
-| 🟡 **Moderato** | 20–45 | Verificare prima di cliccare link |
-| 🔴 **Alto** | 45–70 | Trattare con estrema cautela |
-| 🟣 **Critico** | 70–100 | Non cliccare nulla, non aprire allegati |
+| 🟢 **Low** | 0–20 | Probably legitimate |
+| 🟡 **Medium** | 20–45 | Verify before clicking links |
+| 🔴 **High** | 45–70 | Treat with extreme caution |
+| 🟣 **Critical** | 70–100 | Don't click anything, don't open attachments |
 
-**Come viene calcolato:**
-Il punteggio combina quattro moduli con **pesi adattivi**: Header 35% + Body 35% + URL 20% + Allegati 10%. I moduli non applicabili (es. URL assenti) non diluiscono il punteggio — il peso viene ridistribuito sui moduli presenti.
+### How It's Calculated
 
-Inoltre sono attivi dei **livelli minimi garantiti** per indicatori critici ad alta confidenza: ad esempio, un mismatch tra From e Return-Path (finding HIGH) garantisce sempre almeno un punteggio Moderato, indipendentemente dal resto. Un allegato con macro VBA o un allegato CRITICAL (eseguibile camuffato) garantisce rispettivamente almeno 25 o 40 punti.
+The score combines four modules with **adaptive weights:**
+- Header 35%
+- Body 35%
+- URL 20%
+- Attachment 10%
 
-I controlli di reputazione possono aggiungere fino a +30 punti.
+Non-applicable modules (e.g., no URLs) don't dilute the score — weights redistribute to present modules.
 
-> ℹ️ Il punteggio è uno strumento di supporto, non una sentenza definitiva. Usa sempre il giudizio critico insieme ai dati tecnici.
+**Guaranteed minimums** for critical indicators:
+- Mismatch From ↔ Return-Path (HIGH) → ≥ Medium score
+- VBA macros in attachment → ≥ 25 points
+- Dangerous executable → ≥ 40 points
 
----
+Reputation checks can add up to +30 points.
 
-## Le schede di analisi
-
-Cliccando su un'analisi nella lista si apre un pannello con sei schede.
-
----
-
-### Scheda Riepilogo
-
-La panoramica principale. Contiene:
-
-- **Misuratore di rischio** — grafico semicircolare con punteggio e barre per modulo
-- **Metadati email** — mittente, destinatario, oggetto, data, Message-ID, hash del file
-- **Spiegazione del rischio** — elenco degli indicatori principali con livello di gravità
-- **Note dell'analista** — area di testo libero (vedi sezione dedicata)
+> [!IMPORTANT]
+> ℹ️ Score is a support tool, not a verdict. Always use critical judgment alongside technical data.
 
 ---
 
-### Scheda Header
+## 🔍 The Analysis Tabs
 
-Analizza le intestazioni tecniche dell'email.
+Click an analysis in the list to open a panel with **six tabs.**
 
-**Autenticazione SPF / DKIM / DMARC:**
+---
 
-Tre sistemi di verifica che garantiscono che l'email provenga davvero dal dominio dichiarato.
+### 📋 Summary Tab
 
-| Risultato | Significato |
+Main overview. Contains:
+
+- **Risk gauge** — semicircular chart with score and module bars
+- **Email metadata** — sender, recipient, subject, date, Message-ID, file hash
+- **Risk explanation** — list of main indicators with severity
+- **Analyst notes** — free-text area (see dedicated section)
+
+---
+
+### 📧 Header Tab
+
+Analyzes email technical headers.
+
+**SPF / DKIM / DMARC Authentication:**
+
+Three verification systems that guarantee the email comes from the claimed domain.
+
+| ✓ Result | 📝 Meaning |
 |---|---|
-| ✓ verde | Controllo superato |
-| ✗ rosso | Controllo fallito — possibile falsificazione |
+| ✓ Green | Check passed |
+| ✗ Red | Check failed — possible spoofing |
 
-Le email legittime di grandi organizzazioni (banche, PayPal, Google...) superano **tutti e tre** questi controlli.
+Legitimate emails from major organizations (banks, PayPal, Google) pass **all three**.
 
-**Mismatch di identità:**
+**Identity Mismatch:**
 
-Il programma confronta il dominio `From` con `Return-Path` e `Reply-To`. Se sono diversi, le risposte andrebbero a un indirizzo diverso da quello dichiarato — tecnica classica del phishing.
+Compares `From` domain with `Return-Path` and `Reply-To`. If different, replies go to a different address — classic phishing technique.
 
-Esempio sospetto:
+Suspicious example:
 ```
 From:        security@paypal.com
-Return-Path: bounce@evil-domain.ru    ← diverso!
-Reply-To:    collect@fake-site.com    ← diverso!
+Return-Path: bounce@evil-domain.ru    ← Different!
+Reply-To:    collect@fake-site.com    ← Different!
 ```
 
-**Percorso SMTP:** la catena dei server attraverso cui l'email è transitata, con IP e orari.
+**SMTP Path:** the chain of servers the email traveled through, with IPs and timestamps.
 
 ---
 
-### Scheda Body
+### 📝 Body Tab
 
-Analizza il contenuto dell'email.
+Analyzes email content.
 
-**Statistiche:**
+**Statistics:**
 
-| Campo | Cos'è |
+| 📊 Field | 📝 What It Is |
 |---|---|
-| Pattern urgenza | Espressioni come "urgente", "subito", "sospeso", "scade entro" |
-| CTA sospette | "Clicca qui", "Accedi ora", "Verifica subito" |
-| Keyword credenziali | Richieste di password, carta di credito, IBAN, PIN |
-| Form HTML | Moduli di raccolta dati nell'HTML — **le email legittime non li contengono mai** |
-| JavaScript | Codice JavaScript nell'HTML — anomalo per un'email |
-| Elementi nascosti | Testo invisibile con CSS per aggirare i filtri antispam |
-| Link offuscati | Link dove il testo visibile ≠ destinazione reale |
+| **Urgency patterns** | Phrases like "urgent", "immediately", "pending", "expires in" |
+| **Suspicious CTAs** | "Click here", "Sign in now", "Verify immediately" |
+| **Credential keywords** | Requests for password, credit card, IBAN, PIN |
+| **HTML forms** | Data collection forms in HTML — **legitimate emails never have these** |
+| **JavaScript** | JavaScript code in HTML — abnormal for email |
+| **Hidden elements** | Invisible text using CSS to bypass spam filters |
+| **Obfuscated links** | Links where visible text ≠ actual destination |
 
-**Analisi NLP:**
-Un classificatore machine learning analizza il testo e produce una probabilità di phishing (0–100%), un livello di confidenza e le parole chiave che hanno influenzato la classificazione.
+**NLP Analysis:**
 
-**Contenuto HTML nascosto:**
-Se presenti, vengono mostrati: numero di elementi nascosti, il testo effettivamente nascosto, le tecniche CSS usate. Questa tecnica viene usata per ingannare i filtri antispam.
+Machine learning classifier analyzes text and produces:
+- Phishing probability (0–100%)
+- Confidence level
+- Keywords that influenced the classification
 
-**Link offuscati:**
+**Hidden HTML Content:**
+
+If present, shows:
+- Number of hidden elements
+- Actual hidden text
+- CSS techniques used (often used to evade spam filters)
+
+**Obfuscated Links:**
+
 ```
-Testo visibile:    http://www.paypal.com/verify
-Destinazione reale: http://185.220.101.47/phish/login.php
+Visible text:     http://www.paypal.com/verify
+Actual target:    http://185.220.101.47/phish/login.php
 ```
 
 ---
 
-### Scheda URL
+### 🔗 URL Tab
 
-Lista e analisi di ogni link trovato nell'email.
+Lists and analyzes every link in the email.
 
-**Tag di rischio:**
+**Risk Tags:**
 
-| Tag | Perché è sospetto |
+| 🏷️ Tag | ⚠️ Why Suspicious |
 |---|---|
-| `IP diretto` | I siti legittimi usano nomi di dominio, non IP numerici |
-| `Shortener` | Nasconde la destinazione reale (es. `bit.ly/...`) |
-| `Punycode` | Simula domini noti con caratteri speciali (es. `xn--pypal-4ve.com`) |
-| `HTTP` | Connessione non cifrata — i siti che chiedono dati usano sempre HTTPS |
+| `Direct IP` | Legitimate sites use domain names, not numeric IPs |
+| `Shortener` | Hides real destination (e.g., `bit.ly/...`) |
+| `Punycode` | Simulates known domains with special chars |
+| `HTTP` | Unencrypted — sites asking for data use HTTPS |
 
 ---
 
-### Scheda Allegati
+### 📎 Attachment Tab
 
-Analisi statica dei file allegati (nessun file viene eseguito).
+Static analysis of attached files (no files are executed).
 
-| Indicatore | Gravità | Significato |
+| 📊 Indicator | 🔴 Severity | 📝 Meaning |
 |---|---|---|
-| MIME mismatch | Alto | Il file si spaccia per un tipo diverso |
-| Macro VBA | Critico | Macro pericolose in file Office |
-| JavaScript in PDF | Critico | Codice eseguibile nascosto nel PDF |
-| Doppia estensione | Alto | Es. `fattura.pdf.exe` — nasconde l'estensione pericolosa |
-| Estensione pericolosa | Critico | `.exe`, `.bat`, `.ps1`, `.vbs`, `.js`, `.msi`, ecc. |
+| MIME mismatch | High | File disguises itself as different type |
+| VBA macros | **Critical** | Dangerous macros in Office files |
+| JavaScript in PDF | **Critical** | Executable code hidden in PDF |
+| Double extension | High | E.g., `invoice.pdf.exe` — hides dangerous extension |
+| Dangerous extension | **Critical** | `.exe`, `.bat`, `.ps1`, `.vbs`, `.js`, `.msi`, etc. |
 
-Per ogni allegato viene mostrato anche il **hash SHA256** — utile per cercarlo manualmente su database come VirusTotal.
+Each attachment also shows **SHA256 hash** — useful for manual lookup on VirusTotal.
 
 ---
 
-### Scheda Reputazione
+### 🌐 Reputation Tab
 
-Verifica IP, URL e hash su database pubblici di minacce.
+Checks IP, URL, and hash against public threat databases.
 
-**Prima dell'esecuzione:** anteprima di tutti i 19 servizi con indicazione se la API key è configurata o meno.
+**Before running:** preview of all 19 services with API key status indicator.
 
-**Dopo aver cliccato "Avvia controllo reputazione"**, i risultati arrivano in due fasi:
-- **Fase 1** (pochi secondi): Spamhaus, ASN Lookup, Shodan InternetDB, CIRCL Passive DNS, GreyNoise Community, Criminal IP, OpenPhish, PhishTank, Redirect Chain, URLhaus, URLScan.io, ThreatFox, MalwareBazaar, Hybrid Analysis, Pulsedive, SecurityTrails
-- **Fase 2** (in background, aggiornamento automatico): AbuseIPDB, VirusTotal, crt.sh
+**After clicking "Run reputation check"**, results arrive in two phases:
 
-| Icona | Stato | Significato |
+✅ **Phase 1** (seconds):  
+Spamhaus, ASN Lookup, Shodan InternetDB, CIRCL Passive DNS, GreyNoise, Criminal IP, OpenPhish, PhishTank, Redirect Chain, URLhaus, URLScan.io, ThreatFox, MalwareBazaar, Hybrid Analysis, Pulsedive, SecurityTrails
+
+🔄 **Phase 2** (background, auto-updating):  
+AbuseIPDB, VirusTotal, crt.sh
+
+**Status Icons:**
+
+| 🔴 Icon | 📝 Status | 📝 Meaning |
 |---|---|---|
-| ✅ | Pulito | Analizzato, nessuna minaccia trovata |
-| 🔴 | MALEVOLO | Trovato in un database di minacce |
-| ⏳ | In elaborazione | Servizio SLOW in elaborazione background (si aggiorna automaticamente) |
-| 🔑 | Chiave mancante | API key non configurata (vedi [Configurazione](CONFIGURAZIONE.md)) |
-| ➖ | Non applicabile | Attivo ma questa email non ha entità del tipo analizzato (es. nessun URL shortener per Redirect Chain) |
-| ⚠️ | Errore | Problema di connessione al servizio |
+| ✅ | Clean | Analyzed, no threats found |
+| 🔴 | **MALICIOUS** | Found in threat database |
+| ⏳ | In progress | SLOW service running (auto-updates) |
+| 🔑 | Key missing | API key not configured (see [Configuration](./CONFIGURAZIONE.md)) |
+| ➖ | Not applicable | Active but email has no entities of this type |
+| ⚠️ | Error | Service connection problem |
 
-**Servizi sempre attivi (nessuna chiave richiesta):**
-- **Spamhaus DROP** — blocklist IP malevoli di alto profilo
-- **ASN Lookup** — Autonomous System Number per ogni IP (ipinfo.io)
-- **Shodan InternetDB** — porte aperte, CVE e tag per ogni IP *(ℹ️ informativo)*
-- **OpenPhish** — feed URL phishing aggiornato
-- **URLScan.io** — scansioni esistenti per URL/domini *(search pubblico, chiave opzionale)*
-- **Redirect Chain** — segue i redirect degli URL shortener
-- **crt.sh** — certificati TLS del dominio (età, sottodomini)
+**Always-active services (no key required):**
+- 🟢 **Spamhaus DROP** — blocklist for malicious IPs
+- 🟢 **ASN Lookup** — Autonomous System for each IP
+- 🟢 **Shodan InternetDB** — open ports, CVE, tags *(informational)*
+- 🟢 **OpenPhish** — phishing URL feed
+- 🟢 **URLScan.io** — existing scans for URLs/domains
+- 🟢 **Redirect Chain** — follows URL shortener redirects
+- 🟢 **crt.sh** — TLS certificates for domain
 
-**Servizi che richiedono API key:**
-- **AbuseIPDB** — reputazione IP (header SMTP, X-Originating-IP) (`ABUSEIPDB_API_KEY`)
-- **VirusTotal** — IP, URL e hash allegati (70+ engine) (`VIRUSTOTAL_API_KEY`)
-- **PhishTank** — URL phishing verificati dalla community (`PHISHTANK_API_KEY`)
-- **URLhaus** — database URL malware di abuse.ch (`ABUSECH_API_KEY`)
-- **ThreatFox** — database IOC abuse.ch: IP, URL, hash malware (`ABUSECH_API_KEY`)
-- **MalwareBazaar** — hash allegati nel database malware (`ABUSECH_API_KEY`)
-- **CIRCL Passive DNS** — storico DNS per IP e domini (`CIRCL_API_KEY`) *(ℹ️ informativo)*
-- **GreyNoise Community** — classifica IP come scanner/malevolo/benigno (`GREYNOISE_API_KEY`)
-- **Criminal IP** — score rischio IP 0-4 con geolocalizzazione (`CRIMINALIP_API_KEY`)
-- **Pulsedive** — threat intel aggregata IP e URL (`PULSEDIVE_API_KEY`)
-- **SecurityTrails** — DNS attuale e storico per domini (`SECURITYTRAILS_API_KEY`) *(ℹ️ informativo)*
-- **Hybrid Analysis** — analisi hash allegati nel database sandbox Falcon (`HYBRID_ANALYSIS_API_KEY`)
-
-Clicca su un servizio per espanderlo e vedere il dettaglio di ogni entità analizzata.
+**Services requiring API key:**
+See [Configuration Guide](./CONFIGURAZIONE.md) for setup instructions.
 
 ---
 
-## Salvare le note dell'analista
+## 📝 Save Analyst Notes
 
-Nella scheda **Riepilogo**, in fondo alla pagina, trovi l'area **"Note dell'Analista"**.
+In the **Summary** tab, bottom of the page, find **"Analyst Notes"** area.
 
-Esempi di contenuto utile:
+Useful examples:
 ```
-Mittente già segnalato il 12/01/2025.
-IP 185.220.101.47 — exit node Tor, segnalato al SOC.
-Allegato inviato a sandbox — rilevato Trojan.AgentTesla.
-Utente informato, cambio password avviato.
+Sender already reported 01/12/2025.
+IP 185.220.101.47 — Tor exit node, reported to SOC.
+Attachment sent to sandbox — detected Trojan.AgentTesla.
+User informed, password change initiated.
 ```
 
-Clicca **"Salva note"** — il pulsante mostra **"✓ Salvato"** per conferma.
-Le note vengono incluse nel report .docx (sezione 8). Limite: 10.000 caratteri.
+Click **"Save notes"** — button shows **"✓ Saved"** for confirmation.
+
+Notes are included in the .docx report. Limit: 10,000 characters.
 
 ---
 
-## Generare il report Word
+## 📄 Generate Word Report
 
-Clicca il pulsante **"📄 Report .docx"** in alto a destra nel pannello dell'analisi.
+Click **"📄 Report .docx"** button (top right) in the analysis panel.
 
-Il documento contiene:
+Document contains:
 
-| Sezione | Contenuto |
+| 📄 Section | 📝 Content |
 |---|---|
-| 1. Executive Summary | Punteggio, label, indicatori principali |
-| 2. Email Metadata | Tutti i campi tecnici |
-| 3. Indicatori Tecnici | Finding header e catena SMTP |
-| 4. Analisi del Contenuto | Body, URL offuscati |
-| 5. Allegati | Hash e finding |
-| 6. Reputazione | Risultati dei controlli (se eseguiti) |
-| 7. Valutazione del Rischio | Punteggio per modulo |
-| 8. Note dell'Analista | Osservazioni manuali |
+| 1. Executive Summary | Score, label, main indicators |
+| 2. Email Metadata | All technical fields |
+| 3. Technical Indicators | Header findings and SMTP chain |
+| 4. Content Analysis | Body, obfuscated URLs |
+| 5. Attachments | Hashes and findings |
+| 6. Reputation | Reputation check results (if run) |
+| 7. Risk Assessment | Score per module |
+| 8. Analyst Notes | Manual observations |
 
-Compatibile con Microsoft Word, LibreOffice Writer, Google Docs.
-
----
-
-## Lista analisi: ricerca e filtri
-
-### Colonna numerazione `#`
-
-La prima colonna della lista mostra il numero riga assoluto rispetto alla pagina corrente (es. pagina 2 con 25 risultati per pagina inizia da #26).
-
-### Barra di ricerca
-
-Digita qualsiasi testo per filtrare per oggetto o mittente in tempo reale.
-Il termine trovato viene **evidenziato in giallo** nella lista.
-
-> ℹ️ L'oggetto viene decodificato correttamente anche se contiene emoji, caratteri non-ASCII o charset esotici (RFC 2047 con fallback UTF-8 → Latin-1 → Windows-1252).
-
-### Filtri per rischio
-
-Clicca uno o più pulsanti: 🟢 Basso · 🟡 Moderato · 🔴 Alto · 🟣 Critico.
-Per rimuovere i filtri clicca ✕ o clicca di nuovo sul filtro attivo.
-
-### Selettore email per pagina
-
-Il menu a tendina accanto ai filtri permette di scegliere quante analisi mostrare: **10 / 25 / 50 / 100** per pagina.
-
-### Esporta CSV
-
-Clicca **"📥 Esporta CSV"** per scaricare la lista corrente in formato CSV (apribile con Excel o LibreOffice).
-
-### Paginazione
-
-Usa i pulsanti di navigazione:
-- **«** — vai alla prima pagina
-- **← Prec** — pagina precedente
-- **Succ →** — pagina successiva
-- **»** — vai all'ultima pagina
-
-### Eliminare un'analisi
-
-Clicca l'icona 🗑 a destra della riga per eliminare il record. Una finestra di conferma chiede di verificare prima di procedere. L'eliminazione rimuove il record dal database **e i file fisici associati** (file email e report `.docx`).
-
-### Eliminazione massiva
-
-Per eliminare più analisi contemporaneamente:
-
-1. **Seleziona** le analisi usando le checkbox nella prima colonna della tabella
-2. La checkbox nell'intestazione seleziona/deseleziona tutte le analisi della pagina corrente
-3. Quando almeno un'analisi è selezionata, appare una **barra azioni flottante** in basso al centro con:
-   - Conteggio analisi selezionate
-   - Pulsante **"Elimina selezionati"** (rosso) — richiede conferma
-   - Pulsante **"Deseleziona tutto"**
-4. La selezione viene resettata automaticamente quando cambi pagina o filtri
-
-> ⚠️ L'eliminazione è **irreversibile**: rimuove il record dal DB, il file email da `uploads/` e il report `.docx` da `reports/`. Massimo 100 analisi per operazione.
+Compatible with Microsoft Word, LibreOffice Writer, Google Docs.
 
 ---
 
-## Rilevamento campagne
+## 📋 Search and Filter Analyses
 
-La sezione **"🕸 Campagne Rilevate"** raggruppa email simili per identificare attacchi coordinati.
+### 🔍 Search Bar
 
-**Clicca "Analizza campagne"** per avviare l'analisi su tutte le email nel database.
+Type any text to filter by subject or sender in real-time.
 
-Il sistema raggruppa le email che condividono:
+Found text highlights **yellow** in the list.
 
-| Criterio | Spiegazione |
+> [!NOTE]
+> ℹ️ Subjects decode correctly even with emoji, non-ASCII chars, or exotic charsets (RFC 2047).
+
+---
+
+### 🎨 Risk Filters
+
+Click one or more buttons: 🟢 Low · 🟡 Medium · 🔴 High · 🟣 Critical.
+
+Remove filters by clicking ✕ or clicking the active filter again.
+
+---
+
+### 📊 Emails Per Page
+
+Dropdown menu lets you choose display size: **10 / 25 / 50 / 100** per page.
+
+---
+
+### 📥 Export CSV
+
+Click **"📥 Export CSV"** to download current list (openable in Excel or LibreOffice).
+
+---
+
+### 🔘 Pagination
+
+Use navigation buttons:
+- **«** → first page
+- **← Prev** → previous page
+- **Next →** → next page
+- **»** → last page
+
+---
+
+### 🗑️ Delete Analysis
+
+Click trash icon 🗑 on the right of a row to delete. Confirmation window appears. Deletion removes record **and associated files** (email file and .docx report).
+
+---
+
+### 🗑️ Bulk Delete
+
+To delete multiple analyses at once:
+
+1. **Select** analyses using checkboxes in first column
+2. Header checkbox selects/deselects all on current page
+3. When ≥1 selected, **floating action bar** appears at bottom with:
+   - Count of selected
+   - **"Delete selected"** button (red) — requires confirmation
+   - **"Deselect all"** button
+4. Selection resets when you change page/filters
+
+> [!CAUTION]
+> ⚠️ Deletion is **irreversible**: removes record from DB, email from `uploads/`, and .docx from `reports/`. Max 100 per operation.
+
+---
+
+## 🕸️ Campaign Detection
+
+The **"🕸 Detected Campaigns"** section groups similar emails to identify coordinated attacks.
+
+Click **"Analyze campaigns"** to run analysis on all emails in the database.
+
+System groups emails sharing:
+
+| 🔍 Criterion | 📝 Explanation |
 |---|---|
-| Body identico | Stesso testo del corpo (stesso template) |
-| X-Campaign-ID | Stesso identificatore negli header |
-| Message-ID pattern | Stesso dominio nel Message-ID |
-| Subject simile | Oggetti molto simili (soglia configurabile) |
-| Dominio mittente | Stesso dominio per email ad alto rischio |
+| Identical body | Same text (same template) |
+| X-Campaign-ID | Same header identifier |
+| Message-ID pattern | Same domain in Message-ID |
+| Similar subject | Very similar subjects (threshold-based) |
+| Sender domain | Same domain for high-risk emails |
 
-**Slider soglia:** controlla quanto devono essere simili i soggetti.
-- 30% = molti cluster, meno precisi
-- 60% = equilibrio (default)
-- 90% = solo email quasi identiche
+**Threshold slider:** controls subject similarity:
+- 30% = many clusters, less precise
+- 60% = balanced (default)
+- 90% = nearly identical emails only
 
-Ogni cluster mostra: tipo di correlazione, valore comune, numero email, rischio massimo, date prima/ultima occorrenza.
+Each cluster shows: correlation type, common value, email count, max risk, first/last date.
 
 ---
 
-## Cambiare la lingua
+## 🌐 Change Language
 
-Pulsanti **IT** / **EN** in alto a destra nell'interfaccia.
+Buttons **IT** / **EN** (top right) in the interface.
 
-Per rendere la scelta permanente, modifica `backend/.env`:
-```
+To make permanent, edit `backend/.env`:
+```env
 LANGUAGE=it
 ```
-oppure `LANGUAGE=en`, poi riavvia.
+or `LANGUAGE=en`, then restart.
 
 ---
 
-## Esempi pratici
+## 💡 Practical Examples
 
-### Esempio 1 — Email di phishing bancario
+### 💡 Example 1: Bank Phishing Email
 
-1. Salva l'email come `.eml` dal tuo client
-2. Caricala su EMLyzer
-3. **Controlla il punteggio** — se è Alto o Critico, non interagire con l'email
-4. **Scheda Header** — SPF/DKIM/DMARC devono essere tutti PASS per un'email legittima di banca
-5. **Scheda URL** — i link devono puntare al dominio ufficiale, non a IP numerici
-6. Se confermato phishing: non cliccare nulla, inserisci note, genera report
-
-### Esempio 2 — Allegato sospetto
-
-1. Carica l'email
-2. **Scheda Allegati** — controlla il badge **"Macro VBA"** o **"JavaScript"**
-3. Copia il **SHA256** e usalo nella scheda Reputazione per verificarlo su MalwareBazaar e VirusTotal
-4. Non aprire mai l'allegato in caso di finding critici
-
-### Esempio 3 — Campagna aziendale
-
-1. Carica tutte le email sospette ricevute (una per volta)
-2. Clicca **"Analizza campagne"**
-3. Espandi i cluster per vedere le email correlate
-4. Usa le informazioni per bloccare il dominio sul firewall o segnalare agli organi competenti
+1. Save email as `.eml` from your client
+2. Upload to EMLyzer
+3. **Check score** — if High or Critical, don't interact with email
+4. **Header tab** — SPF/DKIM/DMARC must all PASS for legitimate bank email
+5. **URL tab** — links must point to official domain, not numeric IPs
+6. If confirmed phishing: don't click anything, add notes, generate report
 
 ---
 
-*Prossimo passo → [Configurazione](CONFIGURAZIONE.md)*
+### 💡 Example 2: Suspicious Attachment
+
+1. Upload email
+2. **Attachments tab** — check for **"VBA Macros"** or **"JavaScript"** badges
+3. Copy **SHA256** and verify on MalwareBazaar and VirusTotal in Reputation tab
+4. Never open attachment if critical findings
+
+---
+
+### 💡 Example 3: Company Campaign
+
+1. Upload all suspicious emails (one at a time)
+2. Click **"Analyze campaigns"**
+3. Expand clusters to see correlated emails
+4. Use information to block domain on firewall or report to authorities
+
+---
+
+## ✅ What's Next?
+
+- **Need API keys?** → [Configuration Guide](./CONFIGURAZIONE.md)
+- **Using the API?** → [API Reference](./API.md)
+- **Having issues?** → [Requirements & Troubleshooting](./REQUISITI.md)
+
+---
+
+*← [Configuration](./CONFIGURAZIONE.md) | [API →](./API.md)*
