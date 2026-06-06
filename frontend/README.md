@@ -60,14 +60,13 @@ frontend/
 │   │   └── Dashboard.jsx      # Main analysis interface
 │   ├── components/
 │   │   ├── UploadZone.jsx     # Drag-and-drop file upload
-│   │   ├── AnalysisDetail.jsx # Results panel with tabs
-│   │   ├── TabHeader.jsx      # SPF/DKIM/DMARC analysis
-│   │   ├── TabBody.jsx        # Content & NLP analysis
-│   │   ├── TabURL.jsx         # URL list & risk assessment
-│   │   ├── TabAttachment.jsx  # Attachment analysis
-│   │   ├── TabReputation.jsx  # Threat intelligence
-│   │   ├── CampaignsPanel.jsx # Campaign clustering
-│   │   └── ... (more components)
+│   │   ├── AnalysisDetail.jsx # Results panel with six analysis tabs
+│   │   ├── TabReputation.jsx  # Threat intelligence & reputation checks
+│   │   ├── CampaignsPanel.jsx # Campaign clustering & detection
+│   │   ├── RiskMeter.jsx      # Risk score visualization
+│   │   ├── LanguageSwitcher.jsx # IT/EN language toggle
+│   │   ├── ui.jsx             # Shared UI utilities
+│   │   └── Dashboard.jsx      # Main analysis page layout
 │   ├── i18n/
 │   │   ├── LangContext.jsx    # Localization provider
 │   │   └── translations.js    # 160+ translations (it/en)

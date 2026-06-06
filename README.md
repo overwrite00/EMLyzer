@@ -182,7 +182,6 @@ Contributions are welcome! Please:
 
 > [!NOTE]
 > 📖 All PRs should target the **`develop`** branch, not `main`.
-> See [Development Guide](./CLAUDE.md) for details.
 
 ---
 

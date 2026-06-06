@@ -212,10 +212,10 @@ Saves analyst notes.
 Runs reputation checks in two phases:
 
 ✅ **Phase 1** (< 15s, synchronous):  
-Spamhaus, ASN Lookup, Shodan InternetDB, CIRCL Passive DNS, GreyNoise Community, Criminal IP, OpenPhish, PhishTank, Redirect Chain, URLhaus, URLScan.io, ThreatFox, MalwareBazaar, Hybrid Analysis, Pulsedive, SecurityTrails
+Spamhaus, ASN Lookup, Shodan InternetDB, CIRCL Passive DNS, Criminal IP, OpenPhish, PhishTank, Redirect Chain, URLhaus, URLScan.io, ThreatFox, MalwareBazaar, Hybrid Analysis, Pulsedive
 
 🔄 **Phase 2** (background):  
-AbuseIPDB, VirusTotal, crt.sh
+AbuseIPDB, VirusTotal, crt.sh, GreyNoise, SecurityTrails
 
 Field `slow_running: true` indicates Phase 2 in progress. Poll `GET /api/analysis/{job_id}` and check `reputation_results.reputation_phase === "complete"` when done.
 

@@ -245,11 +245,11 @@ Checks IP, URL, and hash against public threat databases.
 
 **After clicking "Run reputation check"**, results arrive in two phases:
 
-✅ **Phase 1** (seconds):  
-Spamhaus, ASN Lookup, Shodan InternetDB, CIRCL Passive DNS, GreyNoise, Criminal IP, OpenPhish, PhishTank, Redirect Chain, URLhaus, URLScan.io, ThreatFox, MalwareBazaar, Hybrid Analysis, Pulsedive, SecurityTrails
+✅ **Phase 1** (< 15s):  
+Spamhaus, ASN Lookup, Shodan InternetDB, CIRCL Passive DNS, Criminal IP, OpenPhish, PhishTank, Redirect Chain, URLhaus, URLScan.io, ThreatFox, MalwareBazaar, Hybrid Analysis, Pulsedive
 
 🔄 **Phase 2** (background, auto-updating):  
-AbuseIPDB, VirusTotal, crt.sh
+AbuseIPDB, VirusTotal, crt.sh, GreyNoise, SecurityTrails
 
 **Status Icons:**
 
