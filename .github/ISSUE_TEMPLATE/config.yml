@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "📚 Documentation"
+    url: https://github.com/overwrite00/EMLyzer/blob/develop/docs
+    about: "Read our comprehensive guides and API documentation"
+  - name: "💬 GitHub Discussions"
+    url: https://github.com/overwrite00/EMLyzer/discussions
+    about: "Ask questions and get help from the community"
+  - name: "🔒 Security Issue"
+    url: https://github.com/overwrite00/EMLyzer/security/advisories/new
+    about: "Report a security vulnerability responsibly"

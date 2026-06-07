@@ -457,4 +457,5 @@ or `LANGUAGE=en`, then restart.
 
 ---
 
+*Last updated: 2026-06-07*
 *← [Configuration](./CONFIGURATION.md) | [API →](./API.md)*

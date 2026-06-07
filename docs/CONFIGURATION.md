@@ -372,4 +372,5 @@ For professional use with large analysis volumes.
 
 ---
 
-*← [Installation](./INSTALLATION.md) | Next: [Usage →](./USAGE.md)*
+*Last updated: 2026-06-07*
+*← [Installation](./INSTALLATION.md) | [Usage →](./USAGE.md)*

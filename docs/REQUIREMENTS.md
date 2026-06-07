@@ -261,4 +261,5 @@ No. Python 3.11+ is required. Some dependencies don't support 3.10.
 
 ---
 
-*← [README](../README.md) | Next: [INSTALLATION →](./INSTALLATION.md)*
+*Last updated: 2026-06-07*
+*← [README](../README.md) | [Installation →](./INSTALLATION.md)*

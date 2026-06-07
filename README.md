@@ -207,4 +207,5 @@ Distributed with MIT License · [View License](LICENSE)
 
 ---
 
-*Ready to get started?* → [Installation Guide](docs/INSTALLATION.md)
+*Last updated: 2026-06-07*
+*← [Contributing](./CONTRIBUTING.md) | [Docs →](./docs/)*

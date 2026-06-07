@@ -463,4 +463,5 @@ if r.status_code != 200:
 
 ---
 
-*← [Usage Guide](./USAGE.md) | [Requirements](./REQUIREMENTS.md)*
+*Last updated: 2026-06-07*
+*← [Usage](./USAGE.md) | [Back to README →](../README.md)*
