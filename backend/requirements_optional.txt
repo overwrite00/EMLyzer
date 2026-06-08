@@ -9,5 +9,5 @@
 # Queste dipendenze abilitano il classificatore bayesiano nel modulo NLP
 # (funzionalita' prevista nella roadmap, non ancora attiva nel core).
 
-scikit-learn>=1.4.2
+scikit-learn>=1.9.0
 nltk>=3.9.4
