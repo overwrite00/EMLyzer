@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Backend Python dependencies (main)
+  # Backend Python dependencies
   - package-ecosystem: "pip"
     directory: "/backend"
     schedule:
@@ -21,6 +21,7 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+    base: "develop"
 
   # Frontend JavaScript dependencies
   - package-ecosystem: "npm"
@@ -43,6 +44,7 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+    base: "develop"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -62,3 +64,4 @@ updates:
     commit-message:
       prefix: "chore(ci)"
       include: "scope"
+    base: "develop"
