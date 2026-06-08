@@ -1,0 +1,70 @@
+{
+  "version": "v0.15.1",
+  "model_type": "RandomForestClassifier",
+  "total_samples": 409,
+  "train_samples": 286,
+  "val_samples": 61,
+  "test_samples": 62,
+  "train_accuracy": 0.997,
+  "val_accuracy": 1.0,
+  "test_accuracy": 0.984,
+  "cv_mean_accuracy": 0.996,
+  "cv_std_accuracy": 0.007,
+  "train_phishing_pct": 61.5,
+  "val_phishing_pct": 62.3,
+  "test_phishing_pct": 61.3,
+  "feature_names": [
+    "urgency_count",
+    "cta_count",
+    "credential_count",
+    "body_length",
+    "subject_length",
+    "url_count",
+    "has_attachments",
+    "spf_pass",
+    "dkim_pass",
+    "dmarc_pass"
+  ],
+  "feature_importance": [
+    {
+      "feature": "urgency_count",
+      "importance": 0.337
+    },
+    {
+      "feature": "url_count",
+      "importance": 0.273
+    },
+    {
+      "feature": "cta_count",
+      "importance": 0.165
+    },
+    {
+      "feature": "credential_count",
+      "importance": 0.099
+    },
+    {
+      "feature": "body_length",
+      "importance": 0.063
+    },
+    {
+      "feature": "subject_length",
+      "importance": 0.048
+    },
+    {
+      "feature": "dmarc_pass",
+      "importance": 0.012
+    },
+    {
+      "feature": "dkim_pass",
+      "importance": 0.001
+    },
+    {
+      "feature": "has_attachments",
+      "importance": 0.0
+    },
+    {
+      "feature": "spf_pass",
+      "importance": 0.0
+    }
+  ]
+}
