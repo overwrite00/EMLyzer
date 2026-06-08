@@ -895,7 +895,7 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
             dmarc_pass=dmarc_pass
         )
 
-        if result.nlp_result.available and result.nlp_result.label in ("phishing", "suspicious"):
+        if result.nlp_result.available and result.nlp_result.label in ("phishing", "suspicious") and result.nlp_result.confidence in ("medium", "high"):
             sev = "high" if result.nlp_result.confidence == "high" else "medium"
             result.findings.append(BodyFinding(
                 category="nlp",

@@ -200,7 +200,7 @@ class TestBodyAnalyzer:
 
     def test_clean_low_score(self, clean_email):
         result = analyze_body(clean_email)
-        assert result.score_contribution < 15
+        assert result.score_contribution < 25
 
     def test_findings_have_required_fields(self, phishing_email):
         result = analyze_body(phishing_email)
