@@ -18,10 +18,10 @@ updates:
     commit-message:
       prefix: "chore(deps-backend)"
       include: "scope"
+    target-branch: "develop"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-    base: "develop"
 
   # Frontend JavaScript dependencies
   - package-ecosystem: "npm"
@@ -41,10 +41,10 @@ updates:
     commit-message:
       prefix: "chore(deps-frontend)"
       include: "scope"
+    target-branch: "develop"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-    base: "develop"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -61,7 +61,7 @@ updates:
     open-pull-requests-limit: 5
     pull-request-branch-name:
       separator: "/"
+    target-branch: "develop"
     commit-message:
       prefix: "chore(ci)"
       include: "scope"
-    base: "develop"
