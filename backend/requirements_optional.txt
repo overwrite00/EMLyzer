@@ -10,4 +10,4 @@
 # (funzionalita' prevista nella roadmap, non ancora attiva nel core).
 
 scikit-learn>=1.4.2
-nltk>=3.8.1
+nltk>=3.9.4
