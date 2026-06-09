@@ -10,8 +10,8 @@ updates:
       timezone: "UTC"
     labels:
       - "dependencies"
-      - "python"
-      - "backend"
+      - "lang:python"
+      - "scope:backend"
     open-pull-requests-limit: 5
     pull-request-branch-name:
       separator: "/"
@@ -22,7 +22,6 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-
   # Frontend JavaScript dependencies
   - package-ecosystem: "npm"
     directory: "/frontend"
@@ -33,8 +32,8 @@ updates:
       timezone: "UTC"
     labels:
       - "dependencies"
-      - "javascript"
-      - "frontend"
+      - "lang:javascript"
+      - "scope:frontend"
     open-pull-requests-limit: 5
     pull-request-branch-name:
       separator: "/"
@@ -45,7 +44,6 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -56,8 +54,8 @@ updates:
       timezone: "UTC"
     labels:
       - "dependencies"
-      - "github-actions"
-      - "ci"
+      - "type:ci"
+      - "scope:deps"
     open-pull-requests-limit: 5
     pull-request-branch-name:
       separator: "/"
