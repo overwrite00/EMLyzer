@@ -19,7 +19,6 @@ jobs:
     steps:
       - name: "Assign and Add to Project"
         run: |
-          # Variables
           REPO="${{ github.repository }}"
           TOKEN="${{ secrets.GITHUB_TOKEN }}"
           PROJECT_ID="PVT_kwHOAeOTfc4BZzTY"
@@ -34,33 +33,35 @@ jobs:
             
             # Assegna Issue
             echo "  - Assigning to $ASSIGNEE..."
-            ASSIGN_RESPONSE=$(curl -s -X PATCH \
+            curl -s -X PATCH \
               -H "Authorization: token $TOKEN" \
               -H "Accept: application/vnd.github+json" \
               -d "{\"assignees\":[\"$ASSIGNEE\"]}" \
-              "https://api.github.com/repos/$REPO/issues/$ISSUE_NUM")
+              "https://api.github.com/repos/$REPO/issues/$ISSUE_NUM" > /dev/null
+            echo "    ✅ Assigned"
             
-            if echo "$ASSIGN_RESPONSE" | grep -q "\"login\""; then
-              echo "    ✅ Assigned"
-            else
-              echo "    ⚠️  Assign failed"
-            fi
-            
-            # Aggiungi al Project
+            # Aggiungi al Project con jq per escape corretto
             echo "  - Adding to Project..."
-            PROJECT_RESPONSE=$(curl -s -X POST \
+            
+            PAYLOAD=$(jq -n \
+              --arg query 'mutation($projectId:ID!, $itemId:ID!) { addProjectV2ItemById(input: {projectId: $projectId, contentId: $itemId}) { item { id } } }' \
+              --arg projectId "$PROJECT_ID" \
+              --arg itemId "$ITEM_ID" \
+              '{query: $query, variables: {projectId: $projectId, itemId: $itemId}}')
+            
+            RESPONSE=$(curl -s -X POST \
               -H "Authorization: token $TOKEN" \
               -H "Content-Type: application/json" \
-              -d "{\"query\":\"mutation(\\\$projectId:ID!, \\\$itemId:ID!) { addProjectV2ItemById(input: {projectId: \\\$projectId, contentId: \\\$itemId}) { item { id } } }\",\"variables\":{\"projectId\":\"$PROJECT_ID\",\"itemId\":\"$ITEM_ID\"}}" \
+              -d "$PAYLOAD" \
               "https://api.github.com/graphql")
             
-            echo "    Response: $PROJECT_RESPONSE"
+            echo "    Response: $RESPONSE"
             
-            if echo "$PROJECT_RESPONSE" | grep -q "\"id\""; then
+            if echo "$RESPONSE" | jq -e '.data.addProjectV2ItemById.item.id' > /dev/null 2>&1; then
               echo "    ✅ Added to Project"
             else
               echo "    ❌ Failed to add to Project"
-              echo "    Error details: $PROJECT_RESPONSE"
+              echo "    Details: $(echo "$RESPONSE" | jq '.errors')"
             fi
           fi
           
@@ -73,32 +74,34 @@ jobs:
             
             # Assegna PR
             echo "  - Assigning to $ASSIGNEE..."
-            ASSIGN_RESPONSE=$(curl -s -X PATCH \
+            curl -s -X PATCH \
               -H "Authorization: token $TOKEN" \
               -H "Accept: application/vnd.github+json" \
               -d "{\"assignees\":[\"$ASSIGNEE\"]}" \
-              "https://api.github.com/repos/$REPO/issues/$PR_NUM")
-            
-            if echo "$ASSIGN_RESPONSE" | grep -q "\"login\""; then
-              echo "    ✅ Assigned"
-            else
-              echo "    ⚠️  Assign failed"
-            fi
+              "https://api.github.com/repos/$REPO/issues/$PR_NUM" > /dev/null
+            echo "    ✅ Assigned"
             
             # Aggiungi al Project
             echo "  - Adding to Project..."
-            PROJECT_RESPONSE=$(curl -s -X POST \
+            
+            PAYLOAD=$(jq -n \
+              --arg query 'mutation($projectId:ID!, $itemId:ID!) { addProjectV2ItemById(input: {projectId: $projectId, contentId: $itemId}) { item { id } } }' \
+              --arg projectId "$PROJECT_ID" \
+              --arg itemId "$ITEM_ID" \
+              '{query: $query, variables: {projectId: $projectId, itemId: $itemId}}')
+            
+            RESPONSE=$(curl -s -X POST \
               -H "Authorization: token $TOKEN" \
               -H "Content-Type: application/json" \
-              -d "{\"query\":\"mutation(\\\$projectId:ID!, \\\$itemId:ID!) { addProjectV2ItemById(input: {projectId: \\\$projectId, contentId: \\\$itemId}) { item { id } } }\",\"variables\":{\"projectId\":\"$PROJECT_ID\",\"itemId\":\"$ITEM_ID\"}}" \
+              -d "$PAYLOAD" \
               "https://api.github.com/graphql")
             
-            echo "    Response: $PROJECT_RESPONSE"
+            echo "    Response: $RESPONSE"
             
-            if echo "$PROJECT_RESPONSE" | grep -q "\"id\""; then
+            if echo "$RESPONSE" | jq -e '.data.addProjectV2ItemById.item.id' > /dev/null 2>&1; then
               echo "    ✅ Added to Project"
             else
               echo "    ❌ Failed to add to Project"
-              echo "    Error details: $PROJECT_RESPONSE"
+              echo "    Details: $(echo "$RESPONSE" | jq '.errors')"
             fi
           fi
