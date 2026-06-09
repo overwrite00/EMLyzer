@@ -1,0 +1,50 @@
+name: "Project Automation"
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, closed]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  add-to-project:
+    name: "Add to Project & Assign"
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: "Add Issue to Project"
+        if: github.event_name == 'issues' && github.event.action == 'opened'
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: "https://github.com/users/overwrite00/projects/3"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Add PR to Project"
+        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: "https://github.com/users/overwrite00/projects/3"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Assign Issue to @overwrite00"
+        if: github.event_name == 'issues' && github.event.action == 'opened'
+        run: |
+          curl -X PATCH \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -d '{"assignees":["overwrite00"]}' \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}"
+
+      - name: "Assign PR to @overwrite00"
+        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        run: |
+          curl -X PATCH \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -d '{"assignees":["overwrite00"]}' \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}"
