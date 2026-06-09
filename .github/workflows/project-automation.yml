@@ -17,34 +17,66 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: "Add Issue to Project"
-        if: github.event_name == 'issues' && github.event.action == 'opened'
-        uses: actions/add-to-project@v0.5.0
-        with:
-          project-url: "https://github.com/users/overwrite00/projects/3"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: "Add PR to Project"
-        if: github.event_name == 'pull_request' && github.event.action == 'opened'
-        uses: actions/add-to-project@v0.5.0
-        with:
-          project-url: "https://github.com/users/overwrite00/projects/3"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: "Assign Issue to @overwrite00"
-        if: github.event_name == 'issues' && github.event.action == 'opened'
+      - name: "Assign and Add to Project"
         run: |
-          curl -X PATCH \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            -d '{"assignees":["overwrite00"]}' \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}"
-
-      - name: "Assign PR to @overwrite00"
-        if: github.event_name == 'pull_request' && github.event.action == 'opened'
-        run: |
-          curl -X PATCH \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            -d '{"assignees":["overwrite00"]}' \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}"
+          # Variables
+          REPO="${{ github.repository }}"
+          TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          PROJECT_ID="PVT_kwHOAeOTfc4BZzTY"
+          ASSIGNEE="overwrite00"
+          
+          # GraphQL Query per aggiungere al project
+          MUTATION=$(cat <<'MUTATION'
+          mutation($projectId:ID!, $itemId:ID!) {
+            addProjectV2ItemById(input: {projectId: $projectId, contentId: $itemId}) {
+              item {
+                id
+              }
+            }
+          }
+          MUTATION
+          )
+          
+          # Se Issue
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            ITEM_ID="${{ github.event.issue.node_id }}"
+            ISSUE_NUM="${{ github.event.issue.number }}"
+            
+            # Assegna Issue
+            curl -s -X PATCH \
+              -H "Authorization: token $TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -d "{\"assignees\":[\"$ASSIGNEE\"]}" \
+              "https://api.github.com/repos/$REPO/issues/$ISSUE_NUM" > /dev/null
+            
+            # Aggiungi al Project
+            curl -s -X POST \
+              -H "Authorization: token $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"query\":\"$MUTATION\",\"variables\":{\"projectId\":\"$PROJECT_ID\",\"itemId\":\"$ITEM_ID\"}}" \
+              "https://api.github.com/graphql" > /dev/null
+            
+            echo "✅ Issue #$ISSUE_NUM aggiunta al Project e assegnata a $ASSIGNEE"
+          fi
+          
+          # Se Pull Request
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ITEM_ID="${{ github.event.pull_request.node_id }}"
+            PR_NUM="${{ github.event.pull_request.number }}"
+            
+            # Assegna PR
+            curl -s -X PATCH \
+              -H "Authorization: token $TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -d "{\"assignees\":[\"$ASSIGNEE\"]}" \
+              "https://api.github.com/repos/$REPO/issues/$PR_NUM" > /dev/null
+            
+            # Aggiungi al Project
+            curl -s -X POST \
+              -H "Authorization: token $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"query\":\"$MUTATION\",\"variables\":{\"projectId\":\"$PROJECT_ID\",\"itemId\":\"$ITEM_ID\"}}" \
+              "https://api.github.com/graphql" > /dev/null
+            
+            echo "✅ PR #$PR_NUM aggiunta al Project e assegnata a $ASSIGNEE"
+          fi
