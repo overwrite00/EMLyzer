@@ -1,0 +1,147 @@
+name: "Project Automation"
+
+on:
+  issues:
+    types: [opened, labeled, unlabeled]
+  pull_request:
+    types: [opened, closed, reopened, labeled, unlabeled]
+  pull_request_review:
+    types: [submitted]
+  workflow_run:
+    workflows: ["*"]
+    types: [completed]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  add-to-project:
+    name: "Add to Project & Assign Status"
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: "Determine issue/PR type"
+        id: determine_type
+        run: |
+          if [ "${{ github.event_name }}" == "issues" ]; then
+            echo "item_type=issue" >> $GITHUB_OUTPUT
+            echo "item_number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+            echo "is_dependabot=false" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "item_type=pr" >> $GITHUB_OUTPUT
+            echo "item_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            if [ "${{ github.event.pull_request.user.login }}" == "dependabot[bot]" ]; then
+              echo "is_dependabot=true" >> $GITHUB_OUTPUT
+            else
+              echo "is_dependabot=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: "Add to Project (via project.json)"
+        if: |
+          github.event_name == 'issues' && github.event.action == 'opened' ||
+          github.event_name == 'pull_request' && github.event.action == 'opened'
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: "https://github.com/users/overwrite00/projects/3"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Assign to @overwrite00"
+        if: |
+          (github.event_name == 'issues' && github.event.action == 'opened') ||
+          (github.event_name == 'pull_request' && github.event.action == 'opened')
+        run: |
+          if [ "${{ steps.determine_type.outputs.item_type }}" == "issue" ]; then
+            curl -X PATCH \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              -d '{"assignees":["overwrite00"]}' \
+              "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}"
+          else
+            curl -X PATCH \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              -d '{"assignees":["overwrite00"]}' \
+              "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}"
+          fi
+
+      - name: "Set initial status: Issue → To triage"
+        if: github.event_name == 'issues' && github.event.action == 'opened'
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.graphql-preview+json" \
+            -d '{
+              "query": "mutation($projectId:ID!, $itemId:ID!) { addProjectNextItem(input: {projectId: $projectId, contentId: $itemId}) { projectNextItem { id } } }",
+              "variables": {
+                "projectId": "PVT_kwMDOC4F-84AC5Q",
+                "itemId": "${{ github.event.issue.node_id }}"
+              }
+            }' \
+            "https://api.github.com/graphql"
+
+      - name: "Set PR status: Manual → In progress, Dependabot → In review"
+        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        run: |
+          STATUS="In progress"
+          if [ "${{ steps.determine_type.outputs.is_dependabot }}" == "true" ]; then
+            STATUS="In review"
+          fi
+          
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.graphql-preview+json" \
+            -d "{
+              \"query\": \"mutation { updateProjectNextItemField(input: {projectId: \\\"PVT_kwMDOC4F-84AC5Q\\\", itemId: \\\"${{ github.event.pull_request.node_id }}\\\", fieldId: \\\"PVTF_lADOC4F-84AC5QzHWbwA\\\", value: \\\"$STATUS\\\"}) { projectNextItem { id } } }\"
+            }" \
+            "https://api.github.com/graphql"
+
+      - name: "Update status on CI pass (PR)"
+        if: |
+          github.event_name == 'workflow_run' && 
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'pull_request'
+        run: |
+          echo "CI passed - would move to In review if it was in progress"
+
+      - name: "Move to Done on merge"
+        if: |
+          github.event_name == 'pull_request' && 
+          github.event.action == 'closed' && 
+          github.event.pull_request.merged == true
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.graphql-preview+json" \
+            -d "{
+              \"query\": \"mutation { updateProjectNextItemField(input: {projectId: \\\"PVT_kwMDOC4F-84AC5Q\\\", itemId: \\\"${{ github.event.pull_request.node_id }}\\\", fieldId: \\\"PVTF_lADOC4F-84AC5QzHWbwA\\\", value: \\\"Done\\\"}) { projectNextItem { id } } }\"
+            }" \
+            "https://api.github.com/graphql"
+
+      - name: "Auto-close linked issues"
+        if: |
+          github.event_name == 'pull_request' && 
+          github.event.action == 'closed' && 
+          github.event.pull_request.merged == true
+        run: |
+          # Estrai il numero dell'issue dal body della PR (Closes #123)
+          ISSUE_NUMBER=$(echo "${{ github.event.pull_request.body }}" | grep -oP 'Closes #\K[0-9]+' | head -1)
+          
+          if [ ! -z "$ISSUE_NUMBER" ]; then
+            curl -X PATCH \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              -d '{"state":"closed"}' \
+              "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER"
+            
+            # Sposta issue a Done nel project
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.graphql-preview+json" \
+              -d "{
+                \"query\": \"mutation { updateProjectNextItemField(input: {projectId: \\\"PVT_kwMDOC4F-84AC5Q\\\", itemId: \\\"gho_issue_$ISSUE_NUMBER\\\", fieldId: \\\"PVTF_lADOC4F-84AC5QzHWbwA\\\", value: \\\"Done\\\"}) { projectNextItem { id } } }\"
+              }" \
+              "https://api.github.com/graphql"
+          fi
