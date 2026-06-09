@@ -25,38 +25,43 @@ jobs:
           PROJECT_ID="PVT_kwHOAeOTfc4BZzTY"
           ASSIGNEE="overwrite00"
           
-          # GraphQL Query per aggiungere al project
-          MUTATION=$(cat <<'MUTATION'
-          mutation($projectId:ID!, $itemId:ID!) {
-            addProjectV2ItemById(input: {projectId: $projectId, contentId: $itemId}) {
-              item {
-                id
-              }
-            }
-          }
-          MUTATION
-          )
-          
           # Se Issue
           if [ "${{ github.event_name }}" = "issues" ]; then
             ITEM_ID="${{ github.event.issue.node_id }}"
             ISSUE_NUM="${{ github.event.issue.number }}"
             
+            echo "🔄 Processing Issue #$ISSUE_NUM..."
+            
             # Assegna Issue
-            curl -s -X PATCH \
+            echo "  - Assigning to $ASSIGNEE..."
+            ASSIGN_RESPONSE=$(curl -s -X PATCH \
               -H "Authorization: token $TOKEN" \
               -H "Accept: application/vnd.github+json" \
               -d "{\"assignees\":[\"$ASSIGNEE\"]}" \
-              "https://api.github.com/repos/$REPO/issues/$ISSUE_NUM" > /dev/null
+              "https://api.github.com/repos/$REPO/issues/$ISSUE_NUM")
+            
+            if echo "$ASSIGN_RESPONSE" | grep -q "\"login\""; then
+              echo "    ✅ Assigned"
+            else
+              echo "    ⚠️  Assign failed"
+            fi
             
             # Aggiungi al Project
-            curl -s -X POST \
+            echo "  - Adding to Project..."
+            PROJECT_RESPONSE=$(curl -s -X POST \
               -H "Authorization: token $TOKEN" \
               -H "Content-Type: application/json" \
-              -d "{\"query\":\"$MUTATION\",\"variables\":{\"projectId\":\"$PROJECT_ID\",\"itemId\":\"$ITEM_ID\"}}" \
-              "https://api.github.com/graphql" > /dev/null
+              -d "{\"query\":\"mutation(\\\$projectId:ID!, \\\$itemId:ID!) { addProjectV2ItemById(input: {projectId: \\\$projectId, contentId: \\\$itemId}) { item { id } } }\",\"variables\":{\"projectId\":\"$PROJECT_ID\",\"itemId\":\"$ITEM_ID\"}}" \
+              "https://api.github.com/graphql")
             
-            echo "✅ Issue #$ISSUE_NUM aggiunta al Project e assegnata a $ASSIGNEE"
+            echo "    Response: $PROJECT_RESPONSE"
+            
+            if echo "$PROJECT_RESPONSE" | grep -q "\"id\""; then
+              echo "    ✅ Added to Project"
+            else
+              echo "    ❌ Failed to add to Project"
+              echo "    Error details: $PROJECT_RESPONSE"
+            fi
           fi
           
           # Se Pull Request
@@ -64,19 +69,36 @@ jobs:
             ITEM_ID="${{ github.event.pull_request.node_id }}"
             PR_NUM="${{ github.event.pull_request.number }}"
             
+            echo "🔄 Processing PR #$PR_NUM..."
+            
             # Assegna PR
-            curl -s -X PATCH \
+            echo "  - Assigning to $ASSIGNEE..."
+            ASSIGN_RESPONSE=$(curl -s -X PATCH \
               -H "Authorization: token $TOKEN" \
               -H "Accept: application/vnd.github+json" \
               -d "{\"assignees\":[\"$ASSIGNEE\"]}" \
-              "https://api.github.com/repos/$REPO/issues/$PR_NUM" > /dev/null
+              "https://api.github.com/repos/$REPO/issues/$PR_NUM")
+            
+            if echo "$ASSIGN_RESPONSE" | grep -q "\"login\""; then
+              echo "    ✅ Assigned"
+            else
+              echo "    ⚠️  Assign failed"
+            fi
             
             # Aggiungi al Project
-            curl -s -X POST \
+            echo "  - Adding to Project..."
+            PROJECT_RESPONSE=$(curl -s -X POST \
               -H "Authorization: token $TOKEN" \
               -H "Content-Type: application/json" \
-              -d "{\"query\":\"$MUTATION\",\"variables\":{\"projectId\":\"$PROJECT_ID\",\"itemId\":\"$ITEM_ID\"}}" \
-              "https://api.github.com/graphql" > /dev/null
+              -d "{\"query\":\"mutation(\\\$projectId:ID!, \\\$itemId:ID!) { addProjectV2ItemById(input: {projectId: \\\$projectId, contentId: \\\$itemId}) { item { id } } }\",\"variables\":{\"projectId\":\"$PROJECT_ID\",\"itemId\":\"$ITEM_ID\"}}" \
+              "https://api.github.com/graphql")
             
-            echo "✅ PR #$PR_NUM aggiunta al Project e assegnata a $ASSIGNEE"
+            echo "    Response: $PROJECT_RESPONSE"
+            
+            if echo "$PROJECT_RESPONSE" | grep -q "\"id\""; then
+              echo "    ✅ Added to Project"
+            else
+              echo "    ❌ Failed to add to Project"
+              echo "    Error details: $PROJECT_RESPONSE"
+            fi
           fi
