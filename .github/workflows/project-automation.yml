@@ -20,7 +20,7 @@ jobs:
       - name: "Assign and Add to Project"
         run: |
           REPO="${{ github.repository }}"
-          TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          TOKEN="${{ secrets.GH_PROJECT_TOKEN }}"
           PROJECT_ID="PVT_kwHOAeOTfc4BZzTY"
           ASSIGNEE="overwrite00"
           
