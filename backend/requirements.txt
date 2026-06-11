@@ -33,7 +33,7 @@ sqlalchemy==2.0.48
 aiosqlite==0.22.1
 
 # Security / sanitization
-bleach==6.3.0
+bleach==6.4.0
 tinycss2>=1.3.0
 
 # Dev & test
