@@ -13,13 +13,13 @@ EMLyzer analyzes suspicious emails by uploading `.eml` or `.msg` files, or pasti
 
 ## 📚 Documentation Index
 
-| 📄 Document | 📝 Purpose |
-|---|---|
-| [📋 REQUIREMENTS.md](docs/REQUIREMENTS.md) | System requirements and prerequisites |
-| [🚀 INSTALLATION.md](docs/INSTALLATION.md) | Step-by-step installation guide |
-| [⚙️ CONFIGURATION.md](docs/CONFIGURATION.md) | Environment setup and API keys |
-| [📖 USAGE.md](docs/USAGE.md) | How to use the application |
-| [📡 API.md](docs/API.md) | REST API reference for developers |
+| 📄 Document                                  | 📝 Purpose                             |
+| ------------------------------------------- | ------------------------------------- |
+| [📋 REQUIREMENTS.md](docs/REQUIREMENTS.md)   | System requirements and prerequisites |
+| [🚀 INSTALLATION.md](docs/INSTALLATION.md)   | Step-by-step installation guide       |
+| [⚙️ CONFIGURATION.md](docs/CONFIGURATION.md) | Environment setup and API keys        |
+| [📖 USAGE.md](docs/USAGE.md)                 | How to use the application            |
+| [📡 API.md](docs/API.md)                     | REST API reference for developers     |
 
 ---
 
@@ -133,13 +133,13 @@ Explore the API in [API.md](docs/API.md).
 
 ## 🏗️ Architecture
 
-| Layer | Technology | Notes |
-|---|---|---|
-| **Backend** | Python 3.13, FastAPI, SQLAlchemy async | REST API + email analysis engine |
-| **Frontend** | React 19, Vite 8, no external UI libs | Responsive web dashboard |
-| **Database** | SQLite (local) | No external DB required |
+| Layer        | Technology                                  | Notes                            |
+| ------------ | ------------------------------------------- | -------------------------------- |
+| **Backend**  | Python 3.13, FastAPI, SQLAlchemy async      | REST API + email analysis engine |
+| **Frontend** | React 19, Vite 8, no external UI libs       | Responsive web dashboard         |
+| **Database** | SQLite (local)                              | No external DB required          |
 | **Analysis** | scikit-learn NLP, dnspython, beautifulsoup4 | Phishing detection + URL parsing |
-| **Reports** | python-docx | Editable Word documents |
+| **Reports**  | python-docx                                 | Editable Word documents          |
 
 ---
 
