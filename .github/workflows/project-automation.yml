@@ -2,9 +2,9 @@ name: "Project Automation"
 
 on:
   issues:
-    types: [opened]
+    types: [opened, reopened]
   pull_request:
-    types: [opened, closed]
+    types: [opened, closed, reopened]
 
 permissions:
   issues: write
