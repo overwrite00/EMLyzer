@@ -259,7 +259,7 @@ function ServiceCard({ svc, expanded, onToggle, lang }) {
 }
 
 // ── Riga dettaglio singola entità ─────────────────────────────────────────────
-function DetailRow({ r, lang }) {
+function DetailRow({ r }) {
   // Servizi informativi: non malevoli per natura, mostrano dati contestuali
   const isInfoService = ['ASN Lookup', 'crt.sh', 'Redirect Chain', 'Shodan InternetDB', 'CIRCL Passive DNS', 'SecurityTrails'].includes(r.source)
   const icon = r.is_malicious ? '🔴'

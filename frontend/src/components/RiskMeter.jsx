@@ -22,7 +22,7 @@ export default function RiskMeter({ score = 0, label = 'low', contributions = []
   const r   = 54
   const cx  = 70
   const cy  = 70
-  const arc = Math.PI  // 180° semicircle
+  // Note: arc length calculated inline in strokeDasharray formula
   const x1  = cx - r
   const y1  = cy
   const x2  = cx + r

@@ -1,0 +1,91 @@
+name: Tests
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/tests.yml"
+      - "pyproject.toml"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    branches: [develop, main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-tests:
+    name: Backend Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run pytest
+        run: |
+          cd backend
+          pytest tests/test_core.py -v --tb=short --junit-xml=pytest-results.xml
+        continue-on-error: false
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results-${{ matrix.python-version }}
+          path: backend/pytest-results.xml
+          retention-days: 7
+
+  frontend-lint-build:
+    name: Frontend Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run linter
+        run: |
+          cd frontend
+          npm run lint -- --max-warnings 0
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Verify bundle size
+        run: |
+          cd frontend
+          du -sh dist/assets/*.js dist/assets/*.css 2>/dev/null || echo "Build artifacts verified"

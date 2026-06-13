@@ -1,65 +1,125 @@
 version: 2
+
+# Dependabot auto-creates PRs against `develop` (not `main`).
+# `main` is reserved for releases and is protected — all updates flow through develop.
+# Configuration strategy:
+# - production deps: minor/patch updates auto-applied (fasttrack)
+# - dev deps: only minor/patch (no majors — prevents breaking CI changes)
+# - GitHub Actions: all updates applied (security-critical)
+
 updates:
   # Backend Python dependencies
   - package-ecosystem: "pip"
     directory: "/backend"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "04:00"
       timezone: "UTC"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "lang:python"
       - "scope:backend"
-    open-pull-requests-limit: 5
-    pull-request-branch-name:
-      separator: "/"
     commit-message:
       prefix: "chore(deps-backend)"
       include: "scope"
-    target-branch: "develop"
+    groups:
+      minor-and-patch:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      development-updates:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
-      - dependency-name: "*"
+      # Block major version updates for dev-only dependencies.
+      # Rationale: major test/CI dep upgrades can break builds without user benefit.
+      # Keep production deps (FastAPI, SQLAlchemy, etc.) fully updated for stability.
+      # Note: `ignore` does not support `dependency-type`, so dev deps are listed explicitly.
+      - dependency-name: "pytest"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "pytest-asyncio"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "httpx"
+        update-types: ["version-update:semver-major"]
+
   # Frontend JavaScript dependencies
   - package-ecosystem: "npm"
     directory: "/frontend"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "04:00"
       timezone: "UTC"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "lang:javascript"
       - "scope:frontend"
-    open-pull-requests-limit: 5
-    pull-request-branch-name:
-      separator: "/"
     commit-message:
       prefix: "chore(deps-frontend)"
       include: "scope"
-    target-branch: "develop"
+    groups:
+      minor-and-patch:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      development-updates:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
-      - dependency-name: "*"
+      # Block major version updates for dev-only dependencies (linters, type checkers, build tools).
+      # Rationale: major tool upgrades can break build pipeline without user benefit.
+      # Keep production deps (react, react-dom, react-router-dom, axios, vite) fully updated.
+      # Note: `ignore` does not support `dependency-type`, so dev deps are listed explicitly.
+      - dependency-name: "@eslint/js"
         update-types: ["version-update:semver-major"]
-  # GitHub Actions
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-plugin-react-hooks"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-plugin-react-refresh"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "globals"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions — no major version ignore (CI/CD is security-critical).
+  # Unlike dev deps, action updates are security patches and should be applied immediately.
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "04:00"
       timezone: "UTC"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "type:ci"
       - "scope:deps"
-    open-pull-requests-limit: 5
-    pull-request-branch-name:
-      separator: "/"
-    target-branch: "develop"
     commit-message:
       prefix: "chore(ci)"
       include: "scope"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"

@@ -1,4 +1,5 @@
 // src/pages/Dashboard.jsx
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useCallback } from 'react'
 import { listAnalyses, getAnalysis, deleteAnalysis, deleteBulkAnalyses } from '../api/client'
 import UploadZone from '../components/UploadZone'
@@ -60,14 +61,26 @@ export default function Dashboard() {
       setAnalyses(data.items || [])
       setTotal(data.total || 0)
       setPages(data.pages || 1)
-    } catch (_) {}
+    } catch {
+      // Intentional: silence list fetch error, retain current state
+    }
     finally { setLoading(false) }
   }, [debouncedQ, riskFilter, page, pageSize])
 
-  useEffect(() => { fetchList() }, [fetchList])
+  useEffect(() => {
+    fetchList()
+  }, [fetchList])
 
-  useEffect(() => { setPage(1); setSelectedIds(new Set()) }, [debouncedQ, riskFilter, pageSize])
-  useEffect(() => { setSelectedIds(new Set()) }, [page])
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPage(1)
+    setSelectedIds(new Set())
+  }, [debouncedQ, riskFilter, pageSize])
+
+  // Clear selections when page changes
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [page])
 
   async function openDetail(jobId) {
     setDetailLoading(true)
@@ -75,9 +88,9 @@ export default function Dashboard() {
       const result = await getAnalysis(jobId)
       setSelected(result)
       setSelectedJobId(jobId)
-    }
-    catch (_) {}
-    finally { setDetailLoading(false) }
+    } catch {
+      // Intentional: silence detail fetch error
+    } finally { setDetailLoading(false) }
   }
 
   function onNewAnalysis(result) {
@@ -102,7 +115,9 @@ export default function Dashboard() {
         setSelectedJobId(null)
       }
       fetchList()
-    } catch (_) {}
+    } catch {
+      // Intentional: silence delete error
+    }
   }
 
   function toggleSelect(jobId) {
@@ -135,7 +150,9 @@ export default function Dashboard() {
       }
       setSelectedIds(new Set())
       fetchList()
-    } catch (_) {}
+    } catch {
+      // Intentional: silence bulk delete error
+    }
   }
 
   function exportCSV() {

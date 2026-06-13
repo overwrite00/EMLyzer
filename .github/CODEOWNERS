@@ -1,0 +1,8 @@
+# EMLyzer — Open-source single-maintainer project
+# Auto-assign reviewer on all PRs
+* @0verwrite
+
+# Future: when team grows, uncomment and extend:
+# backend/core/ @0verwrite @future-backend-lead
+# frontend/ @0verwrite @future-frontend-lead
+# backend/api/ @0verwrite @future-backend-lead
