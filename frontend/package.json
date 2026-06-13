@@ -10,10 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "axios": "^1.16.0",
-    "lucide-react": "^1.17.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "axios": "^1.17.0",
+    "lucide-react": "^1.18.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "react-router-dom": "^7.17.0"
   },
   "overrides": {
@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "eslint": "^9.39.4",
