@@ -3,63 +3,92 @@ updates:
   # Backend Python dependencies
   - package-ecosystem: "pip"
     directory: "/backend"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "04:00"
       timezone: "UTC"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "lang:python"
       - "scope:backend"
-    open-pull-requests-limit: 5
-    pull-request-branch-name:
-      separator: "/"
     commit-message:
       prefix: "chore(deps-backend)"
       include: "scope"
-    target-branch: "develop"
+    groups:
+      minor-and-patch:
+        dependency-types:
+          - "production"
+        update-types:
+          - "minor"
+          - "patch"
+      development-updates:
+        dependency-types:
+          - "development"
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+        dependency-type: "development"
+
   # Frontend JavaScript dependencies
   - package-ecosystem: "npm"
     directory: "/frontend"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "04:00"
       timezone: "UTC"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "lang:javascript"
       - "scope:frontend"
-    open-pull-requests-limit: 5
-    pull-request-branch-name:
-      separator: "/"
     commit-message:
       prefix: "chore(deps-frontend)"
       include: "scope"
-    target-branch: "develop"
+    groups:
+      minor-and-patch:
+        dependency-types:
+          - "production"
+        update-types:
+          - "minor"
+          - "patch"
+      development-updates:
+        dependency-types:
+          - "development"
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-  # GitHub Actions
+        dependency-type: "development"
+
+  # GitHub Actions — no major version ignore (CI/CD security-critical)
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "04:00"
       timezone: "UTC"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "type:ci"
       - "scope:deps"
-    open-pull-requests-limit: 5
-    pull-request-branch-name:
-      separator: "/"
-    target-branch: "develop"
     commit-message:
       prefix: "chore(ci)"
       include: "scope"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
