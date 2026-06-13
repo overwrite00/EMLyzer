@@ -19,14 +19,12 @@ updates:
       include: "scope"
     groups:
       minor-and-patch:
-        dependency-types:
-          - "production"
+        dependency-type: "production"
         update-types:
           - "minor"
           - "patch"
       development-updates:
-        dependency-types:
-          - "development"
+        dependency-type: "development"
         update-types:
           - "minor"
           - "patch"
@@ -54,14 +52,12 @@ updates:
       include: "scope"
     groups:
       minor-and-patch:
-        dependency-types:
-          - "production"
+        dependency-type: "production"
         update-types:
           - "minor"
           - "patch"
       development-updates:
-        dependency-types:
-          - "development"
+        dependency-type: "development"
         update-types:
           - "minor"
           - "patch"
