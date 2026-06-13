@@ -39,3 +39,5 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{matrix.language}}"
+          upload: true
+          sarif-upload: true
