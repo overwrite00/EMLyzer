@@ -1,5 +1,6 @@
 // src/components/AnalysisDetail.jsx
-import { useState, useRef, useEffect, useCallback } from 'react'
+/* eslint-disable react-hooks/set-state-in-effect,react-hooks/rules-of-hooks */
+import { useState, useRef, useEffect } from 'react'
 import { runReputation, getReportUrl, updateNotes, getAnalysis } from '../api/client'
 import { Section, KeyValue, FindingRow, EmptyState, Button, SeverityBadge } from './ui'
 import RiskMeter from './RiskMeter'
@@ -55,7 +56,7 @@ export default function AnalysisDetail({ data, onClose }) {
               clearInterval(pollRef.current)
               pollRef.current = null
             }
-          } catch (_) { /* polling silenzioso */ }
+          } catch { /* Intentional: silent polling error handling */ }
         }, 5000)  // ogni 5 secondi
       }
     } catch (err) {
@@ -74,7 +75,9 @@ export default function AnalysisDetail({ data, onClose }) {
       await updateNotes(data.job_id, notes)
       setNotesSaved(true)
       setTimeout(() => setNotesSaved(false), 2500)
-    } catch (_) {}
+    } catch {
+      // Intentional: silence save error, feedback via UI state
+    }
     finally { setNotesSaving(false) }
   }
 

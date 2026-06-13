@@ -15,7 +15,11 @@ export function LangProvider({ children }) {
   const setLang = useCallback(async (newLang) => {
     setLangState(newLang)
     localStorage.setItem('emlyzer_lang', newLang)
-    try { await apiSetLanguage(newLang) } catch (_) {}
+    try {
+      await apiSetLanguage(newLang)
+    } catch {
+      // Intentional: silence API error, language already set locally
+    }
   }, [])
 
   return (
@@ -25,6 +29,7 @@ export function LangProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useLang() {
   return useContext(LangContext)
 }

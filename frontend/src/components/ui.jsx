@@ -1,21 +1,20 @@
 // src/components/ui.jsx
 // Componenti UI riusabili
 
-export function Card({ children, className = '' }) {
+export function Card({ children }) {
   return (
     <div style={{
       background: 'var(--bg-card)',
       border: '1px solid var(--border)',
       borderRadius: 'var(--radius-lg)',
       padding: '20px',
-      ...parseStyle(className),
     }}>
       {children}
     </div>
   )
 }
 
-export function Section({ title, icon, children, defaultOpen = true }) {
+export function Section({ title, icon, children }) {
   return (
     <div style={{ marginBottom: 24 }}>
       <div style={{
@@ -112,7 +111,7 @@ export function KeyValue({ label, value, mono = false }) {
 }
 
 export function FindingRow({ finding }) {
-  const { severity, description, evidence, category, matched_patterns } = finding
+  const { severity, description, evidence, matched_patterns } = finding
   return (
     <div style={{
       display: 'flex',
@@ -232,5 +231,3 @@ export function Button({ children, onClick, variant = 'primary', disabled = fals
   )
 }
 
-// Helper: non usato per styling ma utile
-function parseStyle(className) { return {} }
