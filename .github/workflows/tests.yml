@@ -41,10 +41,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
-      - name: Run pytest
+      - name: Run pytest with coverage
         run: |
           cd backend
-          pytest tests/test_core.py -v --tb=short --junit-xml=pytest-results.xml
+          coverage run -m pytest tests/test_core.py -v --tb=short --junit-xml=pytest-results.xml
+          coverage xml -o coverage.xml
+          coverage report -m
         continue-on-error: false
 
       - name: Upload test results
@@ -54,6 +56,22 @@ jobs:
           name: pytest-results-${{ matrix.python-version }}
           path: backend/pytest-results.xml
           retention-days: 7
+
+      - name: Upload coverage report
+        if: always() && matrix.python-version == '3.13'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: backend/coverage.xml
+          retention-days: 30
+
+      - name: Generate coverage summary
+        if: always() && matrix.python-version == '3.13'
+        run: |
+          cd backend
+          coverage report -m > coverage-summary.txt
+          cat coverage-summary.txt
+        continue-on-error: true
 
   frontend-lint-build:
     name: Frontend Lint & Build
