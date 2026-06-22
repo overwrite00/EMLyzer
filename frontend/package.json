@@ -17,7 +17,9 @@
     "react-router-dom": "^7.18.0"
   },
   "overrides": {
-    "follow-redirects": "1.16.0"
+    "follow-redirects": "1.16.0",
+    "@babel/core": "7.29.6",
+    "js-yaml": "4.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
