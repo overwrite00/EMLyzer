@@ -97,7 +97,7 @@ Email (.eml / .msg / plain text)
 
 ## 🔧 Version
 
-**v0.15.1** — 🐛 Bugfix release: Campaign detection now includes visible HTML text (Silvercrest and other campaigns correctly detected), NLP score consistency fixed (both backend and frontend use standard mathematical rounding), removed duplicate emoji, cleaned debug logging. All 119 tests passing ✅, production-ready.
+**v0.16.0** — 🏗️ Architecture release: Migrated .msg parsing to python-oxmsg (MIT license), eliminated GPL violation, introduced MsgBackend abstraction for pluggable implementations, unblocked beautifulsoup4 to 4.14.0, added transport headers support (SPF/DKIM/DMARC for .msg files), RTF-only email support with optional RTFDE fallback. All 122 tests passing ✅, production-ready.
 
 📖 **See full version history** → [CHANGELOG.md](./CHANGELOG.md)
 
@@ -145,7 +145,7 @@ Explore the API in [API.md](docs/API.md).
 
 ## 📊 Test Suite
 
-✅ **119 automated tests** — all passing, zero technical debt
+✅ **122 automated tests** — all passing, zero technical debt
 
 - Unit tests for all analyzers
 - Integration tests for API routes
