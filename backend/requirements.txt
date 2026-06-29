@@ -11,8 +11,12 @@ python-multipart==0.0.32
 
 # Email parsing
 mail-parser==4.4.0
-extract-msg==0.55.0
-beautifulsoup4==4.13.5
+python-oxmsg==0.0.2
+beautifulsoup4==4.14.0
+
+# Optional: RTF decompression for legacy .msg files (Outlook <2010)
+# Uncomment if you receive email from Outlook 97-2003 with RTF-only body:
+# RTFDE>=0.0.6
 
 # URL & domain analysis
 tldextract==5.3.1

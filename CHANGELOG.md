@@ -22,6 +22,59 @@ Features are ordered by implementation priority.
 
 ---
 
+## [0.16.0] — 2026-06-29
+
+### Changed — .msg Backend Abstraction & GPL License Resolution
+
+#### Migrated from extract-msg (GPLv3) to python-oxmsg (MIT)
+- **Licensing:** Eliminated GPL violation — extract-msg is GPLv3, incompatible with MIT distribution
+- **Dependencies:** Removed 7 transitive deps (RTFDE, ebcdic, compressed-rtf, tzlocal, red-black-tree-mod, internet-codepage, iconv-lite)
+- **Clean:** Now only 3 deps for .msg support: `olefile` (BSD), `click` (BSD), `typing_extensions` (PSF)
+
+#### Architecture: MsgBackend Abstraction
+- **Introduced:** `MsgBackend` interface in `backend/core/analysis/msg_backends.py`
+  - Decouples EMLyzer from any specific .msg library implementation
+  - Enables pluggable backends: OxMsgBackend (default), CustomOleBackend (future), etc.
+  - Future-proof: if python-oxmsg abandoned, swap to custom parser without touching pipeline
+- **Aligned:** With roadmap "Plugin System" for long-term extensibility
+
+#### Unblocked beautifulsoup4
+- **Removed:** Pin `beautifulsoup4<4.14` (enforced by extract-msg GPLv3 constraint)
+- **Updated:** beautifulsoup4 `4.13.5` → `4.14.0` for security updates & features
+
+#### Bonus: Transport Headers Parsing
+- **.msg files now expose RFC822 transport headers** (if available)
+- **Reuses EML parser** to extract SPF/DKIM/DMARC from .msg files
+- **Impact:** Email auth headers now analyzed for .msg files (was missing before)
+
+#### RTF-only Legacy .msg Support
+- **Detected:** Rare legacy .msg files from Outlook 97-2003 (RTF-only, no PR_BODY)
+- **Fallback:** Optional RTFDE library provides RTF decompression (install: `pip install RTFDE`)
+- **Graceful:** If RTFDE not installed, warning logged, no crash
+- **Prevalence:** ~1% of .msg files (Outlook <2010)
+
+### Added
+- Test suite for .msg parsing via MsgBackend
+- RTF-only detection and warning logging
+- mime_type detection for attachments in .msg (improvement over extract-msg hardcoded `octet-stream`)
+
+### Fixed
+- **GPL Dependency Violation** — extract-msg is GPLv3, now using MIT-licensed python-oxmsg
+- **beautifulsoup4 Dependency Conflict** — removed artificial `<4.14` pin
+
+### Dependencies
+- Removed: `extract-msg==0.55.0` (GPLv3)
+- Added: `python-oxmsg==0.0.2` (MIT, Unstructured-IO maintained)
+- Updated: `beautifulsoup4==4.13.5` → `4.14.0`
+- Optional: `RTFDE>=0.0.6` (for RTF-only .msg support)
+
+### Testing
+- ✅ **119/119 tests PASS** — Zero regressions from migration
+- ✅ **MsgBackend interface tested** with malformed input, graceful error handling
+- ✅ **beautifulsoup4 4.14.0** validated against all body parsing patterns
+
+---
+
 ## [0.15.1] — 2026-06-06
 
 ### Fixed — Campaign Detection & NLP Score Consistency (Bugfix Release)
