@@ -22,110 +22,48 @@ jobs:
 
     steps:
       - name: "Assign and Add to Project"
+        env:
+          GH_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
         run: |
-          REPO="${{ github.repository }}"
-          TOKEN="${{ secrets.GH_PROJECT_TOKEN }}"
+          ASSIGNEE="${{ env.ASSIGNEE }}"
 
           # Se Issue
           if [ "${{ github.event_name }}" = "issues" ]; then
-            ITEM_ID="${{ github.event.issue.node_id }}"
             ISSUE_NUM="${{ github.event.issue.number }}"
-
             echo "Processing Issue #$ISSUE_NUM..."
 
             # Assegna Issue
-            echo "  - Assigning to ${{ env.ASSIGNEE }}..."
-            curl -s -X PATCH \
-              -H "Authorization: token $TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              -d "{\"assignees\":[\"${{ env.ASSIGNEE }}\"]}" \
-              "https://api.github.com/repos/$REPO/issues/$ISSUE_NUM" > /dev/null
-            echo "    Assigned"
+            echo "  - Assigning to $ASSIGNEE..."
+            gh issue edit "$ISSUE_NUM" --assignee "$ASSIGNEE" && echo "    Assigned" || echo "    Failed to assign"
 
             # Aggiungi al Project
             echo "  - Adding to Project..."
-
-            PAYLOAD=$(jq -n \
-              --arg query 'mutation($projectId:ID!, $itemId:ID!) { addProjectV2ItemById(input: {projectId: $projectId, contentId: $itemId}) { item { id } } }' \
-              --arg projectId "${{ env.PROJECT_ID }}" \
-              --arg itemId "$ITEM_ID" \
-              '{query: $query, variables: {projectId: $projectId, itemId: $itemId}}')
-
-            RESPONSE=$(curl -s -X POST \
-              -H "Authorization: token $TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "$PAYLOAD" \
-              "https://api.github.com/graphql")
-
-            if echo "$RESPONSE" | jq -e '.data.addProjectV2ItemById.item.id' > /dev/null 2>&1; then
-              echo "    Added to Project"
-            else
-              echo "    Failed to add to Project"
-              echo "    Details: $(echo "$RESPONSE" | jq '.errors')"
-            fi
+            gh issue edit "$ISSUE_NUM" --add-project "${{ env.PROJECT_ID }}" && echo "    Added to Project" || echo "    Failed to add to Project"
           fi
 
           # Se Pull Request
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            ITEM_ID="${{ github.event.pull_request.node_id }}"
             PR_NUM="${{ github.event.pull_request.number }}"
             PR_ACTION="${{ github.event.action }}"
-
             echo "Processing PR #$PR_NUM ($PR_ACTION)..."
 
             # Assegna PR
-            echo "  - Assigning to ${{ env.ASSIGNEE }}..."
-            curl -s -X PATCH \
-              -H "Authorization: token $TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              -d "{\"assignees\":[\"${{ env.ASSIGNEE }}\"]}" \
-              "https://api.github.com/repos/$REPO/issues/$PR_NUM" > /dev/null
-            echo "    Assigned"
+            echo "  - Assigning to $ASSIGNEE..."
+            gh pr edit "$PR_NUM" --assignee "$ASSIGNEE" && echo "    Assigned" || echo "    Failed to assign"
 
-            # Aggiungi al Project (solo se opened o reopened)
+            # Aggiungi al Project e richiedi reviewer (solo se opened o reopened)
             if [ "$PR_ACTION" = "opened" ] || [ "$PR_ACTION" = "reopened" ]; then
               echo "  - Adding to Project..."
+              gh pr edit "$PR_NUM" --add-project "${{ env.PROJECT_ID }}" && echo "    Added to Project" || echo "    Failed to add to Project"
 
-              PAYLOAD=$(jq -n \
-                --arg query 'mutation($projectId:ID!, $itemId:ID!) { addProjectV2ItemById(input: {projectId: $projectId, contentId: $itemId}) { item { id } } }' \
-                --arg projectId "${{ env.PROJECT_ID }}" \
-                --arg itemId "$ITEM_ID" \
-                '{query: $query, variables: {projectId: $projectId, itemId: $itemId}}')
-
-              RESPONSE=$(curl -s -X POST \
-                -H "Authorization: token $TOKEN" \
-                -H "Content-Type: application/json" \
-                -d "$PAYLOAD" \
-                "https://api.github.com/graphql")
-
-              if echo "$RESPONSE" | jq -e '.data.addProjectV2ItemById.item.id' > /dev/null 2>&1; then
-                echo "    Added to Project"
-              else
-                echo "    Failed to add to Project"
-                echo "    Details: $(echo "$RESPONSE" | jq '.errors')"
-              fi
-
-              # Richiedi reviewer
               echo "  - Requesting reviewer..."
-              REVIEWER_RESPONSE=$(curl -s -X POST \
-                -H "Authorization: token $TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                -d "{\"reviewers\":[\"${{ env.ASSIGNEE }}\"]}" \
-                "https://api.github.com/repos/$REPO/pulls/$PR_NUM/requested_reviewers")
-
-              if echo "$REVIEWER_RESPONSE" | jq -e '.requested_reviewers[0].login' > /dev/null 2>&1; then
-                echo "    Reviewer requested successfully"
-              else
-                echo "    Failed to request reviewer"
-                echo "    Response: $(echo "$REVIEWER_RESPONSE" | jq '.' 2>/dev/null || echo "$REVIEWER_RESPONSE")"
-              fi
+              gh pr edit "$PR_NUM" --add-reviewer "$ASSIGNEE" && echo "    Reviewer requested successfully" || echo "    Failed to request reviewer"
             fi
 
             # Se PR è stato chiuso
             if [ "$PR_ACTION" = "closed" ]; then
               echo "  - PR closed"
-              PR_MERGED="${{ github.event.pull_request.merged }}"
-              if [ "$PR_MERGED" = "true" ]; then
+              if gh pr view "$PR_NUM" --json merged --jq '.merged' | grep -q true; then
                 echo "    PR merged - Item will auto-transition in Project"
               fi
             fi

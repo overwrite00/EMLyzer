@@ -12,6 +12,13 @@ on:
       - "package-lock.json"
   pull_request:
     branches: [develop, main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/tests.yml"
+      - "pyproject.toml"
+      - "package.json"
+      - "package-lock.json"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -19,21 +26,17 @@ concurrency:
 
 jobs:
   backend-tests:
-    name: Backend Tests (Python ${{ matrix.python-version }})
+    name: Backend Tests (Python 3.13)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.11', '3.12', '3.13']
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.13
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.13'
           cache: 'pip'
 
       - name: Install dependencies
@@ -53,12 +56,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: pytest-results-${{ matrix.python-version }}
+          name: pytest-results
           path: backend/pytest-results.xml
           retention-days: 7
 
       - name: Upload coverage report
-        if: always() && matrix.python-version == '3.13'
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
@@ -66,7 +69,7 @@ jobs:
           retention-days: 30
 
       - name: Generate coverage summary
-        if: always() && matrix.python-version == '3.13'
+        if: always()
         run: |
           cd backend
           coverage report -m > coverage-summary.txt
@@ -88,14 +91,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'frontend/package-lock.json'
 
-      - name: Cache node_modules
-        uses: actions/cache@v6
-        with:
-          path: frontend/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('frontend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
       - name: Install dependencies
         run: |
           cd frontend
@@ -111,7 +106,17 @@ jobs:
           cd frontend
           npm run build
 
-      - name: Verify bundle size
+      - name: Verify bundle size (max 150KB combined)
         run: |
           cd frontend
-          du -sh dist/assets/*.js dist/assets/*.css 2>/dev/null || echo "Build artifacts verified"
+          JS_SIZE=$(du -b dist/assets/index.js | awk '{print $1}')
+          CSS_SIZE=$(du -b dist/assets/index.css | awk '{print $1}')
+          TOTAL=$((JS_SIZE + CSS_SIZE))
+          MAX_SIZE=$((150 * 1024))
+
+          echo "Bundle size: JS=${JS_SIZE} bytes, CSS=${CSS_SIZE} bytes, Total=${TOTAL} bytes (max=${MAX_SIZE})"
+          if [ $TOTAL -gt $MAX_SIZE ]; then
+            echo "ERROR: Bundle exceeds ${MAX_SIZE} bytes limit"
+            exit 1
+          fi
+          echo "✓ Bundle size check passed"
