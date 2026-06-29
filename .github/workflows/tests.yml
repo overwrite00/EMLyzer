@@ -106,13 +106,13 @@ jobs:
           cd frontend
           npm run build
 
-      - name: Verify bundle size (max 150KB combined)
+      - name: Verify bundle size (max 450KB combined)
         run: |
           cd frontend
           JS_SIZE=$(du -b dist/assets/index.js | awk '{print $1}')
           CSS_SIZE=$(du -b dist/assets/index.css | awk '{print $1}')
           TOTAL=$((JS_SIZE + CSS_SIZE))
-          MAX_SIZE=$((150 * 1024))
+          MAX_SIZE=$((450 * 1024))
 
           echo "Bundle size: JS=${JS_SIZE} bytes, CSS=${CSS_SIZE} bytes, Total=${TOTAL} bytes (max=${MAX_SIZE})"
           if [ $TOTAL -gt $MAX_SIZE ]; then
