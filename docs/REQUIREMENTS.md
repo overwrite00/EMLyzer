@@ -131,8 +131,8 @@ All dependencies are installed **automatically** during first run via `start.bat
 
 ### 📧 Email Parsing
 - **mail-parser** (3.15.0+) — RFC 5322 parser for .eml files
-- **extract-msg** (0.41.1+) — Microsoft Outlook .msg parser
-- **beautifulsoup4** (4.12.0+) — HTML parsing and analysis
+- **python-oxmsg** (0.0.2+) — Microsoft Outlook .msg parser (MIT license, Unstructured-IO maintained)
+- **beautifulsoup4** (4.14.0+) — HTML parsing and analysis
 
 ### 🌐 URL & Domain Analysis
 - **tldextract** (5.1.0+) — Domain and TLD extraction
@@ -261,5 +261,5 @@ No. Python 3.11+ is required. Some dependencies don't support 3.10.
 
 ---
 
-*Last updated: 2026-06-07*
+*Last updated: 2026-06-29*
 *← [README](../README.md) | [Installation →](./INSTALLATION.md)*
