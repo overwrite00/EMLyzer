@@ -328,51 +328,65 @@ def _extract_attachment(part, parsed: ParsedEmail):
 
 
 def _parse_msg(raw: bytes, filename: str) -> ParsedEmail:
-    """Parse a raw .msg (Outlook) file using extract-msg."""
+    """Parse a raw .msg (Outlook) file using pluggable MsgBackend."""
+    from core.analysis.msg_backends import get_msg_backend
+
     parsed = ParsedEmail()
     parsed.filename = filename
     parsed.file_size_bytes = len(raw)
     parsed.file_hash_md5, parsed.file_hash_sha1, parsed.file_hash_sha256 = _compute_hashes(raw)
 
-    try:
-        import extract_msg
-        import io
-        msg = extract_msg.openMsg(io.BytesIO(raw))
-    except Exception as e:
-        parsed.parse_errors.append(f"MSG parse error: {e}")
+    backend = get_msg_backend()
+    if backend is None:
+        parsed.parse_errors.append("No .msg backend available (install python-oxmsg)")
         return parsed
 
+    # Parse using backend
+    f = backend.parse(raw)
+    parsed.parse_errors.extend(f.errors)
+
     try:
-        parsed.mail_from = str(msg.sender or "")
-        parsed.mail_subject = str(msg.subject or "")
-        parsed.mail_date = str(msg.date or "")
-        parsed.mail_to = [str(msg.to or "")]
-        parsed.mail_cc = [str(msg.cc or "")] if msg.cc else []
-        parsed.body_text = str(msg.body or "")
-        parsed.body_html = str(msg.htmlBody or "") if hasattr(msg, "htmlBody") else ""
+        # Map backend fields to ParsedEmail
+        parsed.mail_from = f.mail_from
+        parsed.mail_subject = f.subject
+        parsed.mail_date = f.date
+        parsed.mail_to = f.mail_to if f.mail_to else []
+        parsed.mail_cc = f.mail_cc if f.mail_cc else []
+        parsed.body_text = f.body_text
+        parsed.body_html = f.body_html
 
-        # Attachments
-        for att in (msg.attachments or []):
+        # Bonus: if transport headers available, reuse EML parser for auth headers
+        if f.transport_headers.strip():
             try:
-                data = att.data
-                if data:
-                    detected = filetype.guess(data)
-                    real_mime = detected.mime if detected else "application/octet-stream"
-                    md5, sha1, sha256 = _compute_hashes(data)
-                    parsed.attachments.append({
-                        "filename": str(att.longFilename or att.shortFilename or "unknown"),
-                        "size_bytes": len(data),
-                        "declared_mime": "application/octet-stream",
-                        "real_mime": real_mime,
-                        "mime_mismatch": False,
-                        "hash_md5": md5,
-                        "hash_sha1": sha1,
-                        "hash_sha256": sha256,
-                    })
+                eml_view = _parse_eml(f.transport_headers.encode("utf-8", "replace"), filename)
+                parsed.spf_result = eml_view.spf_result
+                parsed.dkim_result = eml_view.dkim_result
+                parsed.dmarc_result = eml_view.dmarc_result
+                parsed.received_chain = eml_view.received_chain
+                parsed.raw_headers = eml_view.raw_headers
+                if eml_view.message_id:
+                    parsed.message_id = eml_view.message_id
             except Exception as e:
-                parsed.parse_errors.append(f"MSG attachment error: {e}")
+                parsed.parse_errors.append(f"Transport header parsing: {e}")
 
-        msg.close()
+        # Attachments (improved: use declared_mime from backend)
+        for att in f.attachments:
+            data = att["data"]
+            if data:
+                detected = filetype.guess(data)
+                real_mime = detected.mime if detected else att["declared_mime"]
+                md5, sha1, sha256 = _compute_hashes(data)
+                parsed.attachments.append({
+                    "filename": att["filename"],
+                    "size_bytes": len(data),
+                    "declared_mime": att["declared_mime"],
+                    "real_mime": real_mime,
+                    "mime_mismatch": real_mime != att["declared_mime"],
+                    "hash_md5": md5,
+                    "hash_sha1": sha1,
+                    "hash_sha256": sha256,
+                })
+
     except Exception as e:
         parsed.parse_errors.append(f"MSG field extraction error: {e}")
 
@@ -385,7 +399,7 @@ def parse_email_file(file_bytes: bytes, filename: str) -> ParsedEmail:
 
     Supported formats:
     - .eml (RFC 2822, plain text SMTP format) → via mail-parser library
-    - .msg (Microsoft Outlook binary format) → via extract-msg library
+    - .msg (Microsoft Outlook binary format) → via python-oxmsg library (MIT license)
     - Auto-detection: if extension unknown, attempts EML parsing
 
     Extracts:
