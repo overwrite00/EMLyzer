@@ -97,6 +97,8 @@ Email (.eml / .msg / plain text)
 
 ## 🔧 Version
 
+**v0.16.1** — 🔧 Hardening release: Enabled attachment binary analysis in the live pipeline (VBA macros, PDF JavaScript, suspicious streams), fixed Authentication-Results header selection (anti-spoofing), inline attachment extraction, removed body pattern double-counting on multipart emails, added 6 missing i18n keys, made WHOIS/URL batch timeouts effective, plus 10 correctness fixes. All 123 tests passing ✅, zero regressions.
+
 **v0.16.0** — 🏗️ Architecture release: Migrated .msg parsing to python-oxmsg (MIT license), eliminated GPL violation, introduced MsgBackend abstraction for pluggable implementations, unblocked beautifulsoup4 to 4.14.0, added transport headers support (SPF/DKIM/DMARC for .msg files), RTF-only email support with optional RTFDE fallback. All 122 tests passing ✅, production-ready.
 
 📖 **See full version history** → [CHANGELOG.md](./CHANGELOG.md)
