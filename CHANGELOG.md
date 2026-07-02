@@ -70,6 +70,11 @@ Features are ordered by implementation priority.
 - **Manual analysis parity** — `/api/manual/` now passes `header_result` to `analyze_body()`
   so the NLP model receives real SPF/DKIM/DMARC flags (was always False)
 - **SPA fallback** — unknown `/api/*` paths now return JSON 404 instead of the SPA HTML page
+- **Unbounded upload memory read** — `POST /api/upload/` read the entire request body into
+  memory via `file.read()` before checking it against `MAX_UPLOAD_SIZE_MB`, so an oversized
+  upload was still fully buffered before being rejected (potential memory-exhaustion DoS on
+  internet-facing deployments without a reverse-proxy body-size limit). Now reads in 1MB
+  chunks and rejects as soon as the configured limit is exceeded, without buffering the rest
 
 ### Notes
 - All 123 tests passing (1 skipped), zero regressions
