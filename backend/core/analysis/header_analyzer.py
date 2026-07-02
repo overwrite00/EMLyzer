@@ -190,6 +190,15 @@ def _extract_domain(address: str) -> str:
     return m.group(1).lower() if m else ""
 
 
+def _same_or_subdomain(host: str, domain: str) -> bool:
+    """True se host coincide con domain o ne è un sottodominio.
+
+    Usa il confine del punto: un semplice endswith farebbe passare
+    "evilpaypal.com" come interno a "paypal.com".
+    """
+    return host == domain or host.endswith("." + domain)
+
+
 def _check_identity_mismatch(parsed: ParsedEmail, result: HeaderAnalysisResult):
     """Confronta From, Return-Path, Reply-To per individuare mismatch."""
     from_domain = _extract_domain(parsed.mail_from)
@@ -251,8 +260,10 @@ def _parse_dkim_signature(raw: str) -> dict:
 
 def _parse_auth_results_subfields(auth_headers: list[str]) -> dict:
     """
-    Estrae sub-campi dall'ultimo Authentication-Results header (quello
-    aggiunto dal server ricevente finale, tipicamente il più in basso).
+    Estrae sub-campi dal PRIMO Authentication-Results header: i server SMTP
+    prependono i propri header, quindi il primo è quello aggiunto dal server
+    ricevente finale (l'unico affidabile — l'ultimo può essere stato
+    iniettato dal mittente).
 
     Restituisce dict con:
       spf_client_ip, spf_envelope_from,
@@ -261,7 +272,7 @@ def _parse_auth_results_subfields(auth_headers: list[str]) -> dict:
     """
     if not auth_headers:
         return {}
-    raw = " ".join(auth_headers[-1].split())  # LAST header, spazi normalizzati
+    raw = " ".join(auth_headers[0].split())  # FIRST header, spazi normalizzati
 
     out: dict = {}
 
@@ -760,7 +771,7 @@ def _check_list_unsubscribe(parsed: ParsedEmail, result: HeaderAnalysisResult):
             m_dom = re.match(r"https?://([^/:?#]+)", item)
             if m_dom and from_domain:
                 link_domain = m_dom.group(1).lower()
-                if not link_domain.endswith(from_domain):
+                if not _same_or_subdomain(link_domain, from_domain):
                     external_domain = link_domain
         elif item.lower().startswith("https://"):
             # Controlla IP diretto
@@ -771,14 +782,14 @@ def _check_list_unsubscribe(parsed: ParsedEmail, result: HeaderAnalysisResult):
             m_dom = re.match(r"https://([^/:?#]+)", item)
             if m_dom and from_domain:
                 link_domain = m_dom.group(1).lower()
-                if not link_domain.endswith(from_domain):
+                if not _same_or_subdomain(link_domain, from_domain):
                     external_domain = link_domain
         elif item.lower().startswith("mailto:"):
             # Controlla dominio mailto vs mittente
             m = re.search(r"@([\w.\-]+)", item)
             if m and from_domain:
                 mailto_domain = m.group(1).lower()
-                if not mailto_domain.endswith(from_domain):
+                if not _same_or_subdomain(mailto_domain, from_domain):
                     external_domain = mailto_domain
 
     if has_ip:
@@ -926,8 +937,10 @@ def _check_brand_spoofing(parsed: ParsedEmail, result: HeaderAnalysisResult):
         official_domains = brand.get("official_domains", [])
 
         # Check if brand name or alias appears in From field
+        # Word-boundary: evita falsi positivi da alias corti contenuti
+        # in altre parole (es. "visa" dentro "advisor").
         for alias in aliases:
-            if alias.lower() in from_lower:
+            if re.search(rf"\b{re.escape(alias.lower())}\b", from_lower):
                 # If domain doesn't match official domains, it's spoofing
                 if from_domain and from_domain not in official_domains:
                     result.findings.append(HeaderFinding(

@@ -167,6 +167,16 @@ TRANSLATIONS = {
         "en": "Bulk email with X-Campaign-ID but missing List-Unsubscribe",
     },
 
+    # ── Brand spoofing / DKIM mismatch (v0.15) ───────────────────────────────
+    "header.brand_spoofing": {
+        "it": "Possibile brand spoofing: '{brand}' nel campo From ma dominio '{domain}' non ufficiale",
+        "en": "Possible brand spoofing: '{brand}' in From field but unofficial domain '{domain}'",
+    },
+    "header.dkim_domain_mismatch": {
+        "it": "Dominio DKIM '{dkim_domain}' diverso dal dominio From '{from_domain}' (DKIM pass su dominio non allineato)",
+        "en": "DKIM domain '{dkim_domain}' differs from From domain '{from_domain}' (DKIM passes on misaligned domain)",
+    },
+
     # ── ARC chain findings ────────────────────────────────────────────────────
     "header.arc_valid": {
         "it": "ARC chain valida ({n} hop)",
@@ -246,6 +256,14 @@ TRANSLATIONS = {
         "it": "Possibili errori grammaticali nel testo ({count}) — potrebbe indicare testo tradotto automaticamente",
         "en": "Possible grammar errors in text ({count}) — may indicate auto-translated content",
     },
+    "body.language_mismatch": {
+        "it": "Lingua del corpo email inattesa: rilevato '{detected}' — possibile account compromesso o invio non autorizzato",
+        "en": "Unexpected email body language: detected '{detected}' — possible compromised account or unauthorized mailing",
+    },
+    "body.known_campaign": {
+        "it": "Email corrispondente a campagna phishing nota: {name}",
+        "en": "Email matches known phishing campaign: {name}",
+    },
 
     # ── URL analysis ──────────────────────────────────────────────────────────
     "url.ip_direct": {
@@ -286,6 +304,10 @@ TRANSLATIONS = {
     "url.http": {
         "it": "URL usa HTTP (non HTTPS)",
         "en": "URL uses HTTP (not HTTPS)",
+    },
+    "url.malicious_cdn": {
+        "it": "Pattern CDN malevolo rilevato: {cdn} usato come redirect di phishing",
+        "en": "Malicious CDN pattern detected: {cdn} used as phishing redirect",
     },
 
     # ── Attachment analysis ───────────────────────────────────────────────────
@@ -336,6 +358,10 @@ TRANSLATIONS = {
     "analysis.notes_too_long": {
         "it": "Note troppo lunghe (max 10.000 caratteri)",
         "en": "Notes too long (max 10,000 characters)",
+    },
+    "analysis.db_error": {
+        "it": "Errore durante il salvataggio dell'analisi nel database",
+        "en": "Error while saving the analysis to the database",
     },
 
     # ── Reputation route ─────────────────────────────────────────────────────────

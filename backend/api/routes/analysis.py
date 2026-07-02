@@ -375,6 +375,18 @@ def _build_response_from_record(record) -> dict:
     ai = record.attachment_indicators or {}
     ri = record.risk_explanation or {}
 
+    # mail_to è salvato come JSON (lista serializzata): decodifica per
+    # restituire la stessa struttura del POST. Fallback al valore grezzo
+    # per record storici salvati in altri formati.
+    mail_to = record.mail_to
+    if isinstance(mail_to, str):
+        try:
+            decoded = json.loads(mail_to)
+            if isinstance(decoded, list):
+                mail_to = decoded
+        except (ValueError, TypeError):
+            pass
+
     return {
         "job_id": record.id,
         "status": "completed",
@@ -383,7 +395,7 @@ def _build_response_from_record(record) -> dict:
             "filename":        record.filename,
             "subject":         record.mail_subject,
             "from":            record.mail_from,
-            "to":              record.mail_to,
+            "to":              mail_to,
             "date":            record.mail_date,
             "message_id":      record.message_id,
             "file_hash_sha256": record.file_hash_sha256,

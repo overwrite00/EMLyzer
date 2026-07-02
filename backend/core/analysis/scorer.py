@@ -33,11 +33,14 @@ from core.analysis.url_analyzer import URLAnalysisResult
 from core.analysis.attachment_analyzer import AttachmentAnalysisResult
 
 
+# Il testo tradotto viene risolto a runtime (chiave i18n, non stringa):
+# valutare t() a import time congelerebbe la lingua a quella di avvio,
+# ignorando i cambi via POST /api/settings/language.
 RISK_LABELS = {
-    (0, 20):   ("low",      t("risk.low")),
-    (20, 45):  ("medium",   t("risk.medium")),
-    (45, 70):  ("high",     t("risk.high")),
-    (70, 101): ("critical", t("risk.critical")),
+    (0, 20):   ("low",      "risk.low"),
+    (20, 45):  ("medium",   "risk.medium"),
+    (45, 70):  ("high",     "risk.high"),
+    (70, 101): ("critical", "risk.critical"),
 }
 
 # Pesi base per modulo — ridistribuiti adattativamente sui moduli attivi
@@ -73,9 +76,9 @@ def _label_for_score(score: float) -> tuple[str, str]:
 
     Returns: (label, label_text) dove label in ('low', 'medium', 'high', 'critical')
     """
-    for (lo, hi), (label, text) in RISK_LABELS.items():
+    for (lo, hi), (label, text_key) in RISK_LABELS.items():
         if lo <= score < hi:
-            return label, text
+            return label, t(text_key)
     return "critical", t("risk.critical")
 
 

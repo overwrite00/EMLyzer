@@ -22,6 +22,61 @@ Features are ordered by implementation priority.
 
 ---
 
+## [0.16.1] — 2026-07-02
+
+### Fixed — Code Review Hardening
+
+#### Detection pipeline
+- **Attachment binary analysis now runs in production** — the parser now retains attachment
+  bytes (`data` key) and `analyze_attachments()` passes them to the binary scanners.
+  VBA macro detection (OLE2/OOXML), PDF JavaScript and suspicious PDF stream checks were
+  previously dead code in the live pipeline (only exercised by tests with synthetic bytes)
+- **Authentication-Results header selection** — SPF/DKIM/DMARC results are now read from
+  the FIRST (topmost) `Authentication-Results` header, the one prepended by the final
+  receiving server. Previously the LAST header was used, which an attacker could inject
+  into the original message to spoof `spf=pass; dkim=pass; dmarc=pass`
+- **Inline attachments analyzed** — MIME parts with a filename but `Content-Disposition:
+  inline` (or none) are now extracted and scanned like regular attachments
+- **Body pattern double-counting removed** — urgency/CTA/credential counters now take the
+  MAX across text sources (plain text, HTML-extracted text, hidden content) instead of
+  summing them. multipart/alternative emails (same content in text+HTML) no longer get
+  doubled counts, duplicated findings and inflated body/NLP scores
+
+#### Correctness
+- **6 missing i18n keys added** (`header.brand_spoofing`, `header.dkim_domain_mismatch`,
+  `url.malicious_cdn`, `body.language_mismatch`, `body.known_campaign`, `analysis.db_error`)
+  — v0.15 findings displayed the raw key instead of a description
+- **WHOIS timeout now effective** — per-call `ThreadPoolExecutor` context managers blocked
+  on `shutdown(wait=True)` until the query completed, making the 8s wall-clock timeout
+  illusory; replaced with a shared executor. URL batch analysis executors now shut down
+  with `wait=False, cancel_futures=True` so `URL_BATCH_TIMEOUT` is actually enforced
+- **Risk label language** — `RISK_LABELS` translations resolved at call time instead of
+  import time; label text now follows runtime language switches via `/api/settings/language`
+- **`_logger` NameError** in `campaign_detector.py` (triggered with >10k emails) — logger
+  now defined
+- **Hostname prefix stripping** — `lstrip("www.")` (strips characters, mangling hosts like
+  `web.example.com` → `eb.example.com`) replaced with `removeprefix("www.")` in reputation
+  indicator extraction (4 occurrences)
+- **Trusted CDN IP over-matching** — prefix match now requires an octet boundary
+  (`"54.1"` no longer matches `54.100.x.x`)
+- **List-Unsubscribe domain check bypass** — external-domain comparison now uses dot-boundary
+  subdomain matching (`evilpaypal.com` no longer passes as internal to `paypal.com`)
+- **Brand spoofing false positives** — brand aliases matched with word boundaries
+  (e.g. "visa" no longer matches inside "advisor")
+- **IPv4 validation** — direct-IP URL detection validates octets 0-255 via `ipaddress`
+  (pattern `999.999.999.999` no longer flagged as IP)
+- **`mail_to` consistency** — stored as JSON in both upload and manual pipelines; GET
+  `/api/analysis/{job_id}` now returns it as a list (same shape as POST)
+- **Manual analysis parity** — `/api/manual/` now passes `header_result` to `analyze_body()`
+  so the NLP model receives real SPF/DKIM/DMARC flags (was always False)
+- **SPA fallback** — unknown `/api/*` paths now return JSON 404 instead of the SPA HTML page
+
+### Notes
+- All 123 tests passing (1 skipped), zero regressions
+- No API schema changes; PATCH release per SemVer
+
+---
+
 ## [0.16.0] — 2026-06-29
 
 ### Changed — .msg Backend Abstraction & GPL License Resolution

@@ -339,21 +339,20 @@ def _detect_campaign_match(text_lower: str, subject_lower: str) -> dict | None:
     return None
 
 
-def _count_pattern_matches(pattern_list: list[str], text: str, result: BodyAnalysisResult, attr_name: str, max_match_len: int = 150) -> list[tuple[str, int]]:
+def _count_pattern_matches(pattern_list: list[str], text: str, max_match_len: int = 150) -> tuple[int, list[tuple[str, int]]]:
     """
     Consolida logica pattern matching — evita duplicazione.
 
     Args:
         pattern_list: lista di regex pattern da matchare
         text: testo normalizzato lowercase
-        result: BodyAnalysisResult object (attributo incrementato in-place)
-        attr_name: nome dell'attributo su result da incrementare (es. 'urgency_count')
         max_match_len: ignora match > questo valore (probabili falsi positivi)
 
     Returns:
-        list[tuple(pattern_text, count)] ordinato per frequenza descrescente
+        (totale_match, list[tuple(pattern_text, count)] ordinata per frequenza decrescente)
     """
-    pattern_hits = {}  # {pattern_matched: count}
+    pattern_hits: dict[str, int] = {}  # {pattern_matched: count}
+    total = 0
 
     for pattern in pattern_list:
         matches = re.findall(pattern, text)
@@ -361,36 +360,56 @@ def _count_pattern_matches(pattern_list: list[str], text: str, result: BodyAnaly
             # Ignora match troppo lunghi — probabili errori di capturing
             if len(match_text) > max_match_len:
                 continue
-            # Incrementa il contatore nel result object
-            setattr(result, attr_name, getattr(result, attr_name) + 1)
-            # Track pattern hit
-            if match_text not in pattern_hits:
-                pattern_hits[match_text] = 0
-            pattern_hits[match_text] += 1
+            total += 1
+            pattern_hits[match_text] = pattern_hits.get(match_text, 0) + 1
 
-    # Ritorna lista di tuple ordinata per frequenza (pattern più comuni prima)
-    return sorted(pattern_hits.items(), key=lambda x: x[1], reverse=True)
+    # Tuple ordinate per frequenza (pattern più comuni prima)
+    return total, sorted(pattern_hits.items(), key=lambda x: x[1], reverse=True)
 
 
-def _analyze_text(body_text: str, result: BodyAnalysisResult):
-    """Analisi pattern su testo plain."""
-    if not body_text:
-        return
+def _analyze_text(sources: "str | list[str]", result: BodyAnalysisResult):
+    """Analisi pattern su una o più sorgenti testuali (plain text, testo HTML,
+    contenuto nascosto).
+
+    Le email multipart/alternative duplicano lo stesso contenuto in plain text
+    e HTML: sommare i conteggi delle sorgenti gonfierebbe artificialmente i
+    punteggi. Per ogni categoria si usa quindi il MASSIMO tra le sorgenti
+    (cattura comunque il caso "HTML malevolo con plain text innocuo"),
+    unendo i pattern trovati per l'evidenza.
+    """
+    if isinstance(sources, str):
+        sources = [sources]
+
     # Normalizza Unicode accenti (NFC) per matching multilingua
     # Risolve problemi con portoghese/italiano: "será" vs "sera"
-    text_normalized = unicodedata.normalize('NFC', body_text)
-    text_lower = text_normalized.lower()
+    normalized = [
+        unicodedata.normalize('NFC', text).lower()
+        for text in sources if text
+    ]
+    if not normalized:
+        return
 
-    # P1: Deduplica pattern per categoria — mantiene SOLO i pattern unici trovati
-    # Usa helper function per evitare duplicazione di logica
-    urgency_matches = _count_pattern_matches(URGENCY_PATTERNS, text_lower, result, 'urgency_count')
-    cta_matches = _count_pattern_matches(PHISHING_CTAS, text_lower, result, 'phishing_cta_count')
-    credential_matches = _count_pattern_matches(CREDENTIAL_KEYWORDS, text_lower, result, 'credential_keyword_count')
+    categories = [
+        (URGENCY_PATTERNS,     'urgency_count'),
+        (PHISHING_CTAS,        'phishing_cta_count'),
+        (CREDENTIAL_KEYWORDS,  'credential_keyword_count'),
+    ]
+    hits_by_attr: dict[str, list[tuple[str, int]]] = {}
+    for patterns, attr in categories:
+        best_count = 0
+        merged_hits: dict[str, int] = {}
+        for text in normalized:
+            count, hits = _count_pattern_matches(patterns, text)
+            best_count = max(best_count, count)
+            for match_text, n in hits:
+                merged_hits[match_text] = max(merged_hits.get(match_text, 0), n)
+        setattr(result, attr, best_count)
+        hits_by_attr[attr] = sorted(merged_hits.items(), key=lambda x: x[1], reverse=True)
 
-    # P1: Estrai solo i testi dei pattern (senza conteggi)
-    urgency_unique = [m[0] for m in urgency_matches[:5]]
-    cta_unique = [m[0] for m in cta_matches[:5]]
-    credential_unique = [m[0] for m in credential_matches[:5]]
+    # Estrai solo i testi dei pattern (senza conteggi) per l'evidenza
+    urgency_unique    = [m[0] for m in hits_by_attr['urgency_count'][:5]]
+    cta_unique        = [m[0] for m in hits_by_attr['phishing_cta_count'][:5]]
+    credential_unique = [m[0] for m in hits_by_attr['credential_keyword_count'][:5]]
 
     # URGENCY
     if result.urgency_count >= 3:
@@ -583,13 +602,9 @@ def _analyze_html(body_html: str, result: BodyAnalysisResult):
                 if txt:
                     hidden_texts.append(txt)
         if hidden_texts:
+            # Il testo nascosto viene incluso come sorgente nel pattern
+            # matching centralizzato di analyze_body (niente doppio conteggio).
             result.raw_hidden_content = "\n".join(hidden_texts[:20])
-            # v0.15.1 FIX: Analyze patterns in hidden content too!
-            # Hidden text often contains phishing indicators masked from visual inspection
-            hidden_content_combined = " ".join(hidden_texts)
-            _analyze_text(hidden_content_combined, result)
-            _logger.debug("[BODY] Hidden content analyzed: %d urgency, %d cta, %d credentials",
-                         result.urgency_count, result.phishing_cta_count, result.credential_keyword_count)
 
         result.findings.append(BodyFinding(
             category="html",
@@ -797,8 +812,9 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
 
     _logger.info("[BODY START] text_len=%d, html_len=%d", len(parsed.body_text or ''), len(parsed.body_html or ''))
 
-    _analyze_text(parsed.body_text, result)
-    _logger.debug("[BODY] text analysis: %d findings", len(result.findings))
+    # HTML: link offuscati, form, JS, elementi nascosti (popola raw_hidden_content), base64
+    _analyze_html(parsed.body_html, result)
+    _logger.debug("[BODY] html analysis: %d findings, %d urls extracted", len(result.findings), len(result.extracted_urls))
 
     # v0.15.1 FIX: ALWAYS extract text from HTML for pattern analysis
     # Many sophisticated phishing emails have innocuous plain text but malicious visible HTML content
@@ -811,13 +827,20 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
             if html_text and len(html_text) > 50:
                 # v0.15.1: Save extracted HTML text for campaign matching
                 result.extracted_html_text = html_text
-                _logger.debug("[BODY] Extracting text from HTML for pattern analysis (html_text_len=%d)", len(html_text))
-                _analyze_text(html_text, result)
+                _logger.debug("[BODY] Extracted text from HTML for pattern analysis (html_text_len=%d)", len(html_text))
     except Exception as e:
         _logger.error("[BODY] Failed to extract text from HTML (html_len=%d): %s", len(parsed.body_html or ''), e)
 
-    _analyze_html(parsed.body_html, result)
-    _logger.debug("[BODY] html analysis: %d findings, %d urls extracted", len(result.findings), len(result.extracted_urls))
+    # Pattern matching centralizzato su tutte le sorgenti testuali.
+    # Il massimo per categoria (non la somma) evita il doppio conteggio dello
+    # stesso contenuto nelle email multipart/alternative (plain + HTML).
+    _analyze_text(
+        [parsed.body_text, result.extracted_html_text, result.raw_hidden_content],
+        result,
+    )
+    _logger.debug("[BODY] text analysis: %d findings (urgency=%d, cta=%d, creds=%d)",
+                  len(result.findings), result.urgency_count,
+                  result.phishing_cta_count, result.credential_keyword_count)
 
     _check_homoglyphs(parsed.body_text, result)
     _logger.debug("[BODY] homoglyphs checked: %d findings", len(result.findings))

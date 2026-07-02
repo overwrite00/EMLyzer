@@ -158,10 +158,15 @@ def _decode_header_raw_fallback(raw_email: bytes, header_name: str) -> str | Non
 
 
 def _extract_auth_results(values: list[str], keyword: str) -> str:
-    """Extract pass/fail/none/neutral from the LAST Authentication-Results header."""
+    """Extract pass/fail/none/neutral from the FIRST Authentication-Results header.
+
+    I server SMTP PREpendono i propri header: il primo (in alto) è quello
+    aggiunto dal server ricevente finale ed è l'unico affidabile. L'ultimo
+    può essere stato iniettato dal mittente per simulare spf/dkim/dmarc=pass.
+    """
     if not values or not isinstance(values, list):
         return ""
-    last_header = values[-1]
+    last_header = values[0]
     last_header_clean = " ".join(last_header.split())
     pattern = rf"{keyword}=(\S+)"
     m = re.search(pattern, last_header_clean, re.IGNORECASE)
@@ -266,7 +271,14 @@ def _parse_eml(raw: bytes, filename: str) -> ParsedEmail:
         for part in msg.walk():
             ctype = part.get_content_type()
             disposition = str(part.get("Content-Disposition", ""))
-            if "attachment" in disposition.lower():
+            # Un part è allegato se dichiarato tale, oppure se ha un filename
+            # e non è una parte testuale del corpo (copre gli allegati "inline"
+            # che altrimenti sfuggirebbero all'analisi statica).
+            is_attachment = (
+                "attachment" in disposition.lower()
+                or (part.get_filename() and ctype not in ("text/plain", "text/html"))
+            )
+            if is_attachment:
                 _extract_attachment(part, parsed)
             elif ctype == "text/plain" and not parsed.body_text:
                 try:
@@ -322,6 +334,10 @@ def _extract_attachment(part, parsed: ParsedEmail):
             "hash_md5": md5,
             "hash_sha1": sha1,
             "hash_sha256": sha256,
+            # Bytes grezzi per l'analisi statica (macro VBA, JS in PDF).
+            # Non vengono mai serializzati nel DB: attachment_analyzer li
+            # consuma e produce solo metadati/findings.
+            "data": payload,
         })
     except Exception as e:
         parsed.parse_errors.append(f"Attachment extraction error: {e}")
@@ -385,6 +401,7 @@ def _parse_msg(raw: bytes, filename: str) -> ParsedEmail:
                     "hash_md5": md5,
                     "hash_sha1": sha1,
                     "hash_sha256": sha256,
+                    "data": data,
                 })
 
     except Exception as e:

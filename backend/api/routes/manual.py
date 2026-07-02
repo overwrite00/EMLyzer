@@ -87,7 +87,9 @@ async def analyze_manual(payload: ManualInput):
         """
         _parsed            = parse_email_file(raw, payload.filename)
         _header_result     = analyze_headers(_parsed)
-        _body_result       = analyze_body(_parsed)
+        # header_result passa i flag SPF/DKIM/DMARC al classificatore NLP
+        # (stessa pipeline dell'upload file)
+        _body_result       = analyze_body(_parsed, _header_result)
         _url_result        = analyze_urls(_body_result.extracted_urls, do_whois=_do_whois)
         _attachment_result = analyze_attachments(_parsed.attachments)
         _risk              = compute_risk_score(_header_result, _body_result, _url_result, _attachment_result)
@@ -103,7 +105,7 @@ async def analyze_manual(payload: ManualInput):
         filename=payload.filename,
         file_hash_sha256=parsed.file_hash_sha256,
         mail_from=parsed.mail_from,
-        mail_to=str(parsed.mail_to),
+        mail_to=json.dumps(parsed.mail_to),
         mail_subject=parsed.mail_subject,
         mail_date=parsed.mail_date,
         message_id=parsed.message_id,

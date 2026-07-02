@@ -12,7 +12,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -164,5 +164,9 @@ if STATIC_DIR.exists():
     # (necessario per il routing lato client di React)
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
+        # Gli endpoint API inesistenti devono rispondere 404 JSON,
+        # non con la pagina HTML della SPA
+        if full_path.startswith("api/") or full_path == "api":
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
         index = STATIC_DIR / "index.html"
         return FileResponse(str(index))

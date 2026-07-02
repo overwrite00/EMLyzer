@@ -360,7 +360,9 @@ def analyze_attachments(attachments: list[dict]) -> AttachmentAnalysisResult:
     _logger.info("[ATTACH START] Analyzing %d attachments", result.total_attachments)
 
     for att in attachments:
-        analysis = analyze_attachment(att, raw_data=None)
+        # I bytes grezzi (chiave "data" dal parser) abilitano l'analisi binaria:
+        # macro VBA in OLE2/OOXML, JavaScript e stream sospetti nei PDF.
+        analysis = analyze_attachment(att, raw_data=att.get("data"))
         result.attachments.append(analysis)
         if any(f.severity == "critical" for f in analysis.findings):
             result.critical_count += 1

@@ -34,9 +34,21 @@ URL_SHORTENER_DOMAINS = {
 }
 
 # Regex per rilevare indirizzi IP diretti come host.
-# Formato: 4 ottetti decimali 0-255 separati da punti (senza porta nel match).
+# Il formato viene poi validato con ipaddress (ottetti 0-255).
 # IP diretto in href è HIGH risk: mostra tentativo evasione filtering DNS/dominio.
 IP_HOST_RE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+
+
+def _is_ipv4(host: str) -> bool:
+    """True se host è un IPv4 valido (ottetti 0-255, non solo pattern n.n.n.n)."""
+    if not host or not IP_HOST_RE.match(host):
+        return False
+    import ipaddress
+    try:
+        ipaddress.IPv4Address(host)
+        return True
+    except ValueError:
+        return False
 
 # Punycode / IDN (Internationalized Domain Names).
 # Formato: xn-- prefix → valore Unicode nascosto in ASCII.
@@ -183,22 +195,31 @@ def _whois_age_blocking(domain: str) -> tuple[Optional[datetime], Optional[int],
         _whois_whois_logger.setLevel(_prev_level2)
 
 
+# Executor condiviso per le query WHOIS. NON usare un executor per-chiamata
+# con context manager: l'uscita dal `with` chiama shutdown(wait=True) e
+# bloccherebbe fino al completamento della query, rendendo il timeout
+# illusorio. Con un pool condiviso il worker rimane occupato dalla query
+# lenta ma il chiamante ritorna davvero allo scadere del timeout.
+_WHOIS_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+    max_workers=URL_WORKERS, thread_name_prefix="whois"
+)
+
+
 def _whois_age(domain: str) -> tuple[Optional[datetime], Optional[int], str]:
     """
-    WHOIS con wall-clock timeout garantito tramite ThreadPoolExecutor.
+    WHOIS con wall-clock timeout garantito tramite executor condiviso.
 
     Problema su Linux: python-whois apre connessioni TCP verso server WHOIS
     che possono non rispondere per decine di secondi (comportamento diverso
     da Windows dove il resolver di sistema tende ad essere più rapido).
-    Il wrapping in un executor con future.result(timeout=N) garantisce un
-    limite assoluto indipendente dal comportamento del server remoto.
+    future.result(timeout=N) garantisce un limite assoluto indipendente dal
+    comportamento del server remoto.
     """
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(_whois_age_blocking, domain)
-        try:
-            return future.result(timeout=WHOIS_TIMEOUT)
-        except concurrent.futures.TimeoutError:
-            return None, None, f"WHOIS timeout ({WHOIS_TIMEOUT}s)"
+    future = _WHOIS_EXECUTOR.submit(_whois_age_blocking, domain)
+    try:
+        return future.result(timeout=WHOIS_TIMEOUT)
+    except concurrent.futures.TimeoutError:
+        return None, None, f"WHOIS timeout ({WHOIS_TIMEOUT}s)"
 
 
 def _check_malicious_cdn(url: str) -> dict | None:
@@ -250,7 +271,7 @@ def _analyze_single_url(
     clean_host = host.split(":")[0] if host else ""
 
     # IP diretto?
-    if IP_HOST_RE.match(clean_host):
+    if _is_ipv4(clean_host):
         analysis.is_ip_address = True
         analysis.resolved_ip   = clean_host
         analysis.findings.append({
@@ -383,13 +404,17 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
         for url in capped_urls:
             _, host, _, _ = _parse_url(url)
             clean_host = host.split(":")[0] if host else ""
-            if not IP_HOST_RE.match(clean_host):
+            if not _is_ipv4(clean_host):
                 ext = tldextract.extract(url)
                 domain = f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain
                 if domain:
                     unique_domains.add(domain)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=URL_WORKERS) as executor:
+        # shutdown(wait=False, cancel_futures=True) nel finally: senza,
+        # l'uscita dal blocco attenderebbe il completamento di TUTTE le query
+        # rendendo il timeout di batch illusorio.
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=URL_WORKERS)
+        try:
             domain_futures = {
                 executor.submit(_whois_age, domain): domain
                 for domain in unique_domains
@@ -413,10 +438,15 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
                             pass
                     elif domain not in whois_cache:
                         whois_cache[domain] = (None, None, "whois timeout")
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
-    # Elaborazione parallela degli URL (WHOIS già in cache)
+    # Elaborazione parallela degli URL (WHOIS già in cache).
+    # shutdown(wait=False, cancel_futures=True) rende effettivo il timeout di
+    # batch: il with-block attenderebbe il completamento di tutti i worker.
     analyses: list[URLAnalysis] = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=URL_WORKERS) as executor:
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=URL_WORKERS)
+    try:
         future_map = {
             executor.submit(_analyze_single_url, url, do_whois, whois_cache): url
             for url in capped_urls
@@ -438,6 +468,8 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
                     except Exception as e:
                         url = future_map[future]
                         _logger.warning("[URL] Failed to analyze URL %s after timeout: %s", url, str(e))
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
     result.urls            = analyses
     result.high_risk_count = sum(1 for a in analyses if a.risk_score >= 25)
