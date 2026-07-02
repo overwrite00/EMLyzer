@@ -6,11 +6,7 @@ setlocal enabledelayedexpansion
 set "BACKEND_DIR=%~dp0backend"
 set "VENV_DIR=%~dp0.venv"
 set "VENV_PYTHON=%~dp0.venv\Scripts\python.exe"
-set "FOUND_PYTHON="
-set "FOUND_VER="
-set "VERSION=0.16.0"
-
-:: ── Lingua output (it/en) — rilevata dalla locale di sistema ──────────────────
+set "VERSION=0.16.1"
 :: Default: italiano. Se la lingua UI di Windows e' inglese, usa l'inglese.
 set "SCRIPT_LANG=it"
 for /f "usebackq tokens=*" %%L in (`powershell -NoProfile -Command "[System.Globalization.CultureInfo]::CurrentUICulture.TwoLetterISOLanguageName" 2^>nul`) do (

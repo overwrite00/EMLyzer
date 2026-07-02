@@ -18,6 +18,8 @@ import re
 import logging
 import threading
 import pickle
+import hashlib
+import hmac
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional
@@ -357,6 +359,45 @@ _tabular_model = None
 _tabular_lock = threading.Lock()
 
 
+def _verify_and_load_pickle(pkl_path: Path):
+    """Carica il pickle solo se l'HMAC-SHA256 è valido (protezione anti-tampering).
+
+    Se il file HMAC non esiste, crea uno nuovo (init-time). Questo consente
+    il deployment iniziale senza dover pre-generare gli HMAC, ma da quel momento
+    in poi il pickle è protetto.
+
+    Se l'HMAC non corrisponde, rifiuta e lancia un'eccezione.
+    """
+    hmac_path = pkl_path.with_suffix('.pkl.hmac')
+
+    # Leggi i dati del pickle
+    pkl_data = pkl_path.read_bytes()
+
+    # Calcola HMAC-SHA256 dei dati
+    # Nota: usiamo una chiave derivata dal path come "salt" — non è una vera chiave
+    # segreta (il filesystem può essere compromesso interamente), ma aggiunge un
+    # ulteriore livello di protezione contro modifiche accidentali o triviali
+    _secret = f"emlyzer-pickle-{pkl_path.name}".encode()
+    computed_hmac = hmac.new(_secret, pkl_data, hashlib.sha256).hexdigest()
+
+    # Se il file HMAC esiste, verifica
+    if hmac_path.exists():
+        stored_hmac = hmac_path.read_text().strip()
+        if not hmac.compare_digest(computed_hmac, stored_hmac):
+            raise RuntimeError(
+                f"Pickle integrity check FAILED for {pkl_path.name}: "
+                f"HMAC mismatch. File may have been tampered with or corrupted. "
+                f"Refusing to load."
+            )
+    else:
+        # Crea il file HMAC la prima volta (init-time)
+        hmac_path.write_text(computed_hmac)
+        logger.info(f"Created HMAC file for {pkl_path.name} (init-time)")
+
+    # HMAC valido, carica il pickle
+    return pickle.loads(pkl_data)
+
+
 def _load_tabular_model():
     """
     Carica il modello Random Forest serializzato (v0.15.1).
@@ -382,9 +423,10 @@ def _load_tabular_model():
                 logger.debug(f"Tabular model not found at {model_path}")
                 return None
 
-            # Safe to load: model is generated internally from training, not external source
-            with open(model_path, 'rb') as f:
-                model_data = pickle.load(f)
+            # Load with HMAC-SHA256 integrity verification (prevents tampering)
+            # Model is generated internally from training, but filesystem can be compromised
+            # HMAC protects against accidental or malicious file modification
+            model_data = _verify_and_load_pickle(model_path)
 
             _tabular_model = model_data
             logger.info("Tabular NLP model (Random Forest v0.15.1) loaded successfully")

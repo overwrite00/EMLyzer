@@ -12,9 +12,10 @@ import uuid
 import hashlib
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, HTTPException, status, Request
 from fastapi.responses import JSONResponse
 
+from core.rate_limiting import limiter
 from utils.config import settings
 from utils.i18n import t
 
@@ -24,7 +25,8 @@ MAX_SIZE = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 
 @router.post("/")
-async def upload_email(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def upload_email(request: Request, file: UploadFile = File(...)):
     # 1. Validazione nome file e estensione
     if not file.filename:
         raise HTTPException(status_code=400, detail=t("upload.no_filename"))
@@ -36,15 +38,29 @@ async def upload_email(file: UploadFile = File(...)):
             detail=t("upload.unsupported_format", ext=ext, allowed=settings.ALLOWED_EXTENSIONS),
         )
 
-    # 2. Lettura e validazione dimensione
-    raw = await file.read()
+    # 2. Lettura a chunk con controllo progressivo della dimensione.
+    # Legge al massimo MAX_SIZE+1 byte prima di rifiutare: un client che
+    # dichiara (o invia) un body enorme non riesce a far bufferizzare al
+    # server più dati del limite configurato, indipendentemente dalla
+    # dimensione reale della richiesta.
+    _CHUNK_SIZE = 1024 * 1024  # 1 MB
+    chunks: list[bytes] = []
+    total_size = 0
+    while True:
+        chunk = await file.read(_CHUNK_SIZE)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > MAX_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=t("upload.too_large", max_mb=settings.MAX_UPLOAD_SIZE_MB),
+            )
+        chunks.append(chunk)
+    raw = b"".join(chunks)
+
     if len(raw) == 0:
         raise HTTPException(status_code=400, detail=t("upload.empty_file"))
-    if len(raw) > MAX_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=t("upload.too_large", max_mb=settings.MAX_UPLOAD_SIZE_MB),
-        )
 
     # 3. Calcola hash SHA256 del file caricato
     sha256 = hashlib.sha256(raw).hexdigest()

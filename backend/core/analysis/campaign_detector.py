@@ -13,8 +13,11 @@ Tecniche usate:
 
 import re
 import hashlib
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+
+_logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------

@@ -116,7 +116,9 @@ def _is_trusted_cdn_ip(ip: str) -> bool:
     if not ip:
         return False
     for trusted_prefix in _TRUSTED_CDN_IPS:
-        if ip.startswith(trusted_prefix):
+        # Il punto finale evita over-matching: "54.1" non deve matchare
+        # "54.100.x.x" o "54.19.x.x" ma solo "54.1.x.x".
+        if ip.startswith(trusted_prefix + "."):
             return True
     return False
 
@@ -178,7 +180,7 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
         # Estrai hostname dall'URL
         try:
             from urllib.parse import urlparse
-            hostname = urlparse(url).netloc.split(":")[0].lstrip("www.")
+            hostname = urlparse(url).netloc.split(":")[0].removeprefix("www.")
         except Exception:
             hostname = ""
 
@@ -210,7 +212,7 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
             return
         try:
             from urllib.parse import urlparse
-            hostname = urlparse(raw).netloc.split(":")[0].lstrip("www.")
+            hostname = urlparse(raw).netloc.split(":")[0].removeprefix("www.")
             # Scarta IP diretti
             if hostname and not (hostname.count(".") < 1 or hostname.replace(".", "").isdigit()):
                 if hostname not in seen_domains and not _is_trusted_cdn(hostname):
@@ -369,7 +371,7 @@ def _extract_priority_indicators(
         # Estrai hostname e controlla se trusted CDN (escludi sempre)
         try:
             from urllib.parse import urlparse
-            hostname = urlparse(url_str).netloc.split(":")[0].lstrip("www.")
+            hostname = urlparse(url_str).netloc.split(":")[0].removeprefix("www.")
         except Exception:
             hostname = ""
 
@@ -450,7 +452,7 @@ def _extract_priority_indicators(
         if url_str:
             try:
                 from urllib.parse import urlparse
-                hostname = urlparse(url_str).netloc.split(":")[0].lstrip("www.")
+                hostname = urlparse(url_str).netloc.split(":")[0].removeprefix("www.")
                 is_suspicious = (
                     u.get("is_ip_address") or u.get("is_ip") or
                     u.get("is_shortener") or u.get("is_new_domain") or
