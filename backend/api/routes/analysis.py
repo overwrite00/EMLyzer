@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,7 @@ class NotesUpdate(BaseModel):
     notes: str = ""
 
 from sqlalchemy import text
+from core.rate_limiting import limiter
 from models.database import get_session, EmailAnalysis, engine
 from utils.config import settings
 from utils.i18n import t
@@ -105,7 +106,9 @@ class BulkDeleteRequest(BaseModel):
 
 
 @router.post("/bulk-delete")
+@limiter.limit("5/minute")
 async def bulk_delete_analyses(
+    request: Request,
     body: BulkDeleteRequest,
     db: AsyncSession = Depends(get_session),
 ):
@@ -145,7 +148,9 @@ async def bulk_delete_analyses(
 
 
 @router.post("/{job_id}")
+@limiter.limit("10/minute")
 async def run_analysis(
+    request: Request,
     job_id: str,
     do_whois: bool = True,
     db: AsyncSession = Depends(get_session),
@@ -159,6 +164,18 @@ async def run_analysis(
 
     # Recupera il file
     file_path = _find_upload_file(job_id)
+
+    # Verifica dimensione file prima di leggere in RAM (non affidarsi solo al chunking upload)
+    MAX_SIZE = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    file_size = file_path.stat().st_size
+    if file_size > MAX_SIZE:
+        _logger.warning("[%s] [FILE SIZE EXCEEDED] File size %d bytes > limit %d bytes",
+                       job_id, file_size, MAX_SIZE)
+        raise HTTPException(
+            status_code=413,
+            detail=t("upload.too_large", max_mb=settings.MAX_UPLOAD_SIZE_MB)
+        )
+
     raw = file_path.read_bytes()
     original_filename = file_path.name  # es. <uuid>.eml
 
@@ -253,20 +270,16 @@ async def run_analysis(
         risk_explanation={"explanation": risk.explanation, "contributions": _dataclass_to_dict(risk)},
     )
 
-    # Upsert: se già esiste (riesecuzione analisi), aggiorna
-    # IMPORTANT: atomic transaction — delete + add in single commit to avoid race conditions
-    existing = await db.get(EmailAnalysis, job_id)
-    if existing:
-        _logger.info("[%s] [DB DELETE] Existing analysis found, deleting for upsert", job_id)
-        await db.delete(existing)
-        _logger.info("[%s] [DB DELETE] Existing record marked for deletion", job_id)
-
-    _logger.info("[%s] [DB ADD] Adding new EmailAnalysis record to session", job_id)
+    # Upsert: idempotent merge per evitare race conditions tra get() e add()
+    # SQLAlchemy merge() è atomico: se il record esiste, lo aggiorna; se no, lo crea.
+    # Questo previene la finestra di tempo dove un'altra richiesta potrebbe modificare il record.
+    _logger.info("[%s] [DB UPSERT] Merging EmailAnalysis record (atomic upsert)", job_id)
     try:
-        db.add(record)
-        _logger.info("[%s] [DB COMMIT] Committing transaction to database (includes delete if applicable)", job_id)
+        # merge() è atomico in SQLAlchemy 2.0+: no race condition tra get() e add()
+        merged_record = await db.merge(record)
+        _logger.info("[%s] [DB COMMIT] Committing transaction to database", job_id)
         await db.commit()
-        _logger.info("[%s] [DB SUCCESS] Analysis persisted successfully, record_id=%s", job_id, record.id)
+        _logger.info("[%s] [DB SUCCESS] Analysis persisted successfully, record_id=%s", job_id, merged_record.id)
     except Exception as e:
         _logger.error("[%s] [DB ERROR] Failed to commit to database: %s", job_id, str(e))
         await db.rollback()
@@ -592,6 +605,8 @@ _HTML_CSS_SANITIZER = _CSSSanitizer(
     ]
 )
 
+# Allowlist di tag HTML sicuri per email preview.
+# Tag esclusi per protezione: script, style, iframe, form, input, meta, link (no remote resources/code execution)
 _BLEACH_ALLOWED_TAGS = [
     'a', 'abbr', 'acronym', 'b', 'blockquote', 'br', 'caption',
     'cite', 'code', 'dd', 'del', 'dfn', 'div', 'dl', 'dt', 'em',
@@ -745,8 +760,26 @@ async def delete_analysis(
     if not record:
         raise HTTPException(status_code=404, detail=t("analysis.not_found"))
 
-    await db.delete(record)
-    await db.commit()
-    files_removed = _cleanup_files(job_id)
-    await _vacuum_db()
+    # Cleanup file first, then delete from DB (atomic semantic)
+    # If file cleanup fails, DB delete won't execute
+    try:
+        files_removed = _cleanup_files(job_id)
+    except Exception as e:
+        _logger.error("[%s] [FILE CLEANUP ERROR] Failed to delete files: %s", job_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=t("analysis.delete_error"))
+
+    # File cleanup succeeded, safe to delete from DB
+    try:
+        await db.delete(record)
+        await db.commit()
+    except Exception as e:
+        _logger.error("[%s] [DB DELETE ERROR] Failed to delete from database: %s", job_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=t("analysis.delete_error"))
+
+    # VACUUM is non-critical, don't fail if it errors
+    try:
+        await _vacuum_db()
+    except Exception as e:
+        _logger.warning("[%s] [VACUUM WARNING] Database compaction failed (non-critical): %s", job_id, e)
+
     return {"status": "deleted", "job_id": job_id, "files_removed": files_removed}

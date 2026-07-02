@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from api.routes import upload, analysis, reputation, report, health, manual, settings as settings_route, campaigns
+from core.rate_limiting import limiter
 from models.database import init_db
 from utils.config import settings
 
@@ -52,9 +53,30 @@ class _NoiseFilter(logging.Filter):
         return not any(marker in msg for marker in self._SUPPRESS)
 
 
+class _SecretRedactionFilter(logging.Filter):
+    """Redatta informazioni sensibili dai log (API keys, auth headers, etc.)."""
+    import re
+    _REDACT_PATTERNS = [
+        (r'(?:API[_-]?KEY|Authorization|X[_-]API[_-]?KEY)[\s=:"\']+([^\s"\']+)', r'AUTH=***REDACTED***'),
+        (r'(?:password|pwd|secret|token)[\s=:"\']+([^\s"\']+)', r'\g<0>***REDACTED***'),
+    ]
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = str(record.getMessage())
+            for pattern, repl in self._REDACT_PATTERNS:
+                msg = self._re.sub(pattern, repl, msg, flags=self._re.IGNORECASE)
+            record.msg = msg
+            record.args = ()  # Clear args to avoid formatting issues
+        except Exception:
+            pass  # If redaction fails, log the original message
+        return True
+
+
 def _install_noise_filters() -> None:
-    """Installa il filtro su tutti i logger che possono emettere questi messaggi."""
-    _filter = _NoiseFilter()
+    """Installa filtri su tutti i logger: suppressione noise + redazione segreti."""
+    _noise_filter = _NoiseFilter()
+    _secret_filter = _SecretRedactionFilter()
     targets = [
         "",                          # root logger
         "whois",                     # python-whois __init__
@@ -70,16 +92,22 @@ def _install_noise_filters() -> None:
         lg = logging.getLogger(name)
         # Evita duplicati
         if not any(isinstance(f, _NoiseFilter) for f in lg.filters):
-            lg.addFilter(_filter)
+            lg.addFilter(_noise_filter)
+        if not any(isinstance(f, _SecretRedactionFilter) for f in lg.filters):
+            lg.addFilter(_secret_filter)
         # Installa anche sugli handler esistenti
         for handler in lg.handlers:
             if not any(isinstance(f, _NoiseFilter) for f in handler.filters):
-                handler.addFilter(_filter)
+                handler.addFilter(_noise_filter)
+            if not any(isinstance(f, _SecretRedactionFilter) for f in handler.filters):
+                handler.addFilter(_secret_filter)
 
     # lastResort: handler di fallback Python 3 (usato quando root non ha handler)
-    if logging.lastResort and not any(isinstance(f, _NoiseFilter)
-                                      for f in logging.lastResort.filters):
-        logging.lastResort.addFilter(_filter)
+    if logging.lastResort:
+        if not any(isinstance(f, _NoiseFilter) for f in logging.lastResort.filters):
+            logging.lastResort.addFilter(_noise_filter)
+        if not any(isinstance(f, _SecretRedactionFilter) for f in logging.lastResort.filters):
+            logging.lastResort.addFilter(_secret_filter)
 
 
 # Installazione immediata all'import (copre i logger già configurati)
@@ -128,6 +156,9 @@ app = FastAPI(
     version=settings.VERSION,
     lifespan=lifespan,
 )
+
+# Limiter middleware per rate limiting
+app.state.limiter = limiter
 
 app.add_middleware(
     CORSMiddleware,

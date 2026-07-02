@@ -12,9 +12,10 @@ import uuid
 import hashlib
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, HTTPException, status, Request
 from fastapi.responses import JSONResponse
 
+from core.rate_limiting import limiter
 from utils.config import settings
 from utils.i18n import t
 
@@ -24,7 +25,8 @@ MAX_SIZE = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 
 @router.post("/")
-async def upload_email(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def upload_email(request: Request, file: UploadFile = File(...)):
     # 1. Validazione nome file e estensione
     if not file.filename:
         raise HTTPException(status_code=400, detail=t("upload.no_filename"))

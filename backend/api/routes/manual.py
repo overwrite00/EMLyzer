@@ -11,11 +11,12 @@ import uuid
 import hashlib
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from core.rate_limiting import limiter
 from utils.config import settings
 from utils.i18n import t
 from core.analysis.email_parser import parse_email_file, raw_looks_like_eml
@@ -35,7 +36,8 @@ class ManualInput(BaseModel):
 
 
 @router.post("/")
-async def analyze_manual(payload: ManualInput):
+@limiter.limit("10/minute")
+async def analyze_manual(request: Request, payload: ManualInput):
     """
     Analizza un sorgente email incollato manualmente.
     Non richiede upload file: accetta il testo come JSON body.
