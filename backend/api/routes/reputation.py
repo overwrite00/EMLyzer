@@ -703,8 +703,9 @@ async def test_urlscan_health():
     try:
         resp = requests.head("https://urlscan.io/api/v1/search/", timeout=5)
         result["connectivity"] = True
-    except Exception as e:
-        result["suggestions"].append(f"URLScan.io non raggiungibile: {type(e).__name__}")
+    except Exception:
+        _logger.warning("URLScan.io health check: connectivity test failed", exc_info=True)
+        result["suggestions"].append("URLScan.io non raggiungibile. Verifica la connessione di rete.")
         return result
 
     # Test 2: API key configurato?
@@ -729,8 +730,9 @@ async def test_urlscan_health():
                 result["suggestions"].append("HTTP 403 Forbidden. Possibili cause: 1) Rate limit superato (1000 req/giorno), 2) IP blacklisted, 3) API key non valida. Verifica urlscan.io/user/settings")
             else:
                 result["suggestions"].append(f"URLScan.io HTTP {resp.status_code}. Risposta: {resp.text[:100]}")
-        except Exception as e:
-            result["suggestions"].append(f"Errore test API key: {type(e).__name__}: {str(e)[:100]}")
+        except Exception:
+            _logger.warning("URLScan.io health check: API key test failed", exc_info=True)
+            result["suggestions"].append("Errore durante il test della API key. Controlla i log del server per dettagli.")
     else:
         result["suggestions"].append("URLSCAN_API_KEY non configurato in .env. Registrati su https://urlscan.io/user/signup e configura la chiave per aumentare il limite a 1000 req/giorno")
 
