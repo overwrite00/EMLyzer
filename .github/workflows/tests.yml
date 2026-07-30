@@ -6,7 +6,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
-      - ".github/workflows/tests.yml"
+      - ".github/workflows/**"
       - "pyproject.toml"
       - "package.json"
       - "package-lock.json"
@@ -15,7 +15,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
-      - ".github/workflows/tests.yml"
+      - ".github/workflows/**"
       - "pyproject.toml"
       - "package.json"
       - "package-lock.json"
