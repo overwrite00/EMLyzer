@@ -3,10 +3,10 @@
 # Versioni pinnate per riproducibilità
 
 # Web framework
-fastapi==0.139.0
+fastapi==0.139.2
 pydantic==2.13.4
 pydantic-settings==2.14.2
-uvicorn[standard]==0.50.0
+uvicorn[standard]==0.51.0
 python-multipart==0.0.32
 
 # Email parsing
@@ -44,7 +44,7 @@ slowapi==0.1.10
 pytest==9.1.1
 pytest-asyncio==1.4.0
 httpx==0.28.1
-coverage==7.15.0
+coverage==7.15.2
 
 # Language detection
 langdetect==1.0.9
