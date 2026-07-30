@@ -52,4 +52,4 @@ langdetect==1.0.9
 # --- OPZIONALI (NLP avanzato) ---
 # Decommentare se serve il classificatore bayesiano:
 scikit-learn>=1.9.0
-nltk>=3.9.4
+nltk>=3.10.0
