@@ -6,13 +6,13 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
-      - ".github/workflows/codeql.yml"
+      - ".github/workflows/**"
   pull_request:
     branches: [ main, develop ]
     paths:
       - "backend/**"
       - "frontend/**"
-      - ".github/workflows/codeql.yml"
+      - ".github/workflows/**"
 
 jobs:
   analyze:
@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [python, javascript-typescript]
+        language: [python, javascript-typescript, actions]
 
     steps:
       - name: Checkout repository
