@@ -24,37 +24,52 @@ jobs:
       - name: "Assign and Add to Project"
         env:
           GH_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           ASSIGNEE="${{ env.ASSIGNEE }}"
+          PROJECT_ID="${{ env.PROJECT_ID }}"
+
+          add_to_project() {
+            local content_id="$1"
+            gh api graphql -f query='
+              mutation($project: ID!, $content: ID!) {
+                addProjectV2ItemById(input: { projectId: $project, contentId: $content }) {
+                  item { id }
+                }
+              }' -f project="$PROJECT_ID" -f content="$content_id" >/dev/null \
+              && echo "    Added to Project" || echo "    Failed to add to Project"
+          }
 
           # Se Issue
           if [ "${{ github.event_name }}" = "issues" ]; then
             ISSUE_NUM="${{ github.event.issue.number }}"
+            ISSUE_NODE_ID="${{ github.event.issue.node_id }}"
             echo "Processing Issue #$ISSUE_NUM..."
 
             # Assegna Issue
             echo "  - Assigning to $ASSIGNEE..."
-            gh issue edit "$ISSUE_NUM" --assignee "$ASSIGNEE" && echo "    Assigned" || echo "    Failed to assign"
+            gh issue edit "$ISSUE_NUM" --add-assignee "$ASSIGNEE" && echo "    Assigned" || echo "    Failed to assign"
 
-            # Aggiungi al Project
+            # Aggiungi al Project (via GraphQL, non richiede risoluzione per titolo)
             echo "  - Adding to Project..."
-            gh issue edit "$ISSUE_NUM" --add-project "${{ env.PROJECT_ID }}" && echo "    Added to Project" || echo "    Failed to add to Project"
+            add_to_project "$ISSUE_NODE_ID"
           fi
 
           # Se Pull Request
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             PR_NUM="${{ github.event.pull_request.number }}"
             PR_ACTION="${{ github.event.action }}"
+            PR_NODE_ID="${{ github.event.pull_request.node_id }}"
             echo "Processing PR #$PR_NUM ($PR_ACTION)..."
 
             # Assegna PR
             echo "  - Assigning to $ASSIGNEE..."
-            gh pr edit "$PR_NUM" --assignee "$ASSIGNEE" && echo "    Assigned" || echo "    Failed to assign"
+            gh pr edit "$PR_NUM" --add-assignee "$ASSIGNEE" && echo "    Assigned" || echo "    Failed to assign"
 
             # Aggiungi al Project e richiedi reviewer (solo se opened o reopened)
             if [ "$PR_ACTION" = "opened" ] || [ "$PR_ACTION" = "reopened" ]; then
               echo "  - Adding to Project..."
-              gh pr edit "$PR_NUM" --add-project "${{ env.PROJECT_ID }}" && echo "    Added to Project" || echo "    Failed to add to Project"
+              add_to_project "$PR_NODE_ID"
 
               echo "  - Requesting reviewer..."
               gh pr edit "$PR_NUM" --add-reviewer "$ASSIGNEE" && echo "    Reviewer requested successfully" || echo "    Failed to request reviewer"
