@@ -40,7 +40,7 @@ jobs:
 
       - name: Set up Python (for Python analysis)
         if: matrix.language == 'python'
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.13'
           cache: 'pip'
