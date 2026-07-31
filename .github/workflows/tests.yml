@@ -28,6 +28,8 @@ jobs:
   backend-tests:
     name: Backend Tests (Python 3.13)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -79,6 +81,8 @@ jobs:
   frontend-lint-build:
     name: Frontend Lint & Build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
