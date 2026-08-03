@@ -3,14 +3,14 @@
 # Versioni pinnate per riproducibilità
 
 # Web framework
-fastapi==0.139.2
+fastapi==0.141.1
 pydantic==2.13.4
 pydantic-settings==2.14.2
-uvicorn[standard]==0.51.0
+uvicorn[standard]==0.52.0
 python-multipart==0.0.32
 
 # Email parsing
-mail-parser==4.4.0
+mail-parser==4.5.0
 python-oxmsg==0.0.2
 beautifulsoup4==4.15.0
 

@@ -16,14 +16,19 @@ env:
   ASSIGNEE: "overwrite00"
 
 jobs:
-  add-to-project:
-    name: "Add to Project & Assign"
+  add-to-project-and-label:
+    name: "Add to Project, Assign & Label"
     runs-on: ubuntu-latest
 
     steps:
-      - name: "Assign and Add to Project"
+      - name: "Checkout repository (for file detection)"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Process Issues & PRs"
         env:
-          GH_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           ASSIGNEE="${{ env.ASSIGNEE }}"
@@ -36,49 +41,178 @@ jobs:
                 addProjectV2ItemById(input: { projectId: $project, contentId: $content }) {
                   item { id }
                 }
-              }' -f project="$PROJECT_ID" -f content="$content_id" >/dev/null \
+              }' -f project="$PROJECT_ID" -f content="$content_id" 2>/dev/null \
               && echo "    Added to Project" || echo "    Failed to add to Project"
           }
 
-          # Se Issue
+          detect_files_changed() {
+            local PR_NUM="$1"
+            if [ -z "$PR_NUM" ]; then
+              return
+            fi
+
+            gh pr diff "$PR_NUM" --name-only 2>/dev/null | grep -E '.*' || true
+          }
+
+          detect_scope_and_lang() {
+            local files="$1"
+            local is_dependabot="$2"
+
+            local has_backend=0
+            local has_frontend=0
+            local has_python=0
+            local has_javascript=0
+            local has_ci=0
+
+            while IFS= read -r file; do
+              case "$file" in
+                backend/*|*.py)
+                  has_backend=1
+                  has_python=1
+                  ;;
+                frontend/*|*.jsx|*.js|*.json|vite.config.js)
+                  has_frontend=1
+                  has_javascript=1
+                  ;;
+                .github/workflows/*|.github/*.yml)
+                  has_ci=1
+                  has_python=1
+                  ;;
+                *)
+                  ;;
+              esac
+            done <<< "$files"
+
+            # Output scope labels
+            [ $has_backend -eq 1 ] && echo "scope:backend"
+            [ $has_frontend -eq 1 ] && echo "scope:frontend"
+            [ $has_ci -eq 1 ] && echo "type:ci"
+
+            # Output language labels
+            [ $has_python -eq 1 ] && echo "lang:python"
+            [ $has_javascript -eq 1 ] && echo "lang:javascript"
+          }
+
+          detect_type_from_title() {
+            local title="$1"
+
+            # Match conventional commit prefix
+            case "$title" in
+              feat*|feature*)
+                echo "type:feature"
+                ;;
+              fix*)
+                echo "type:bug"
+                ;;
+              docs*)
+                echo "type:docs"
+                ;;
+              chore*)
+                echo "type:chore"
+                ;;
+              ci*|ci(*)
+                echo "type:ci"
+                ;;
+              *)
+                ;;
+            esac
+          }
+
+          # Process based on event type
           if [ "${{ github.event_name }}" = "issues" ]; then
             ISSUE_NUM="${{ github.event.issue.number }}"
             ISSUE_NODE_ID="${{ github.event.issue.node_id }}"
+            ISSUE_TITLE="${{ github.event.issue.title }}"
+
             echo "Processing Issue #$ISSUE_NUM..."
 
-            # Assegna Issue
+            # Assign
             echo "  - Assigning to $ASSIGNEE..."
-            gh issue edit "$ISSUE_NUM" --add-assignee "$ASSIGNEE" && echo "    Assigned" || echo "    Failed to assign"
+            gh issue edit "$ISSUE_NUM" --add-assignee "$ASSIGNEE" 2>/dev/null && echo "    Assigned" || echo "    Assignment skipped"
 
-            # Aggiungi al Project (via GraphQL, non richiede risoluzione per titolo)
+            # Add to Project
             echo "  - Adding to Project..."
             add_to_project "$ISSUE_NODE_ID"
-          fi
 
-          # Se Pull Request
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Label
+            echo "  - Adding labels..."
+            LABELS=$(detect_type_from_title "$ISSUE_TITLE")
+            if [ -n "$LABELS" ]; then
+              while IFS= read -r label; do
+                if [ -n "$label" ]; then
+                  gh issue edit "$ISSUE_NUM" --add-label "$label" 2>/dev/null && echo "    Added label: $label"
+                fi
+              done <<< "$LABELS"
+            fi
+
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
             PR_NUM="${{ github.event.pull_request.number }}"
             PR_ACTION="${{ github.event.action }}"
             PR_NODE_ID="${{ github.event.pull_request.node_id }}"
-            echo "Processing PR #$PR_NUM ($PR_ACTION)..."
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_AUTHOR="${{ github.event.pull_request.user.login }}"
 
-            # Assegna PR
+            echo "Processing PR #$PR_NUM ($PR_ACTION) by @$PR_AUTHOR..."
+
+            # Assign
             echo "  - Assigning to $ASSIGNEE..."
-            gh pr edit "$PR_NUM" --add-assignee "$ASSIGNEE" && echo "    Assigned" || echo "    Failed to assign"
+            gh pr edit "$PR_NUM" --add-assignee "$ASSIGNEE" 2>/dev/null && echo "    Assigned" || echo "    Assignment skipped"
 
-            # Aggiungi al Project e richiedi reviewer (solo se opened o reopened)
+            # Add to Project and request reviewer (only on open/reopen)
             if [ "$PR_ACTION" = "opened" ] || [ "$PR_ACTION" = "reopened" ]; then
               echo "  - Adding to Project..."
               add_to_project "$PR_NODE_ID"
 
+              # Request reviewer
               echo "  - Requesting reviewer..."
-              gh pr edit "$PR_NUM" --add-reviewer "$ASSIGNEE" && echo "    Reviewer requested successfully" || echo "    Failed to request reviewer"
+              gh pr edit "$PR_NUM" --add-reviewer "$ASSIGNEE" 2>/dev/null && echo "    Reviewer requested" || echo "    Reviewer request skipped"
             fi
 
-            # Se PR è stato chiuso
+            # Label on open/reopen
+            if [ "$PR_ACTION" = "opened" ] || [ "$PR_ACTION" = "reopened" ]; then
+              echo "  - Adding labels..."
+
+              # Special handling for Dependabot
+              if [ "$PR_AUTHOR" = "dependabot[bot]" ] || [ "$PR_AUTHOR" = "app/dependabot" ]; then
+                LABELS="dependencies"
+                # Detect scope/lang from title for Dependabot
+                if echo "$PR_TITLE" | grep -q "frontend"; then
+                  LABELS="$LABELS
+scope:frontend
+lang:javascript"
+                elif echo "$PR_TITLE" | grep -q "backend"; then
+                  LABELS="$LABELS
+scope:backend
+lang:python"
+                elif echo "$PR_TITLE" | grep -q "actions"; then
+                  LABELS="$LABELS
+type:ci
+scope:deps"
+                fi
+              else
+                # Detect files changed
+                FILES=$(detect_files_changed "$PR_NUM")
+
+                # Combine type from title + scope/lang from files
+                LABELS="$(detect_type_from_title "$PR_TITLE")"
+                if [ -n "$FILES" ]; then
+                  LABELS="$LABELS
+$(detect_scope_and_lang "$FILES" 0)"
+                fi
+              fi
+
+              # Add each label
+              while IFS= read -r label; do
+                if [ -n "$label" ]; then
+                  gh pr edit "$PR_NUM" --add-label "$label" 2>/dev/null && echo "    Added label: $label" || true
+                fi
+              done <<< "$LABELS"
+            fi
+
+            # Handle closed PRs
             if [ "$PR_ACTION" = "closed" ]; then
               echo "  - PR closed"
-              if gh pr view "$PR_NUM" --json merged --jq '.merged' | grep -q true; then
+              if gh pr view "$PR_NUM" --json merged --jq '.merged' 2>/dev/null | grep -q true; then
                 echo "    PR merged - Item will auto-transition in Project"
               fi
             fi
