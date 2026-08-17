@@ -5,12 +5,12 @@
 # Web framework
 fastapi==0.141.1
 pydantic==2.13.4
-pydantic-settings==2.14.2
-uvicorn[standard]==0.52.0
+pydantic-settings==2.15.0
+uvicorn[standard]==0.52.3
 python-multipart==0.0.32
 
 # Email parsing
-mail-parser==4.5.0
+mail-parser==4.6.2
 python-oxmsg==0.0.2
 beautifulsoup4==4.15.0
 
@@ -19,7 +19,7 @@ beautifulsoup4==4.15.0
 # RTFDE>=0.0.6
 
 # URL & domain analysis
-tldextract==5.3.1
+tldextract==5.3.2
 dnspython==2.8.0
 python-whois==0.9.6
 requests==2.34.2
@@ -32,7 +32,7 @@ filetype==1.2.0
 python-docx==1.2.0
 
 # Database (SQLAlchemy >= 2.0.36 richiesto per Python 3.13+)
-sqlalchemy==2.0.51
+sqlalchemy==2.0.52
 aiosqlite==0.22.1
 
 # Security / sanitization
@@ -44,7 +44,7 @@ slowapi==0.1.10
 pytest==9.1.1
 pytest-asyncio==1.4.0
 httpx==0.28.1
-coverage==7.15.2
+coverage==7.15.4
 
 # Language detection
 langdetect==1.0.9
