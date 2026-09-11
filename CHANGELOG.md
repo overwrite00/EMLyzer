@@ -7,6 +7,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Next Release
 
+### Security
+
+- Removed the unused NLTK dependency because the latest available release is affected by
+  an unpatched model-artifact path traversal vulnerability (GHSA-8mgp-746c-j5xp); updated
+  the installation documentation and UI guidance accordingly
+- Updated `@humanfs/node` from 0.16.7 to 0.16.8 and refreshed vulnerable browser-metadata
+  transitive packages; current backend and frontend dependency audits report no known
+  vulnerabilities
+
+### Dependencies
+
+- Backend: updated Pydantic to 2.13.5, pydantic-settings to 2.15.0, Uvicorn to 0.52.4,
+  mail-parser to 4.6.4, tldextract to 5.3.2, SQLAlchemy to 2.0.52 and coverage to 7.16.0
+- Frontend runtime: updated Axios to 1.20.0, lucide-react to 1.42.0 and
+  react-router-dom to 7.18.3
+- Frontend development: updated Vite to 8.2.2, ESLint to 10.9.1,
+  eslint-plugin-react to 6.1.0 and the related TypeScript, React Refresh and globals tooling
+
 ### Roadmap (Low Priority)
 
 This section collects all planned but not yet implemented features.
