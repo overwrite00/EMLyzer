@@ -7,6 +7,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Next Release
 
+### Roadmap (Low Priority)
+
+This section collects all planned but not yet implemented features.
+Features are ordered by implementation priority.
+
+#### Infrastructure (Low Priority)
+
+- [ ] **PostgreSQL** — Alternative database support to SQLite for multi-user deployments
+- [ ] **Plugin System** — Modular architecture for adding connectors and analyzers without modifying core
+- [ ] **YARA Rules** — Pattern detection in attachments via customizable YARA rules
+- [ ] **SIEM Integration** — Export in SIEM-compatible formats (CEF, structured JSON, syslog)
+- [ ] **Optional External Sandbox** — Send attachments to sandbox services (Cuckoo, Any.run) as optional plugin
+
+---
+
+## [0.16.2] — 2026-09-11
+
 ### Security
 
 - Removed the unused NLTK dependency because the latest available release is affected by
@@ -25,18 +42,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Frontend development: updated Vite to 8.2.2, ESLint to 10.9.1,
   eslint-plugin-react to 6.1.0 and the related TypeScript, React Refresh and globals tooling
 
-### Roadmap (Low Priority)
+### Testing
 
-This section collects all planned but not yet implemented features.
-Features are ordered by implementation priority.
+- Converted `test_get_structure.py` and `test_list_filter.py` from standalone scripts
+  (`asyncio.run`) into proper `pytest`/`pytest-asyncio` test functions, and made their
+  sample-file paths resolve relative to the repo instead of the working directory, so
+  they run correctly under the CI test workflow
+- Repaired the `tests.yml` and `project-automation.yml` GitHub Actions workflows
 
-#### Infrastructure (Low Priority)
+### Notes
 
-- [ ] **PostgreSQL** — Alternative database support to SQLite for multi-user deployments
-- [ ] **Plugin System** — Modular architecture for adding connectors and analyzers without modifying core
-- [ ] **YARA Rules** — Pattern detection in attachments via customizable YARA rules
-- [ ] **SIEM Integration** — Export in SIEM-compatible formats (CEF, structured JSON, syslog)
-- [ ] **Optional External Sandbox** — Send attachments to sandbox services (Cuckoo, Any.run) as optional plugin
+- All 124 tests passing (1 skipped), zero regressions
+- No API schema changes; PATCH release per SemVer
 
 ---
 
