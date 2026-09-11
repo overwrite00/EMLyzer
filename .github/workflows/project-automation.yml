@@ -186,17 +186,11 @@ jobs:
                 LABELS="dependencies"
                 # Detect scope/lang from title for Dependabot
                 if echo "$PR_TITLE" | grep -q "frontend"; then
-                  LABELS="$LABELS
-scope:frontend
-lang:javascript"
+                  LABELS=$(printf "%s\nscope:frontend\nlang:javascript" "$LABELS")
                 elif echo "$PR_TITLE" | grep -q "backend"; then
-                  LABELS="$LABELS
-scope:backend
-lang:python"
+                  LABELS=$(printf "%s\nscope:backend\nlang:python" "$LABELS")
                 elif echo "$PR_TITLE" | grep -q "actions"; then
-                  LABELS="$LABELS
-type:ci
-scope:deps"
+                  LABELS=$(printf "%s\ntype:ci\nscope:deps" "$LABELS")
                 fi
               else
                 # Detect files changed
@@ -205,8 +199,7 @@ scope:deps"
                 # Combine type from title + scope/lang from files
                 LABELS="$(detect_type_from_title "$PR_TITLE")"
                 if [ -n "$FILES" ]; then
-                  LABELS="$LABELS
-$(detect_scope_and_lang "$FILES" 0)"
+                  LABELS=$(printf "%s\n%s" "$LABELS" "$(detect_scope_and_lang "$FILES" 0)")
                 fi
               fi
 
