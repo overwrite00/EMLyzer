@@ -341,5 +341,5 @@ To upgrade to a newer version:
 
 ---
 
-*Last updated: 2026-06-29*
+*Last updated: 2026-09-11*
 *← [Requirements](./REQUIREMENTS.md) | [Configuration →](./CONFIGURATION.md)*
