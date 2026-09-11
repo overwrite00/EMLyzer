@@ -211,5 +211,5 @@ Distributed with MIT License · [View License](LICENSE)
 
 ---
 
-*Last updated: 2026-06-29*
+*Last updated: 2026-09-11*
 *← [Contributing](./CONTRIBUTING.md) | [Docs →](./docs/)*
