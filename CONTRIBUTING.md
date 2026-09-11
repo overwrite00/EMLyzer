@@ -89,6 +89,18 @@ npm install
 
 The application will be available at **http://localhost:8000**.
 
+### Git Hooks
+
+Enable the versioned hooks once per clone so documentation footers stay in sync automatically:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This activates a `pre-commit` hook that refreshes the `*Last updated: YYYY-MM-DD*`
+footer in `README.md` and `docs/*.md` to the current date whenever one of those
+files is part of the commit — no manual date bump required.
+
 ---
 
 ## 📝 Code Standards

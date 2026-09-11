@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# EMLyzer - pre-commit hook
+# Refreshes the "*Last updated: YYYY-MM-DD*" footer of any staged Markdown
+# doc (README.md, docs/*.md) to today's date, so the footer never has to be
+# bumped by hand in a separate step.
+#
+# Enable once per clone with:
+#   git config core.hooksPath .githooks
+
+TODAY="$(date +%Y-%m-%d)"
+
+# Staged, non-deleted files under README.md or docs/*.md
+FILES="$(git diff --cached --name-only --diff-filter=ACMR -- README.md 'docs/*.md')"
+
+[ -z "$FILES" ] && exit 0
+
+for f in $FILES; do
+    [ -f "$f" ] || continue
+    grep -qE '^\*Last updated: [0-9]{4}-[0-9]{2}-[0-9]{2}\*$' "$f" || continue
+
+    sed -i -E "s/^\*Last updated: [0-9]{4}-[0-9]{2}-[0-9]{2}\*\$/*Last updated: ${TODAY}*/" "$f"
+    git add "$f"
+done
+
+exit 0
