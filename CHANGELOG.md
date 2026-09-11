@@ -22,6 +22,41 @@ Features are ordered by implementation priority.
 
 ---
 
+## [0.16.2] — 2026-09-11
+
+### Security
+
+- Removed the unused NLTK dependency because the latest available release is affected by
+  an unpatched model-artifact path traversal vulnerability (GHSA-8mgp-746c-j5xp); updated
+  the installation documentation and UI guidance accordingly
+- Updated `@humanfs/node` from 0.16.7 to 0.16.8 and refreshed vulnerable browser-metadata
+  transitive packages; current backend and frontend dependency audits report no known
+  vulnerabilities
+
+### Dependencies
+
+- Backend: updated Pydantic to 2.13.5, pydantic-settings to 2.15.0, Uvicorn to 0.52.4,
+  mail-parser to 4.6.4, tldextract to 5.3.2, SQLAlchemy to 2.0.52 and coverage to 7.16.0
+- Frontend runtime: updated Axios to 1.20.0, lucide-react to 1.42.0 and
+  react-router-dom to 7.18.3
+- Frontend development: updated Vite to 8.2.2, ESLint to 10.9.1,
+  eslint-plugin-react to 6.1.0 and the related TypeScript, React Refresh and globals tooling
+
+### Testing
+
+- Converted `test_get_structure.py` and `test_list_filter.py` from standalone scripts
+  (`asyncio.run`) into proper `pytest`/`pytest-asyncio` test functions, and made their
+  sample-file paths resolve relative to the repo instead of the working directory, so
+  they run correctly under the CI test workflow
+- Repaired the `tests.yml` and `project-automation.yml` GitHub Actions workflows
+
+### Notes
+
+- All 124 tests passing (1 skipped), zero regressions
+- No API schema changes; PATCH release per SemVer
+
+---
+
 ## [0.16.1] — 2026-07-02
 
 ### Fixed — Code Review Hardening

@@ -28,11 +28,20 @@ jobs:
 
       - name: "Process Issues & PRs"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN is repository-scoped and cannot write Projects v2.
+          # Configure GH_PROJECT_TOKEN with Projects write access.
+          GH_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
+
           ASSIGNEE="${{ env.ASSIGNEE }}"
           PROJECT_ID="${{ env.PROJECT_ID }}"
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::Missing GH_PROJECT_TOKEN secret (Projects write access required)."
+            exit 1
+          fi
 
           add_to_project() {
             local content_id="$1"
@@ -41,8 +50,8 @@ jobs:
                 addProjectV2ItemById(input: { projectId: $project, contentId: $content }) {
                   item { id }
                 }
-              }' -f project="$PROJECT_ID" -f content="$content_id" 2>/dev/null \
-              && echo "    Added to Project" || echo "    Failed to add to Project"
+              }' -f project="$PROJECT_ID" -f content="$content_id" --jq '.data.addProjectV2ItemById.item.id'
+            echo "    Added to Project"
           }
 
           detect_files_changed() {
@@ -110,7 +119,7 @@ jobs:
               chore*)
                 echo "type:chore"
                 ;;
-              ci*|ci(*)
+              ci*)
                 echo "type:ci"
                 ;;
               *)
@@ -177,17 +186,11 @@ jobs:
                 LABELS="dependencies"
                 # Detect scope/lang from title for Dependabot
                 if echo "$PR_TITLE" | grep -q "frontend"; then
-                  LABELS="$LABELS
-scope:frontend
-lang:javascript"
+                  LABELS=$(printf "%s\nscope:frontend\nlang:javascript" "$LABELS")
                 elif echo "$PR_TITLE" | grep -q "backend"; then
-                  LABELS="$LABELS
-scope:backend
-lang:python"
+                  LABELS=$(printf "%s\nscope:backend\nlang:python" "$LABELS")
                 elif echo "$PR_TITLE" | grep -q "actions"; then
-                  LABELS="$LABELS
-type:ci
-scope:deps"
+                  LABELS=$(printf "%s\ntype:ci\nscope:deps" "$LABELS")
                 fi
               else
                 # Detect files changed
@@ -196,8 +199,7 @@ scope:deps"
                 # Combine type from title + scope/lang from files
                 LABELS="$(detect_type_from_title "$PR_TITLE")"
                 if [ -n "$FILES" ]; then
-                  LABELS="$LABELS
-$(detect_scope_and_lang "$FILES" 0)"
+                  LABELS=$(printf "%s\n%s" "$LABELS" "$(detect_scope_and_lang "$FILES" 0)")
                 fi
               fi
 

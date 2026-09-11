@@ -136,7 +136,7 @@ echo ""
 cd "$BACKEND_DIR"
 
 # Esegui i test e cattura l'exit code senza far terminare lo script
-"$VENV_PYTHON" -m pytest tests/test_core.py \
+"$VENV_PYTHON" -m pytest tests \
     -v --tb=short --asyncio-mode=auto "$@"
 EXIT_CODE=$?
 

@@ -49,7 +49,7 @@ jobs:
       - name: Run pytest with coverage
         run: |
           cd backend
-          coverage run -m pytest tests/test_core.py -v --tb=short --junit-xml=pytest-results.xml
+          coverage run -m pytest tests -v --tb=short --junit-xml=pytest-results.xml
           coverage xml -o coverage.xml
           coverage report -m
         continue-on-error: false

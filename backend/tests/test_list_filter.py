@@ -1,7 +1,13 @@
-import asyncio, sys
-sys.path.insert(0, '.')
+from pathlib import Path
 
-async def test_list():
+import pytest
+
+
+SAMPLES_DIR = Path(__file__).resolve().parents[2] / "samples"
+
+
+@pytest.mark.asyncio
+async def test_analysis_list_filter_and_pagination():
     from httpx import AsyncClient, ASGITransport
     from main import app
     from models.database import init_db
@@ -10,7 +16,7 @@ async def test_list():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         # Carica 3 email
         for name in ['phishing_sample.eml', 'clean_sample.eml', 'phishing_sample.eml']:
-            with open(f'../samples/{name}', 'rb') as f:
+            with (SAMPLES_DIR / name).open("rb") as f:
                 r = await c.post('/api/upload/', files={'file': (name, f, 'application/octet-stream')})
             await c.post(f'/api/analysis/{r.json()["job_id"]}')
 
@@ -60,5 +66,3 @@ async def test_list():
         print(f"OK combinazione filtri: {r.json()['total']} risultati")
 
     print("\nLISTA/FILTRO/PAGINAZIONE - tutti i test passati OK")
-
-asyncio.run(test_list())
