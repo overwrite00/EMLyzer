@@ -32,6 +32,15 @@ jobs:
           # Configure GH_PROJECT_TOKEN with Projects write access.
           GH_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+          ISSUE_NODE_ID: ${{ github.event.issue.node_id }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+          PR_NODE_ID: ${{ github.event.pull_request.node_id }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           set -euo pipefail
 
@@ -128,11 +137,7 @@ jobs:
           }
 
           # Process based on event type
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            ISSUE_NUM="${{ github.event.issue.number }}"
-            ISSUE_NODE_ID="${{ github.event.issue.node_id }}"
-            ISSUE_TITLE="${{ github.event.issue.title }}"
-
+          if [ "$EVENT_NAME" = "issues" ]; then
             echo "Processing Issue #$ISSUE_NUM..."
 
             # Assign
@@ -154,12 +159,8 @@ jobs:
               done <<< "$LABELS"
             fi
 
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            PR_NUM="${{ github.event.pull_request.number }}"
-            PR_ACTION="${{ github.event.action }}"
-            PR_NODE_ID="${{ github.event.pull_request.node_id }}"
-            PR_TITLE="${{ github.event.pull_request.title }}"
-            PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            PR_ACTION="$EVENT_ACTION"
 
             echo "Processing PR #$PR_NUM ($PR_ACTION) by @$PR_AUTHOR..."
 
