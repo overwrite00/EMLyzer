@@ -1,7 +1,13 @@
-import asyncio, sys
-sys.path.insert(0, '.')
+from pathlib import Path
 
-async def test():
+import pytest
+
+
+SAMPLES_DIR = Path(__file__).resolve().parents[2] / "samples"
+
+
+@pytest.mark.asyncio
+async def test_get_and_post_analysis_have_the_same_structure():
     from httpx import AsyncClient, ASGITransport
     from main import app
     from models.database import init_db
@@ -9,7 +15,7 @@ async def test():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         # Upload e analisi (POST)
-        with open('../samples/phishing_sample.eml', 'rb') as f:
+        with (SAMPLES_DIR / "phishing_sample.eml").open("rb") as f:
             r = await c.post('/api/upload/', files={'file': ('phishing.eml', f, 'application/octet-stream')})
         job_id = r.json()['job_id']
 
@@ -75,7 +81,7 @@ async def test():
         print(f"  OK Note analista:   presenti e corrette")
 
         # Verifica email PULITA (clean)
-        with open('../samples/clean_sample.eml', 'rb') as f:
+        with (SAMPLES_DIR / "clean_sample.eml").open("rb") as f:
             r = await c.post('/api/upload/', files={'file': ('clean.eml', f, 'application/octet-stream')})
         job_id2 = r.json()['job_id']
         await c.post(f'/api/analysis/{job_id2}')
@@ -88,5 +94,3 @@ async def test():
 
         print()
         print("GET e POST restituiscono struttura identica - PASS")
-
-asyncio.run(test())

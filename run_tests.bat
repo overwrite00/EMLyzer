@@ -177,7 +177,7 @@ echo !_I! !_M_RUNNING!
 echo.
 
 cd /d "%BACKEND_DIR%"
-"%VENV_PYTHON%" -m pytest tests\test_core.py -v --tb=short --asyncio-mode=auto %*
+"%VENV_PYTHON%" -m pytest tests -v --tb=short --asyncio-mode=auto %*
 set "TEST_EXIT=%errorlevel%"
 
 echo.
