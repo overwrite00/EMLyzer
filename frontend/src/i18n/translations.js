@@ -164,8 +164,8 @@ export const translations = {
   "body.nlp_label_unknown":     { it: "Sconosciuto", en: "Unknown" },
   "body.nlp_section":           { it: "Analisi NLP", en: "NLP Analysis" },
   "body.nlp_unavailable":       {
-    it: "scikit-learn non installato — installa con: pip install scikit-learn nltk",
-    en: "scikit-learn not installed — install with: pip install scikit-learn nltk",
+    it: "scikit-learn non installato — installa con: pip install scikit-learn",
+    en: "scikit-learn not installed — install with: pip install scikit-learn",
   },
   "body.nlp_top_features": { it: "Feature principali", en: "Top features" },
 

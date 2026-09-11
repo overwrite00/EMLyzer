@@ -141,7 +141,6 @@ All dependencies are installed **automatically** during first run via `start.bat
 
 ### 🧠 Machine Learning & NLP
 - **scikit-learn** (1.5.0+) — Random Forest phishing classifier
-- **nltk** (3.8.1+) — Natural language processing utilities
 - **langdetect** (1.0.9+) — Automatic language detection
 
 ### 🔗 External Integrations
