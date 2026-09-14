@@ -10,7 +10,7 @@ uvicorn[standard]==0.52.4
 python-multipart==0.0.32
 
 # Email parsing
-mail-parser==4.6.4
+mail-parser==4.6.5
 python-oxmsg==0.0.2
 beautifulsoup4==4.15.0
 
@@ -51,4 +51,4 @@ langdetect==1.0.9
 
 # --- OPZIONALI (NLP avanzato) ---
 # Decommentare se serve il classificatore bayesiano:
-scikit-learn>=1.9.0
+scikit-learn>=1.9.1
