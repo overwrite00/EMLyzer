@@ -97,11 +97,11 @@ Email (.eml / .msg / plain text)
 
 ## 🔧 Version
 
+**v0.16.3** — 📦 Dependency release: Updated backend (mail-parser, scikit-learn) and frontend (React, Vite, ESLint and more) dependencies, hardened the `actions/checkout` CI action, and reserialized the tabular phishing model with scikit-learn 1.9.1. All 124 tests passing ✅ (1 skipped), zero regressions.
+
 **v0.16.2** — 🔒 Maintenance release: Removed the unused NLTK dependency (unpatched path traversal vulnerability), updated backend and frontend dependencies (Pydantic, Uvicorn, Axios, Vite, ESLint and more), and repaired the CI test/workflow suite. All 124 tests passing ✅ (1 skipped), zero regressions.
 
 **v0.16.1** — 🔧 Hardening release: Enabled attachment binary analysis in the live pipeline (VBA macros, PDF JavaScript, suspicious streams), fixed Authentication-Results header selection (anti-spoofing), inline attachment extraction, removed body pattern double-counting on multipart emails, added 6 missing i18n keys, made WHOIS/URL batch timeouts effective, plus 10 correctness fixes. All 123 tests passing ✅, zero regressions.
-
-**v0.16.0** — 🏗️ Architecture release: Migrated .msg parsing to python-oxmsg (MIT license), eliminated GPL violation, introduced MsgBackend abstraction for pluggable implementations, unblocked beautifulsoup4 to 4.14.0, added transport headers support (SPF/DKIM/DMARC for .msg files), RTF-only email support with optional RTFDE fallback. All 122 tests passing ✅, production-ready.
 
 📖 **See full version history** → [CHANGELOG.md](./CHANGELOG.md)
 
@@ -211,5 +211,5 @@ Distributed with MIT License · [View License](LICENSE)
 
 ---
 
-*Last updated: 2026-09-11*
+*Last updated: 2026-09-14*
 *← [Contributing](./CONTRIBUTING.md) | [Docs →](./docs/)*
