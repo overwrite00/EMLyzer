@@ -22,6 +22,31 @@ Features are ordered by implementation priority.
 
 ---
 
+## [0.16.3] — 2026-09-14
+
+### Dependencies
+
+- Backend: bumped mail-parser to 4.6.5 and scikit-learn to >=1.9.1
+- Frontend runtime: updated React and react-dom to 19.3.0, lucide-react to 1.44.0
+- Frontend development: updated Vite to 8.3.0, ESLint to 10.10.0, @vitejs/plugin-react
+  to 6.1.1, eslint-plugin-react-refresh to 0.5.6, globals to 17.12.0, and the
+  @types/react / @types/react-dom typings to 19.3.0
+- CI: bumped `actions/checkout` from v4 to v7 across all workflows
+
+### Maintenance
+
+- Reserialized the tabular phishing detection model (`nlp_model_tabular_v0.15.1.pkl`)
+  with scikit-learn 1.9.1 to eliminate an `InconsistentVersionWarning` raised when
+  unpickling a model trained under 1.9.0; same dataset, hyperparameters and
+  `random_state`, so detection metrics are unchanged (test accuracy 0.984)
+
+### Notes
+
+- All 124 tests passing (1 skipped), zero regressions
+- No API schema changes; PATCH release per SemVer
+
+---
+
 ## [0.16.2] — 2026-09-11
 
 ### Security
