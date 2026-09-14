@@ -65,34 +65,36 @@ EMLyzer is designed with security-first principles:
 - Rate limiting respected (no brute-force scanning)
 - Requests authenticated with user-provided credentials only
 
-### Threat Intelligence (feed IOC, campagne note) — v0.17
+### Threat Intelligence (IOC feeds, known campaigns) — v0.17
 
-EMLyzer non implementa un sistema di autenticazione/login. A partire dalla
-v0.17, alcuni endpoint modificano configurazione che influisce sul verdetto
-di rischio delle analisi (forzare il refresh di un feed, creare/modificare
-una campagna nota, approvare una proposta auto-generata):
+EMLyzer does not implement an authentication/login system. Starting with
+v0.17, some endpoints modify configuration that affects the risk verdict of
+analyses (forcing a feed refresh, creating/editing a known campaign,
+approving an auto-generated proposal):
 
-- **Default di rete**: `start.sh`/`start.bat` ascoltano di default su
-  `127.0.0.1` (loopback), non più `0.0.0.0`. Esporre l'app su altre
-  interfacce è opt-in esplicito (`EMLYZER_BIND=0.0.0.0`) e stampa un
-  avviso in console.
-- **Token amministrativo locale**: gli endpoint che scrivono configurazione
+- **Network default**: `start.sh`/`start.bat` now listen on `127.0.0.1`
+  (loopback) by default, no longer `0.0.0.0`. Exposing the app on other
+  interfaces is an explicit opt-in (`EMLYZER_BIND=0.0.0.0`) and prints a
+  console warning.
+- **Local admin token**: endpoints that write configuration
   (`POST /api/intel/refresh`, `POST/PUT/DELETE /api/campaigns/known/*`,
-  `POST /api/campaigns/proposals/*`) accettano richieste da localhost senza
-  alcun token; da qualunque altro indirizzo richiedono l'header
-  `X-EMLyzer-Token`, generato al primo avvio e salvato in
-  `backend/data/admin_token` (mai in git). **Questo non è un sistema di
-  autenticazione completo**: se si espone l'istanza oltre localhost, va
-  messo un reverse proxy con autenticazione propria davanti.
-- **Feed esterni**: il download dei feed IOC (OpenPhish, Spamhaus, URLhaus)
-  e del bollettino RSS CERT-AGID usa URL costanti nel codice (mai
-  configurabili via API o `.env`), con cap di dimensione, timeout/deadline
-  dedicati e rifiuto di redirect verso indirizzi privati/loopback — a
-  difesa da SSRF anche in caso di compromissione di uno di questi domini.
-- **Dati persistiti per il backtest**: se `INTEL_STORE_CAMPAIGN_SURFACE` è
-  attivo (default), ogni analisi salva token normalizzati e filtrati (anti-PII
-  di base) del testo dell'email in `body_indicators.campaign_surface`, usati
-  solo per validare nuove campagne contro lo storico. Disattivabile in `.env`.
+  `POST /api/campaigns/proposals/*`) accept requests from localhost without
+  any token; from any other address they require the `X-EMLyzer-Token`
+  header, generated at first startup and saved to `backend/data/admin_token`
+  (never in git). **This is not a full authentication system**: if you
+  expose the instance beyond localhost, put a reverse proxy with its own
+  authentication in front of it.
+- **External feeds**: downloading IOC feeds (OpenPhish, Spamhaus, URLhaus)
+  and the CERT-AGID RSS bulletin uses URLs hardcoded in the code (never
+  configurable via the API or `.env`), with a size cap, dedicated
+  timeout/deadline, and rejection of redirects toward private/loopback
+  addresses — defending against SSRF even if one of these domains were
+  ever compromised.
+- **Data persisted for the backtest**: if `INTEL_STORE_CAMPAIGN_SURFACE` is
+  enabled (default), each analysis saves normalized, filtered (basic
+  anti-PII) tokens of the email text to `body_indicators.campaign_surface`,
+  used only to validate new campaigns against the historical corpus.
+  Disable it in `.env`.
 
 ### Temporary File Cleanup
 

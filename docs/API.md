@@ -253,17 +253,18 @@ Downloads the Word report (.docx).
 
 ---
 
-### 🛰️ Threat Intelligence (feed IOC, campagne note, bollettini) — v0.17
+### 🛰️ Threat Intelligence (IOC feeds, known campaigns, bulletins) — v0.17
 
-Endpoint che scrivono configurazione (`POST`/`PUT`/`DELETE` sotto `/api/intel/`
-e `/api/campaigns/known`, `/api/campaigns/proposals/*`) richiedono una
-connessione da **localhost**, oppure l'header `X-EMLyzer-Token` (generato al
-primo avvio, stampato in console e salvato in `backend/data/admin_token`) se
-l'app è raggiunta da un altro host. Vedi [SECURITY.md](../SECURITY.md).
+Endpoints that write configuration (`POST`/`PUT`/`DELETE` under `/api/intel/`
+and `/api/campaigns/known`, `/api/campaigns/proposals/*`) require a
+connection from **localhost**, or the `X-EMLyzer-Token` header (generated at
+first startup, printed to the console, and saved to
+`backend/data/admin_token`) if the app is reached from another host. See
+[SECURITY.md](../SECURITY.md).
 
 #### GET `/api/intel/status`
 
-Stato unificato di feed IOC, campagne note e bollettini.
+Unified status of IOC feeds, known campaigns, and bulletins.
 
 ```json
 {
@@ -279,18 +280,18 @@ Stato unificato di feed IOC, campagne note e bollettini.
 
 #### POST `/api/intel/refresh?target=openphish|spamhaus|urlhaus|campaigns|bulletins`
 
-Forza il refresh di un target (whitelist esplicita, mai un URL libero). Risposta `202` con `run_id`, o `409` se un refresh è già in corso.
+Forces a refresh of a target (explicit whitelist, never a free-form URL). `202` response with a `run_id`, or `409` if a refresh is already running.
 
 #### GET `/api/campaigns/known` · POST/PUT/DELETE `/api/campaigns/known/{id}`
 
-CRUD delle campagne note (curate manualmente o approvate da una proposta). Le campagne di sistema (`backend/config/campaigns.json`) non sono modificabili direttamente: creare/modificare una campagna con lo stesso `id` crea un **override utente** in `backend/data/campaigns_user.json`, ripristinabile con `POST /api/campaigns/known/{id}/restore`.
+CRUD for known campaigns (manually curated or approved from a proposal). Built-in campaigns (`backend/config/campaigns.json`) aren't editable directly: creating/updating a campaign with the same `id` creates a **user override** in `backend/data/campaigns_user.json`, restorable with `POST /api/campaigns/known/{id}/restore`.
 
 **Request (create/update):**
 ```json
 {
   "id": "brand-2026",
   "name": "Brand Phishing 2026",
-  "keywords": ["brand", "verifica", "account"],
+  "keywords": ["brand", "verify", "account"],
   "required_keywords": ["brand"],
   "risk_contribution": 25,
   "enabled": true
@@ -299,26 +300,26 @@ CRUD delle campagne note (curate manualmente o approvate da una proposta). Le ca
 
 #### POST `/api/campaigns/known/backtest`
 
-Esegue il matcher **candidato** (non salvato) contro il corpus già analizzato, per stimare falsi positivi prima di salvare una campagna.
+Runs the **candidate** matcher (not saved) against the already-analyzed corpus, to estimate false positives before saving a campaign.
 
 ```json
-{"keywords": ["brand", "verifica"], "risk_contribution": 25}
+{"keywords": ["brand", "verify"], "risk_contribution": 25}
 ```
 ```json
 {
   "total_emails": 40, "evaluable_emails": 38, "matched_count": 3,
   "matched_by_risk_label": {"low": 0, "medium": 1, "high": 2},
-  "coverage_note": "valutate 38/40 email con campaign_surface disponibile"
+  "coverage_note": "evaluated 38/40 emails with campaign_surface available"
 }
 ```
 
 #### GET `/api/campaigns/proposals` · POST `/api/campaigns/proposals/generate` · POST `.../{id}/approve|reject`
 
-Auto-apprendimento interno: propone nuove campagne da cluster di email simili nel corpus dell'utente. `approve` **non scrive nulla**: ritorna il payload da aprire nel form di creazione manuale.
+Internal auto-learning: proposes new campaigns from clusters of similar emails in the user's corpus. `approve` **writes nothing**: it returns the payload to open in the manual creation form.
 
 #### GET `/api/intel/bulletins`
 
-Bacheca di bollettini pubblici CERT-AGID a tema phishing (titolo/data/link/estratto — mai il testo integrale, mai keyword generate automaticamente).
+Board of public CERT-AGID phishing-related bulletins (title/date/link/excerpt — never the full text, never auto-generated keywords).
 
 ---
 

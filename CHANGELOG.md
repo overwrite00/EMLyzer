@@ -24,138 +24,134 @@ Features are ordered by implementation priority.
 
 ## [0.17.0] — 2026-09-14
 
-### Threat Intelligence — Wave 0 + Wave 1 (fondamenta + bugfix)
+### Threat Intelligence — Wave 0 + Wave 1 (foundations + bugfixes)
 
-Prima fase di un piano più ampio (feed IOC di reputazione + rilevamento
-campagne di phishing note). Verifiche esterne in `docs/threat-intel-sources.md`.
+First phase of a broader plan (reputation IOC feeds + known phishing
+campaign detection). External source verification in `docs/threat-intel-sources.md`.
 
 #### Fixed
-- **Campagne note — falsi positivi da substring match**: il matching passa da
-  substring (`"poste"` scattava dentro `"imposte"`) a confini di parola
-  (word-boundary). Introdotta soglia proporzionale + `min_keyword_matches`,
-  keyword pesate (brand > generiche) e uso dei `sender_patterns`/
-  `subject_patterns` già presenti nei dati (prima ignorati) come moltiplicatori
-  di confidenza. `match_campaigns()`/`best_campaign_match()` sostituiscono
-  `_detect_campaign_match` (mantenuta come thin wrapper legacy): ritornano il
-  match con lo score migliore, non il primo trovato iterando l'ordine di
-  inserimento delle keyword nel dict.
-- **`risk_contribution` di `campaigns.json` era un campo morto**: ogni
-  campagna matchata valeva sempre +25 punti fissi (mappa severity→punti in
-  `_compute_score`), indipendentemente dal valore dichiarato nel JSON. Aggiunto
-  `BodyFinding.score_override`, usato ora da `_compute_score`. I 14 valori
-  esistenti sono stati ricalibrati: le campagne di brand-phishing "standard"
-  (INPS, PagoPA, Poste, ecc.) restano a 25 (baseline neutra, nessun cambio di
-  comportamento visibile), le campagne malware/APT (QakBot, Emotet, Venom
-  PhaaS, Diesel Vortex) restano a 40-50 (pesano più delle prime, come previsto).
-- **Bypass dei floor di scoring**: un finding a `score_override` basso restava
-  comunque `severity="high"` e faceva scattare i floor deterministici in
-  `scorer.py`. Aggiunto `BodyFinding.counts_toward_floor`: i match campagna a
-  bassa confidenza non contano più verso il floor "2+ high nel body → ≥30".
-- **Clustering interno (`/api/campaigns/`) — mega-cluster spurio**: il
-  `body_hash` usato per raggruppare email "con lo stesso corpo" era in realtà
-  l'hash di una stringa di 4 contatori (`urgency_count_cta_count_forms_js`),
-  che collide per la maggioranza delle email pulite. Ora si usa un hash SHA256
-  reale del body (`body_indicators.body_sha256`, calcolato durante l'analisi,
-  nessuna migrazione DB necessaria); le email analizzate prima di questo fix
-  restano fuori dalla strategia invece di collidere a caso. Corretto sia in
-  `api/routes/campaigns.py` sia in `api/routes/report.py` (stesso bug in due
-  punti).
-- **Rate limiting senza risposta JSON**: i 4 endpoint già limitati (upload,
-  analysis, manual) rispondevano `text/plain` senza `Retry-After` su un 429,
-  invece del JSON `{detail: ...}` atteso dal frontend. Registrato l'exception
-  handler `RateLimitExceeded` mancante in `main.py`.
+- **Known campaigns — false positives from substring matching**: matching
+  moved from substring (`"poste"` used to fire inside `"imposte"`, Italian
+  for "taxes") to word-boundary matching. Added a proportional threshold +
+  `min_keyword_matches`, weighted keywords (brand > generic), and use of the
+  `sender_patterns`/`subject_patterns` already present in the data (previously
+  ignored) as confidence multipliers. `match_campaigns()`/`best_campaign_match()`
+  replace `_detect_campaign_match` (kept as a thin legacy wrapper): they return
+  the best-scoring match, not the first one found while iterating the dict's
+  keyword insertion order.
+- **`campaigns.json`'s `risk_contribution` was a dead field**: every matched
+  campaign always scored a fixed +25 points (severity→points map in
+  `_compute_score`), regardless of the value declared in the JSON. Added
+  `BodyFinding.score_override`, now used by `_compute_score`. The 14 existing
+  values were recalibrated: "standard" brand-phishing campaigns (INPS, PagoPA,
+  Poste, etc.) stay at 25 (neutral baseline, no visible behavior change),
+  malware/APT campaigns (QakBot, Emotet, Venom PhaaS, Diesel Vortex) stay at
+  40-50 (weighing more than the former, as intended).
+- **Scoring floor bypass**: a finding with a low `score_override` still had
+  `severity="high"` and triggered the deterministic floors in `scorer.py`.
+  Added `BodyFinding.counts_toward_floor`: low-confidence campaign matches no
+  longer count toward the "2+ high in body → ≥30" floor.
+- **Internal clustering (`/api/campaigns/`) — spurious mega-cluster**: the
+  `body_hash` used to group emails with "the same body" was actually the hash
+  of a 4-counter string (`urgency_count_cta_count_forms_js`), which collides
+  for the vast majority of clean emails. Now uses a real SHA256 hash of the
+  body (`body_indicators.body_sha256`, computed during analysis, no DB
+  migration needed); emails analyzed before this fix stay out of the strategy
+  instead of colliding at random. Fixed in both `api/routes/campaigns.py` and
+  `api/routes/report.py` (same bug in two places).
+- **Rate limiting without a JSON response**: the 4 already-limited endpoints
+  (upload, analysis, manual) responded `text/plain` with no `Retry-After` on a
+  429, instead of the JSON `{detail: ...}` the frontend expects. Registered
+  the missing `RateLimitExceeded` exception handler in `main.py`.
 
 #### Added
-- Nuovo package `backend/core/intel/` — infrastruttura condivisa per la
-  Threat Intelligence: `cache.py` (TTL disk cache versionata, compatibile con
-  le cache legacy esistenti), `fetch.py` (download difensivo: cap dimensione,
-  deadline, guardie anti-SSRF sui redirect), `snapshot.py` (pattern
-  build-then-swap per strutture in-memory ricaricabili senza riavvio),
-  `runs.py` (tracciamento esecuzioni per l'osservabilità futura).
-- `core/analysis/campaign_registry.py`: il DB campagne non è più una coppia di
-  globali di modulo popolate una sola volta all'import — ora è uno Snapshot
-  ricaricabile (`reload()`), letto una sola volta per analisi e passato
-  esplicitamente al matcher (evita che un reload a metà produca una visione
-  mista tra i due punti che prima leggevano la globale separatamente).
-- `body_indicators.campaign_surface`: token normalizzati e filtrati (anti-PII
-  di base) della superficie testuale usata dal matcher, persistiti per
-  abilitare un futuro backtest di nuove campagne contro il corpus storico
-  senza salvare il body integrale delle email. Disattivabile via
-  `INTEL_STORE_CAMPAIGN_SURFACE=false`.
-- Nuove impostazioni in `.env`/`Settings`: `DATA_DIR`, `CACHE_DIR`,
-  `CONFIG_DIR`, `USER_DATA_DIR` (path prima hardcoded), più il blocco
-  `INTEL_*` (auto-refresh, TTL, timeout, deadline, soglia di "stale").
+- New `backend/core/intel/` package — shared Threat Intelligence
+  infrastructure: `cache.py` (versioned TTL disk cache, compatible with the
+  existing legacy cache files), `fetch.py` (defensive download: size cap,
+  deadline, anti-SSRF redirect guards), `snapshot.py` (build-then-swap
+  pattern for reloadable in-memory structures with no restart), `runs.py`
+  (execution tracking for future observability).
+- `core/analysis/campaign_registry.py`: the campaign DB is no longer a pair
+  of module-level globals populated once at import — it's now a reloadable
+  Snapshot (`reload()`), read once per analysis and passed explicitly to the
+  matcher (prevents a mid-analysis reload from producing a mixed view across
+  the two call sites that used to read the global separately).
+- `body_indicators.campaign_surface`: normalized, anti-PII-filtered tokens of
+  the text surface the matcher operates on, persisted to enable a future
+  backtest of new campaigns against the historical corpus without storing
+  the full email body. Toggle off via `INTEL_STORE_CAMPAIGN_SURFACE=false`.
+- New `.env`/`Settings` values: `DATA_DIR`, `CACHE_DIR`, `CONFIG_DIR`,
+  `USER_DATA_DIR` (previously hardcoded paths), plus the `INTEL_*` block
+  (auto-refresh, TTL, timeout, deadline, "stale" threshold).
 
-### Threat Intelligence — Wave 2-9 (feed IOC, campagne note, automazione, UI)
+### Threat Intelligence — Wave 2-9 (IOC feeds, known campaigns, automation, UI)
 
 #### Added
-- **Registry feed IOC** (`core/intel/feeds.py`): OpenPhish e Spamhaus migrati
-  al nuovo Snapshot condiviso (stessi nomi cache su disco, nessuna cache
-  invalidata); aggiunto **URLhaus bulk** (`check_url_urlhaus_local`, nuovo
-  connettore FAST senza bisogno di `ABUSECH_API_KEY` — coesiste col
-  connettore live esistente `check_url_urlhaus`, che resta invariato e
-  richiede la chiave). Validazione per-riga uniformata su tutti i feed, cap
-  dimensione/voci, sanity check pre-sostituzione cache (un fetch degradato
-  — pagina di errore HTML, corpo troppo piccolo — non sovrascrive mai una
-  cache buona).
-- **`GET /api/intel/status`**: stato unificato di feed IOC, campagne note e
-  bollettini in un solo endpoint (stato, età, numero voci, ultimo errore
-  categorizzato — mai il messaggio d'eccezione grezzo).
-- **`POST /api/intel/refresh?target=...`**: refresh manuale con whitelist
-  esplicita dei target (mai un URL libero — rischio SSRF su endpoint
-  scrivente), risposta 202 asincrona con `run_id` tracciabile, 409 se un
-  refresh è già in corso.
-- **Scheduler automatico** (`core/intel/scheduler.py`): un solo task
-  asyncio nel lifespan, executor dedicato (separato da quello usato
-  dall'analisi email), backoff esponenziale sui fallimenti per-feed,
-  ritardo di avvio, disattivabile con `INTEL_AUTO_REFRESH=false`. Solo i
-  feed IOC sono automatici (`run_fast_checks` li carica sincronamente
-  in-request: un TTL scaduto si pagava altrimenti in latenza durante
-  l'analisi); i bollettini CERT-AGID restano on-demand.
-- **Hardening minimo** (`core/intel/auth.py`): gli endpoint che scrivono
-  configurazione (refresh forzato, CRUD campagne, proposte) richiedono una
-  connessione da localhost oppure un token generato al primo avvio
-  (`backend/data/admin_token`, stampato in console). `start.sh`/`start.bat`
-  passano a bind di default `127.0.0.1` (`EMLYZER_BIND=0.0.0.0` per
-  esporre l'app, con avviso esplicito). Dettagli in [SECURITY.md](./SECURITY.md).
-- **"Campagne note" — CRUD utente** (`/api/campaigns/known`): campagne
-  personalizzate salvate in `backend/data/campaigns_user.json` (non
-  versionato, non in `backend/config/`), fuse a runtime con quelle di
-  sistema con precedenza utente sui conflitti di id (esposti come
-  `overridden_ids`, ripristinabili con `POST /known/{id}/restore`).
-  Scrittura atomica con backup e rollback se il reload successivo fallisce.
-- **Backtest** (`POST /api/campaigns/known/backtest`): esegue il matcher
-  candidato contro la `campaign_surface` già persistita nelle email
-  analizzate, dichiarando sempre la copertura (email analizzate prima di
-  questa funzione non sono valutabili, non vengono ignorate silenziosamente)
-  e segnalando le email a basso rischio matchate come probabili falsi
-  positivi. Aggregati per default; dettaglio dei subject solo con
-  `detail=true`, dietro lo stesso hardening degli altri endpoint scriventi.
-- **Bollettini CERT-AGID** (`GET /api/intel/bulletins`): bacheca di spunti
-  dal feed RSS pubblico (`cert-agid.gov.it/feed/`, go/no-go quantitativo
-  verificato in `docs/threat-intel-sources.md`) — solo titolo/data/link/
-  estratto, **mai keyword generate automaticamente**: il pulsante "Crea
-  campagna da questo bollettino" apre il form di creazione manuale
-  precompilato solo con i metadati. Parsing con `defusedxml` (nuova
-  dipendenza) contro input XML non fidato.
-- **Auto-apprendimento interno** (`core/analysis/campaign_proposals.py`,
-  tabella `campaign_proposals`): propone nuove campagne da cluster di email
-  simili (solo subject-Jaccard e body-hash reale; escluse le strategie
-  basate su sender-domain/message-id per rischio di retroazione con lo
-  scorer o rumore eccessivo), con filtri di qualità (≥4 email, ≥2 domini
-  mittente distinti, ≥2 email ad alto rischio), dedup contro campagne già
-  coperte, e cooldown a due osservazioni. **Le proposte non vengono mai
-  scritte automaticamente**: `approve` restituisce solo il payload da
-  aprire nel form di creazione manuale.
-- Nuovo pannello frontend **"Threat Intelligence"** (`ThreatIntelPanel.jsx`)
-  con tre sotto-sezioni (Feed IOC, Campagne Note, Bollettini CERT-AGID),
-  i18n IT/EN completo. Il pannello di clustering interno preesistente è
-  stato rinominato in UI **"Cluster Simili"** per disambiguare dal nuovo
-  concetto di "Campagne Note" (due cose diverse che condividevano la
-  parola "campagna").
+- **IOC feed registry** (`core/intel/feeds.py`): OpenPhish and Spamhaus
+  migrated to the new shared Snapshot (same on-disk cache file names, no
+  cache invalidated); added **URLhaus bulk** (`check_url_urlhaus_local`, a
+  new FAST connector that needs no `ABUSECH_API_KEY` — coexists with the
+  existing live connector `check_url_urlhaus`, unchanged and still requiring
+  the key). Uniform per-line validation across all feeds, size/entry caps,
+  pre-swap sanity check (a degraded fetch — HTML error page, body too small —
+  never overwrites a good cache).
+- **`GET /api/intel/status`**: unified status for IOC feeds, known campaigns
+  and bulletins in a single endpoint (state, age, entry count, categorized
+  last error — never the raw exception message).
+- **`POST /api/intel/refresh?target=...`**: manual refresh with an explicit
+  target whitelist (never a free-form URL — SSRF risk on a write endpoint),
+  async 202 response with a trackable `run_id`, 409 if a refresh is already
+  running.
+- **Automatic scheduler** (`core/intel/scheduler.py`): a single asyncio task
+  in the lifespan, dedicated executor (separate from the one used by email
+  analysis), exponential backoff on per-feed failures, startup delay,
+  toggle off via `INTEL_AUTO_REFRESH=false`. Only IOC feeds are automatic
+  (`run_fast_checks` loads them synchronously in-request: an expired TTL
+  otherwise cost latency during analysis); CERT-AGID bulletins stay
+  on-demand.
+- **Minimal hardening** (`core/intel/auth.py`): endpoints that write
+  configuration (forced refresh, campaign CRUD, proposals) require a
+  localhost connection or a token generated at first startup
+  (`backend/data/admin_token`, printed to the console). `start.sh`/
+  `start.bat` now default to binding `127.0.0.1` (`EMLYZER_BIND=0.0.0.0` to
+  expose the app, with an explicit warning). Details in [SECURITY.md](./SECURITY.md).
+- **"Known Campaigns" — user CRUD** (`/api/campaigns/known`): custom
+  campaigns saved to `backend/data/campaigns_user.json` (not version
+  controlled, not under `backend/config/`), merged at runtime with the
+  built-in ones with user precedence on id conflicts (exposed as
+  `overridden_ids`, restorable with `POST /known/{id}/restore`). Atomic
+  write with backup and rollback if the subsequent reload fails.
+- **Backtest** (`POST /api/campaigns/known/backtest`): runs the candidate
+  matcher against the `campaign_surface` already persisted for analyzed
+  emails, always declaring its coverage (emails analyzed before this
+  feature existed are reported as not evaluable, never silently ignored)
+  and flagging matched low-risk emails as likely false positives.
+  Aggregates by default; subject-level detail only with `detail=true`,
+  behind the same hardening as the other write endpoints.
+- **CERT-AGID bulletin board** (`GET /api/intel/bulletins`): a board of
+  leads from the public RSS feed (`cert-agid.gov.it/feed/`, quantitative
+  go/no-go verified in `docs/threat-intel-sources.md`) — title/date/link/
+  excerpt only, **keywords are never auto-generated**: the "Create campaign
+  from this bulletin" button opens the manual creation form pre-filled with
+  metadata only. Parsed with `defusedxml` (new dependency) against untrusted
+  XML input.
+- **Internal auto-learning** (`core/analysis/campaign_proposals.py`, new
+  `campaign_proposals` table): proposes new campaigns from clusters of
+  similar emails (subject-Jaccard and real body-hash only; strategies based
+  on sender-domain/message-id excluded for risk of feedback with the scorer
+  or excessive noise), with quality filters (≥4 emails, ≥2 distinct sender
+  domains, ≥2 high-risk emails), dedup against already-covered campaigns,
+  and a two-sighting cooldown. **Proposals are never written automatically**:
+  `approve` only returns the payload to open in the manual creation form.
+- New frontend **"Threat Intelligence"** panel (`ThreatIntelPanel.jsx`) with
+  three sub-sections (IOC Feeds, Known Campaigns, CERT-AGID Bulletins), full
+  IT/EN i18n. The pre-existing internal clustering panel is relabeled in the
+  UI as **"Similar Clusters"** to disambiguate it from the new "Known
+  Campaigns" concept (two different things that used to share the word
+  "campaign").
 
 ### Dependencies
-- Aggiunto `defusedxml==0.7.1` (parsing sicuro del feed RSS CERT-AGID).
+- Added `defusedxml==0.7.1` (safe parsing of the CERT-AGID RSS feed).
 
 ---
 

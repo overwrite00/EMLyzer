@@ -1,36 +1,36 @@
-# Wave 0 — Verifiche esterne (Threat Intelligence)
+# Wave 0 — External source verification (Threat Intelligence)
 
-Verifiche eseguite il 2026-09-14.
+Checks performed on 2026-09-14.
 
 ## 1. Spamhaus DROP
 - `https://www.spamhaus.org/drop/drop.txt` → **200 OK**, `Content-Type: text/plain; charset=UTF-8`.
-- Formato ancora attivo, nessuna dismissione in corso. Nessun cambio di schema necessario in Wave 2.
+- Format still active, no deprecation in progress. No schema change needed in Wave 2.
 
 ## 2. OpenPhish feed.txt
-- `https://openphish.com/feed.txt` → **302 → 200** (redirect gestito automaticamente da `requests`, che segue i redirect su GET di default; `curl` senza `-L` mostra solo il 302).
-- Corpo raggiunto: 300 righe di URL phishing, formato invariato.
-- `min_entries` iniziale suggerito: 150 (50% del conteggio osservato in questo campione).
+- `https://openphish.com/feed.txt` → **302 → 200** (redirect handled automatically by `requests`, which follows redirects on GET by default; `curl` without `-L` only shows the 302).
+- Body reached: 300 lines of phishing URLs, unchanged format.
+- Suggested initial `min_entries`: 150 (50% of the count observed in this sample).
 
 ## 3. URLhaus bulk (abuse.ch)
-- `https://urlhaus.abuse.ch/downloads/csv_recent/` → **200 OK senza Auth-Key**, ~2.3 MB.
-- Conclusione: il download bulk CSV **non richiede** `ABUSECH_API_KEY` (a differenza delle API live `check_url_urlhaus`/`_query_threatfox` che la richiedono). → **Wave 8: URLhaus bulk procede**, `max_bytes` consigliato 32 MB.
+- `https://urlhaus.abuse.ch/downloads/csv_recent/` → **200 OK with no Auth-Key**, ~2.3 MB.
+- Conclusion: the bulk CSV download **does not require** `ABUSECH_API_KEY` (unlike the live `check_url_urlhaus`/`_query_threatfox` APIs, which do). → **Wave 8: URLhaus bulk proceeds**, recommended `max_bytes` 32 MB.
 
-## 4. CERT-AGID RSS — go/no-go quantitativo
+## 4. CERT-AGID RSS — quantitative go/no-go
 - `https://cert-agid.gov.it/feed/` → **200 OK**, `application/rss+xml`.
-- Campione: 10 item, `pubDate` da 2026-08-11 a 2026-09-11 (≈ 1 mese) → **10 item/mese**, sopra la soglia di 6/mese.
-- Titoli osservati: "Falso rimborso TARI... ai danni di PagoPA", "Nuova campagna di phishing ai danni di INPS...", "Phishing ai danni del Ministero della Salute...", più sintesi settimanali aggregate. **Brand riconoscibile in almeno l'80% dei titoli individuali** (esclusi i soli riepiloghi settimanali aggregati, che non nominano un brand specifico).
-- **Soglia superata (≥6 item/mese, ≥50% titoli con brand riconoscibile) → Wave 7 procede come pianificata**, non degrada a link statico.
-- Nota: la licenza di riuso dei contenuti CERT-AGID non è stata verificata in dettaglio in questa fase — da confermare prima di Wave 7 (probabile: solo titolo + link + estratto breve, mai testo integrale, per prudenza).
+- Sample: 10 items, `pubDate` from 2026-08-11 to 2026-09-11 (≈ 1 month) → **10 items/month**, above the 6/month threshold.
+- Observed titles: "False TARI refund... impersonating PagoPA", "New phishing campaign impersonating INPS...", "Phishing impersonating the Ministry of Health...", plus aggregated weekly summaries. **Recognizable brand in at least 80% of individual titles** (excluding aggregated weekly summaries only, which don't name a specific brand).
+- **Threshold met (≥6 items/month, ≥50% titles with a recognizable brand) → Wave 7 proceeds as planned**, no fallback to a static link.
+- Note: CERT-AGID content reuse licensing was not verified in detail at this stage — to confirm before Wave 7 (likely outcome: title + link + short excerpt only, never full text, as a precaution).
 
-## 5. PhishTank — registrazione nuove chiavi
-- Non verificato in questa sessione (richiede creazione di un account PhishTank, azione manuale). **Rimane condizionato**: se l'utente ha/ottiene una `PHISHTANK_API_KEY`, il bulk `online-valid.json.gz` entra in Wave 8 con la regola asimmetrica (il feed locale può solo confermare `malicious`, mai concludere `clean`). Altrimenti Wave 8 procede solo con URLhaus bulk.
+## 5. PhishTank — new key registration
+- Not verified in this session (requires creating a PhishTank account, a manual action). **Remains conditional**: if the user has/obtains a `PHISHTANK_API_KEY`, the `online-valid.json.gz` bulk feed enters Wave 8 under the asymmetric rule (the local feed can only confirm `malicious`, never conclude `clean`). Otherwise Wave 8 proceeds with URLhaus bulk only.
 
-## Esito complessivo
-| Feed | Esito | Wave interessata |
+## Overall outcome
+| Feed | Outcome | Wave affected |
 |---|---|---|
-| Spamhaus DROP | invariato | W2 |
-| OpenPhish | invariato | W2 |
-| URLhaus bulk | GO, no key richiesta | W8 |
-| ThreatFox bulk | scartato (deciso a priori nel piano) | — |
-| PhishTank bulk | condizionato a chiave utente | W8 |
+| Spamhaus DROP | unchanged | W2 |
+| OpenPhish | unchanged | W2 |
+| URLhaus bulk | GO, no key required | W8 |
+| ThreatFox bulk | dropped (decided upfront in the plan) | — |
+| PhishTank bulk | conditional on user key | W8 |
 | CERT-AGID RSS | **GO** | W7 |
