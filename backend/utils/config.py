@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "EMLyzer"
-    VERSION: str = "0.16.3"
+    VERSION: str = "0.17.0"
     DEBUG: bool = False
 
     # CORS - backend in produzione + Vite dev server
@@ -37,6 +37,26 @@ class Settings(BaseSettings):
 
     # Reports output
     REPORTS_DIR: Path = BASE_DIR / "reports"
+
+    # Threat Intelligence — path (v0.17). Prima erano hardcoded con Path(__file__)
+    # dentro connectors.py/body_analyzer.py: portarli qui permette ai test di
+    # isolarli con variabili d'ambiente invece di monkeypatchare globali di modulo.
+    DATA_DIR: Path = BASE_DIR / "data"
+    CACHE_DIR: Path = BASE_DIR / "data" / "cache"
+    CONFIG_DIR: Path = BASE_DIR / "config"
+    USER_DATA_DIR: Path = BASE_DIR / "data"
+
+    # Threat Intelligence — comportamento (v0.17)
+    INTEL_AUTO_REFRESH: bool = True       # scheduler automatico feed IOC (Wave 5)
+    INTEL_TICK_MINUTES: int = 20
+    INTEL_TTL_MULTIPLIER: float = 1.0     # moltiplicatore globale sui TTL per-feed
+    INTEL_DOWNLOAD_TIMEOUT_CONNECT: float = 5.0
+    INTEL_DOWNLOAD_TIMEOUT_READ: float = 20.0
+    INTEL_DOWNLOAD_DEADLINE: float = 120.0  # deadline assoluta per un fetch (anti thread appeso)
+    INTEL_STARTUP_DELAY_SECONDS: int = 8
+    INTEL_STALE_HARD_HOURS: float = 168.0   # oltre questa età un feed diventa "unavailable"
+    INTEL_STORE_CAMPAIGN_SURFACE: bool = True  # persiste token anti-PII per il backtest campagne
+    CAMPAIGNS_ENABLED: bool = True
 
     # Optional API keys for reputation plugins (empty = disabled)
     ABUSEIPDB_API_KEY: str = ""
@@ -83,4 +103,5 @@ settings = Settings()
 # Ensure required directories exist (pathlib handles OS-specific separators)
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 settings.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-(BASE_DIR / "data").mkdir(parents=True, exist_ok=True)
+settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+settings.CACHE_DIR.mkdir(parents=True, exist_ok=True)

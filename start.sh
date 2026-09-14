@@ -988,4 +988,18 @@ echo "$_M_STOP"
 echo ""
 
 cd "$BACKEND_DIR"
-exec "$VENV_PYTHON" -m uvicorn main:app --host 0.0.0.0 --port "$PORT" --reload
+# v0.17: bind di default su loopback — EMLyzer aggiunge endpoint che
+# scrivono configurazione (campagne note, refresh feed) protetti solo da un
+# token locale, non da un vero sistema di autenticazione. Esporre l'app oltre
+# 127.0.0.1 è quindi opt-in esplicito: EMLYZER_BIND=0.0.0.0 ./start.sh
+BIND_HOST="${EMLYZER_BIND:-127.0.0.1}"
+if [ "$BIND_HOST" != "127.0.0.1" ] && [ "$BIND_HOST" != "localhost" ]; then
+    echo ""
+    echo "$_W ATTENZIONE: EMLyzer sta per ascoltare su $BIND_HOST, non solo localhost."
+    echo "   Gli endpoint che scrivono configurazione (campagne, refresh feed) sono"
+    echo "   protetti solo da un token locale (backend/data/admin_token), non da un"
+    echo "   vero sistema di autenticazione. Vedi SECURITY.md prima di esporre l'app"
+    echo "   su una rete non fidata."
+    echo ""
+fi
+exec "$VENV_PYTHON" -m uvicorn main:app --host "$BIND_HOST" --port "$PORT" --reload

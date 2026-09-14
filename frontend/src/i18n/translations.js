@@ -259,7 +259,10 @@ export const translations = {
   "summary.notes_saved": { it: "✓ Salvato",  en: "✓ Saved" },
 
   // ── Campaigns
-  "camp.title":         { it: "Campagne Rilevate", en: "Detected Campaigns" },
+  // v0.17: rinominato in UI per disambiguare dal nuovo concetto di
+  // "Campagne note" (pattern curati, sezione intel.known.*) — questo pannello
+  // resta il clustering interno grezzo sul corpus dell'utente.
+  "camp.title":         { it: "Cluster Simili", en: "Similar Clusters" },
   "camp.description":   {
     it: "Raggruppa le email analizzate per rilevare campagne malevole coordinate.",
     en: "Groups analyzed emails to detect coordinated malicious campaigns.",
@@ -282,6 +285,79 @@ export const translations = {
   "camp.type.message_id":   { it: "Message-ID pattern",      en: "Message-ID pattern" },
   "camp.type.campaign_id":  { it: "X-Campaign-ID",           en: "X-Campaign-ID" },
   "camp.type.sender_domain":{ it: "Dominio mittente",        en: "Sender domain" },
+
+  // ── Threat Intelligence (v0.17) ──────────────────────────────────────────
+  "intel.title":            { it: "Threat Intelligence", en: "Threat Intelligence" },
+  "intel.tab.feeds":        { it: "Feed IOC", en: "IOC Feeds" },
+  "intel.tab.campaigns":    { it: "Campagne Note", en: "Known Campaigns" },
+  "intel.tab.bulletins":    { it: "Bollettini CERT-AGID", en: "CERT-AGID Bulletins" },
+  "intel.refresh_all":      { it: "Aggiorna tutto", en: "Refresh all" },
+  "intel.refresh_one":      { it: "Aggiorna", en: "Refresh" },
+  "intel.refreshing":       { it: "Aggiornamento…", en: "Refreshing…" },
+  "intel.state.ok":            { it: "Aggiornato", en: "Up to date" },
+  "intel.state.stale":         { it: "Obsoleto", en: "Stale" },
+  "intel.state.unavailable":   { it: "Non disponibile", en: "Unavailable" },
+  "intel.state.never_fetched": { it: "Mai scaricato", en: "Never fetched" },
+  "intel.entries":          { it: "{n} voci", en: "{n} entries" },
+  "intel.age":              { it: "{h}h fa", en: "{h}h ago" },
+  "intel.needs_key":        { it: "Richiede API key non configurata", en: "Requires unconfigured API key" },
+  "intel.error_prefix":     { it: "Errore:", en: "Error:" },
+  "intel.token_hint": {
+    it: "Le operazioni di scrittura da fuori localhost richiedono un token (vedi console di avvio o backend/data/admin_token).",
+    en: "Write operations from outside localhost require a token (see startup console or backend/data/admin_token).",
+  },
+
+  // Campagne note — CRUD
+  "intel.known.new":            { it: "+ Nuova campagna", en: "+ New campaign" },
+  "intel.known.edit":           { it: "Modifica", en: "Edit" },
+  "intel.known.delete":         { it: "Elimina", en: "Delete" },
+  "intel.known.restore":        { it: "Ripristina versione di sistema", en: "Restore system version" },
+  "intel.known.save":           { it: "Salva", en: "Save" },
+  "intel.known.cancel":         { it: "Annulla", en: "Cancel" },
+  "intel.known.source.builtin": { it: "Sistema", en: "Built-in" },
+  "intel.known.source.user":    { it: "Personalizzata", en: "Custom" },
+  "intel.known.source.local-learning": { it: "Auto-apprendimento", en: "Auto-learned" },
+  "intel.known.overridden":     { it: "Override utente attivo", en: "User override active" },
+  "intel.known.field.id":        { it: "ID (es. brand-2026)", en: "ID (e.g. brand-2026)" },
+  "intel.known.field.name":      { it: "Nome", en: "Name" },
+  "intel.known.field.keywords":  { it: "Keyword (una per riga)", en: "Keywords (one per line)" },
+  "intel.known.field.required_keywords": { it: "Keyword obbligatorie (opzionale)", en: "Required keywords (optional)" },
+  "intel.known.field.risk":      { it: "Peso rischio (0-50)", en: "Risk weight (0-50)" },
+  "intel.known.field.enabled":   { it: "Attiva", en: "Enabled" },
+  "intel.known.field.description": { it: "Descrizione", en: "Description" },
+  "intel.known.field.reference_url": { it: "Link di riferimento", en: "Reference link" },
+  "intel.known.empty":           { it: "Nessuna campagna nota configurata.", en: "No known campaigns configured." },
+  "intel.known.delete_confirm":  { it: "Eliminare questa campagna personalizzata?", en: "Delete this custom campaign?" },
+
+  // Backtest
+  "intel.backtest.title":        { it: "Backtest sul corpus", en: "Backtest against corpus" },
+  "intel.backtest.run":          { it: "Esegui backtest", en: "Run backtest" },
+  "intel.backtest.running":      { it: "Analisi in corso…", en: "Analyzing…" },
+  "intel.backtest.coverage":     { it: "Copertura:", en: "Coverage:" },
+  "intel.backtest.matched":      { it: "{n} email matcherebbero", en: "{n} emails would match" },
+  "intel.backtest.false_positive_warning": {
+    it: "⚠ {n} delle email matchate hanno rischio basso — probabili falsi positivi. Rivedi le keyword prima di salvare.",
+    en: "⚠ {n} of the matched emails are low-risk — likely false positives. Review keywords before saving.",
+  },
+  "intel.backtest.ok": { it: "✓ Nessun falso positivo evidente sul corpus disponibile.", en: "✓ No obvious false positives on the available corpus." },
+
+  // Bollettini CERT-AGID
+  "intel.bulletins.description": {
+    it: "Bacheca di bollettini pubblici CERT-AGID a tema phishing. Le keyword non vengono mai generate automaticamente: crea la campagna a mano partendo dallo spunto.",
+    en: "Board of public CERT-AGID phishing bulletins. Keywords are never auto-generated: create the campaign by hand starting from the lead.",
+  },
+  "intel.bulletins.create_from": { it: "Crea campagna da questo bollettino", en: "Create campaign from this bulletin" },
+  "intel.bulletins.empty":       { it: "Nessun bollettino recente a tema phishing.", en: "No recent phishing-related bulletins." },
+  "intel.bulletins.source_note": { it: "Fonte: cert-agid.gov.it — solo titolo, data e link, mai il testo integrale.", en: "Source: cert-agid.gov.it — title, date and link only, never the full text." },
+
+  // Proposte auto-apprendimento (Wave 9)
+  "intel.proposals.title":       { it: "Proposte auto-generate", en: "Auto-generated proposals" },
+  "intel.proposals.generate":    { it: "Cerca nuovi pattern", en: "Search for new patterns" },
+  "intel.proposals.empty":       { it: "Nessuna proposta in attesa di revisione.", en: "No proposals pending review." },
+  "intel.proposals.approve":     { it: "Approva → apri form", en: "Approve → open form" },
+  "intel.proposals.reject":      { it: "Rifiuta", en: "Reject" },
+  "intel.proposals.stale":       { it: "Obsoleta (email di riferimento cancellate)", en: "Stale (referenced emails deleted)" },
+  "intel.proposals.seen_count":  { it: "Osservata {n} volte", en: "Seen {n} times" },
 
   // ── Language switcher ─────────────────────────────────────────────────────────
   "lang.it": { it: "Italiano", en: "Italian" },

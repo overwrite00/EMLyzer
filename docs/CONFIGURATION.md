@@ -54,6 +54,25 @@ You can also change this from the IT/EN button in the app. Modify this file to m
 
 ---
 
+## 🛰️ Threat Intelligence (v0.17+)
+
+Controls the automatic refresh of local IOC feeds (OpenPhish, Spamhaus, URLhaus) and the campaign-surface data used by the campaign backtest. All optional — sensible defaults work out of the box.
+
+```env
+INTEL_AUTO_REFRESH=true        # background scheduler for IOC feeds
+INTEL_TICK_MINUTES=20          # how often the scheduler checks for expired feeds
+INTEL_TTL_MULTIPLIER=1.0       # global multiplier on per-feed TTLs
+INTEL_STALE_HARD_HOURS=168     # past this age a feed reports "unavailable" instead of a false negative
+INTEL_STORE_CAMPAIGN_SURFACE=true  # persist anti-PII tokens per email, used by the campaign backtest
+```
+
+> [!NOTE]
+> Set `INTEL_AUTO_REFRESH=false` to disable the scheduler entirely (air-gapped environments, or if you prefer manual refresh from the "Threat Intelligence" panel in the UI).
+
+The app also binds to `127.0.0.1` by default as of v0.17 — see [Network binding](#-network-binding) below.
+
+---
+
 ## 🌐 Reputation Services (Optional)
 
 Threat intelligence services are **completely optional**. Services work without API keys:
@@ -329,6 +348,22 @@ HYBRID_ANALYSIS_API_KEY=abc555def666ghi777jkl888
 
 ---
 
+## 🌐 Network Binding
+
+As of v0.17, `start.sh`/`start.bat` bind the server to `127.0.0.1` (loopback) by default — the app is not reachable from other machines unless you opt in:
+
+```bash
+EMLYZER_BIND=0.0.0.0 ./start.sh    # Linux/macOS
+```
+```bat
+set EMLYZER_BIND=0.0.0.0 && start.bat   :: Windows
+```
+
+> [!WARNING]
+> EMLyzer has no full authentication system. Endpoints that write configuration (Threat Intelligence refresh, known campaigns, proposals) accept a connection from localhost, or a token printed at startup (`backend/data/admin_token`) from any other host. If you expose the app beyond localhost, put a reverse proxy with real authentication in front of it. See [SECURITY.md](../SECURITY.md).
+
+---
+
 ## 🔐 Security
 
 <details>
@@ -372,5 +407,5 @@ For professional use with large analysis volumes.
 
 ---
 
-*Last updated: 2026-06-07*
+*Last updated: 2026-09-14*
 *← [Installation](./INSTALLATION.md) | [Usage →](./USAGE.md)*

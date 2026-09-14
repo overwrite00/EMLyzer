@@ -161,3 +161,73 @@ export async function getEmailBody(jobId) {
   const res = await api.get(`/analysis/${jobId}/body`)
   return res.data
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Threat Intelligence (v0.17) — feed IOC, campagne note, bollettini CERT-AGID
+// ─────────────────────────────────────────────────────────────────────────
+
+export async function getIntelStatus() {
+  const res = await api.get('/intel/status')
+  return res.data
+}
+
+// target: 'openphish' | 'spamhaus' | 'urlhaus' | 'campaigns' | 'bulletins'
+export async function refreshIntelTarget(target) {
+  const res = await api.post(`/intel/refresh?target=${target}`)
+  return res.data
+}
+
+export async function getBulletins() {
+  const res = await api.get('/intel/bulletins')
+  return res.data
+}
+
+export async function getKnownCampaigns() {
+  const res = await api.get('/campaigns/known')
+  return res.data
+}
+
+export async function createKnownCampaign(payload) {
+  const res = await api.post('/campaigns/known', payload)
+  return res.data
+}
+
+export async function updateKnownCampaign(id, payload) {
+  const res = await api.put(`/campaigns/known/${id}`, payload)
+  return res.data
+}
+
+export async function deleteKnownCampaign(id) {
+  const res = await api.delete(`/campaigns/known/${id}`)
+  return res.data
+}
+
+export async function restoreKnownCampaign(id) {
+  const res = await api.post(`/campaigns/known/${id}/restore`)
+  return res.data
+}
+
+export async function backtestCampaign(payload) {
+  const res = await api.post('/campaigns/known/backtest', payload)
+  return res.data
+}
+
+export async function generateCampaignProposals() {
+  const res = await api.post('/campaigns/proposals/generate')
+  return res.data
+}
+
+export async function listCampaignProposals(status = 'pending') {
+  const res = await api.get(`/campaigns/proposals?status=${status}`)
+  return res.data
+}
+
+export async function approveCampaignProposal(id) {
+  const res = await api.post(`/campaigns/proposals/${id}/approve`)
+  return res.data
+}
+
+export async function rejectCampaignProposal(id, reason = '') {
+  const res = await api.post(`/campaigns/proposals/${id}/reject`, { reason })
+  return res.data
+}

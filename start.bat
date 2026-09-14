@@ -8,7 +8,7 @@ set "VENV_DIR=%~dp0.venv"
 set "VENV_PYTHON=%~dp0.venv\Scripts\python.exe"
 set "FOUND_PYTHON="
 set "FOUND_VER="
-set "VERSION=0.16.3"
+set "VERSION=0.17.0"
 
 :: ── Lingua output (it/en) — rilevata dalla locale di sistema ──────────────────
 :: Default: italiano. Se la lingua UI di Windows e' inglese, usa l'inglese.
@@ -336,10 +336,21 @@ echo.
 
 :: ── Avvio server ─────────────────────────────────────────────────────────────
 :: Nota: --reload rimosso perche' causa crash con multiprocessing su Windows
+:: v0.17: bind di default su loopback — vedi start.sh per il razionale.
+:: EMLYZER_BIND=0.0.0.0 per esporre l'app oltre localhost (sconsigliato senza
+:: una rete fidata: vedi SECURITY.md).
+if not defined EMLYZER_BIND set "EMLYZER_BIND=127.0.0.1"
+if /I not "%EMLYZER_BIND%"=="127.0.0.1" if /I not "%EMLYZER_BIND%"=="localhost" (
+    echo.
+    echo  ATTENZIONE: EMLyzer sta per ascoltare su %EMLYZER_BIND%, non solo localhost.
+    echo  Gli endpoint che scrivono configurazione sono protetti solo da un token
+    echo  locale, non da un vero sistema di autenticazione. Vedi SECURITY.md.
+    echo.
+)
 cd /d "%BACKEND_DIR%"
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUTF8=1"
-"%VENV_PYTHON%" -m uvicorn main:app --host 0.0.0.0 --port 8000
+"%VENV_PYTHON%" -m uvicorn main:app --host %EMLYZER_BIND% --port 8000
 
 echo.
 echo !_I! !_M_SERVER_STOPPED!

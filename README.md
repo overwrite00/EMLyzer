@@ -86,6 +86,7 @@ Email (.eml / .msg / plain text)
 - 🧠 **AI-powered phishing detection** — Machine learning classifier (Random Forest)
 - 🌐 **Multi-language support** — Italian 🇮🇹 and English 🇬🇧
 - 🛡️ **19 reputation services** — AbuseIPDB, VirusTotal, crt.sh, Shodan, and more
+- 🛰️ **Threat Intelligence** — auto-refreshing IOC feeds, curated known-campaign patterns with backtesting, CERT-AGID bulletin board
 - 📄 **Editable reports** — Generate professional Word (.docx) documents
 - 🎨 **Modern web UI** — Clean, responsive interface (React 19 + Vite)
 - 💾 **Offline-first** — No cloud dependencies, local SQLite database
@@ -97,11 +98,11 @@ Email (.eml / .msg / plain text)
 
 ## 🔧 Version
 
+**v0.17.0** — 🛰️ Threat Intelligence release: automatic refresh of local IOC feeds (OpenPhish, Spamhaus, URLhaus) with a shared caching/scheduling infrastructure, a curated "Known Campaigns" system with manual CRUD, corpus backtesting, CERT-AGID bulletin board, and internal auto-learning proposals — all backed by a new "Threat Intelligence" UI panel. Fixed several correctness bugs along the way (word-boundary campaign matching, dead `risk_contribution` weight, a spurious mega-cluster in internal clustering, JSON-less rate-limit responses) and hardened write endpoints with a local admin token; the app now binds to `127.0.0.1` by default. All 189 tests passing ✅ (1 skipped), zero regressions.
+
 **v0.16.3** — 📦 Dependency release: Updated backend (mail-parser, scikit-learn) and frontend (React, Vite, ESLint and more) dependencies, hardened the `actions/checkout` CI action, and reserialized the tabular phishing model with scikit-learn 1.9.1. All 124 tests passing ✅ (1 skipped), zero regressions.
 
 **v0.16.2** — 🔒 Maintenance release: Removed the unused NLTK dependency (unpatched path traversal vulnerability), updated backend and frontend dependencies (Pydantic, Uvicorn, Axios, Vite, ESLint and more), and repaired the CI test/workflow suite. All 124 tests passing ✅ (1 skipped), zero regressions.
-
-**v0.16.1** — 🔧 Hardening release: Enabled attachment binary analysis in the live pipeline (VBA macros, PDF JavaScript, suspicious streams), fixed Authentication-Results header selection (anti-spoofing), inline attachment extraction, removed body pattern double-counting on multipart emails, added 6 missing i18n keys, made WHOIS/URL batch timeouts effective, plus 10 correctness fixes. All 123 tests passing ✅, zero regressions.
 
 📖 **See full version history** → [CHANGELOG.md](./CHANGELOG.md)
 

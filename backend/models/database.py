@@ -67,6 +67,34 @@ class EmailAnalysis(Base):
     analyst_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
+class CampaignProposal(Base):
+    """
+    Wave 9 — proposte di nuove campagne generate dall'auto-apprendimento
+    interno (clustering su subject/body_sha256), in attesa di revisione
+    umana. MAI scritte automaticamente in campaigns_user.json.
+
+    Deliberatamente NESSUNA foreign key verso EmailAnalysis.id: SQLite non
+    applica PRAGMA foreign_keys di default (e DATABASE_URL è configurabile,
+    quindi non si può assumere SQLite), quindi una FK dichiarata non
+    impedirebbe comunque le proposte orfane. job_ids è un semplice elenco;
+    alla lettura si ricalcola quanti di quegli id esistono ancora
+    (resolved_count) e una proposta sotto la soglia minima diventa "stale"
+    e non approvabile, invece di referenziare email cancellate in silenzio.
+    """
+    __tablename__ = "campaign_proposals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    source: Mapped[str] = mapped_column(String(50), default="local-learning")
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending/approved/rejected
+    cluster_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    seen_count: Mapped[int] = mapped_column(default=1)
+    job_ids: Mapped[list] = mapped_column(JSON, default=list)
+    proposed_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    reject_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
 async def init_db():
     """Create all tables on startup."""
     async with engine.begin() as conn:

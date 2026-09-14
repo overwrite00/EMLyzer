@@ -253,9 +253,78 @@ Downloads the Word report (.docx).
 
 ---
 
+### 🛰️ Threat Intelligence (feed IOC, campagne note, bollettini) — v0.17
+
+Endpoint che scrivono configurazione (`POST`/`PUT`/`DELETE` sotto `/api/intel/`
+e `/api/campaigns/known`, `/api/campaigns/proposals/*`) richiedono una
+connessione da **localhost**, oppure l'header `X-EMLyzer-Token` (generato al
+primo avvio, stampato in console e salvato in `backend/data/admin_token`) se
+l'app è raggiunta da un altro host. Vedi [SECURITY.md](../SECURITY.md).
+
+#### GET `/api/intel/status`
+
+Stato unificato di feed IOC, campagne note e bollettini.
+
+```json
+{
+  "schema_version": 1,
+  "scheduler_running": true,
+  "feeds": [
+    {"name": "openphish", "state": "ok", "entry_count": 300, "age_hours": 2.1, "ttl_hours": 12, "last_error": null}
+  ],
+  "campaigns": {"system_count": 14, "user_count": 2, "overridden_ids": [], "last_reload": "2026-09-14T20:00:00Z"},
+  "bulletins": {"state": "ok", "age_hours": 3.0, "item_count": 8}
+}
+```
+
+#### POST `/api/intel/refresh?target=openphish|spamhaus|urlhaus|campaigns|bulletins`
+
+Forza il refresh di un target (whitelist esplicita, mai un URL libero). Risposta `202` con `run_id`, o `409` se un refresh è già in corso.
+
+#### GET `/api/campaigns/known` · POST/PUT/DELETE `/api/campaigns/known/{id}`
+
+CRUD delle campagne note (curate manualmente o approvate da una proposta). Le campagne di sistema (`backend/config/campaigns.json`) non sono modificabili direttamente: creare/modificare una campagna con lo stesso `id` crea un **override utente** in `backend/data/campaigns_user.json`, ripristinabile con `POST /api/campaigns/known/{id}/restore`.
+
+**Request (create/update):**
+```json
+{
+  "id": "brand-2026",
+  "name": "Brand Phishing 2026",
+  "keywords": ["brand", "verifica", "account"],
+  "required_keywords": ["brand"],
+  "risk_contribution": 25,
+  "enabled": true
+}
+```
+
+#### POST `/api/campaigns/known/backtest`
+
+Esegue il matcher **candidato** (non salvato) contro il corpus già analizzato, per stimare falsi positivi prima di salvare una campagna.
+
+```json
+{"keywords": ["brand", "verifica"], "risk_contribution": 25}
+```
+```json
+{
+  "total_emails": 40, "evaluable_emails": 38, "matched_count": 3,
+  "matched_by_risk_label": {"low": 0, "medium": 1, "high": 2},
+  "coverage_note": "valutate 38/40 email con campaign_surface disponibile"
+}
+```
+
+#### GET `/api/campaigns/proposals` · POST `/api/campaigns/proposals/generate` · POST `.../{id}/approve|reject`
+
+Auto-apprendimento interno: propone nuove campagne da cluster di email simili nel corpus dell'utente. `approve` **non scrive nulla**: ritorna il payload da aprire nel form di creazione manuale.
+
+#### GET `/api/intel/bulletins`
+
+Bacheca di bollettini pubblici CERT-AGID a tema phishing (titolo/data/link/estratto — mai il testo integrale, mai keyword generate automaticamente).
+
+---
+
 ### 🕸️ GET `/api/campaigns/`
 
-Detects malicious campaigns among emails in database.
+Detects malicious campaigns among emails in database — this is the raw internal clustering ("Similar Clusters" in the UI), distinct from the curated "Known Campaigns" described above (`/api/campaigns/known`).
 
 **Query parameters:**
 
@@ -447,8 +516,8 @@ if r.status_code != 200:
 
 ## 🔐 Security Notes
 
-- ✅ API runs on **localhost only** (no remote access by default)
-- ✅ No authentication required (local-only deployment)
+- ✅ API binds to **127.0.0.1 by default** (v0.17+; set `EMLYZER_BIND=0.0.0.0` to expose it, not recommended without a trusted network)
+- ✅ No full authentication system — endpoints that write configuration (Threat Intelligence refresh, known campaigns, proposals) require a local connection or a token; see the section above and [SECURITY.md](../SECURITY.md)
 - ✅ Analyze via network tunnel if remote access needed (SSH, VPN)
 - ✅ Store API responses securely (contain email metadata)
 
@@ -463,5 +532,5 @@ if r.status_code != 200:
 
 ---
 
-*Last updated: 2026-06-07*
+*Last updated: 2026-09-14*
 *← [Usage](./USAGE.md) | [Back to README →](../README.md)*

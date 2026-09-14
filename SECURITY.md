@@ -65,6 +65,35 @@ EMLyzer is designed with security-first principles:
 - Rate limiting respected (no brute-force scanning)
 - Requests authenticated with user-provided credentials only
 
+### Threat Intelligence (feed IOC, campagne note) — v0.17
+
+EMLyzer non implementa un sistema di autenticazione/login. A partire dalla
+v0.17, alcuni endpoint modificano configurazione che influisce sul verdetto
+di rischio delle analisi (forzare il refresh di un feed, creare/modificare
+una campagna nota, approvare una proposta auto-generata):
+
+- **Default di rete**: `start.sh`/`start.bat` ascoltano di default su
+  `127.0.0.1` (loopback), non più `0.0.0.0`. Esporre l'app su altre
+  interfacce è opt-in esplicito (`EMLYZER_BIND=0.0.0.0`) e stampa un
+  avviso in console.
+- **Token amministrativo locale**: gli endpoint che scrivono configurazione
+  (`POST /api/intel/refresh`, `POST/PUT/DELETE /api/campaigns/known/*`,
+  `POST /api/campaigns/proposals/*`) accettano richieste da localhost senza
+  alcun token; da qualunque altro indirizzo richiedono l'header
+  `X-EMLyzer-Token`, generato al primo avvio e salvato in
+  `backend/data/admin_token` (mai in git). **Questo non è un sistema di
+  autenticazione completo**: se si espone l'istanza oltre localhost, va
+  messo un reverse proxy con autenticazione propria davanti.
+- **Feed esterni**: il download dei feed IOC (OpenPhish, Spamhaus, URLhaus)
+  e del bollettino RSS CERT-AGID usa URL costanti nel codice (mai
+  configurabili via API o `.env`), con cap di dimensione, timeout/deadline
+  dedicati e rifiuto di redirect verso indirizzi privati/loopback — a
+  difesa da SSRF anche in caso di compromissione di uno di questi domini.
+- **Dati persistiti per il backtest**: se `INTEL_STORE_CAMPAIGN_SURFACE` è
+  attivo (default), ogni analisi salva token normalizzati e filtrati (anti-PII
+  di base) del testo dell'email in `body_indicators.campaign_surface`, usati
+  solo per validare nuove campagne contro lo storico. Disattivabile in `.env`.
+
 ### Temporary File Cleanup
 
 - Uploaded emails: stored in `backend/uploads/` — deleted after analysis

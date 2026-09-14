@@ -8,6 +8,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher'
 import { RiskBadge, Spinner } from '../components/ui'
 import { useLang } from '../i18n/LangContext'
 import CampaignsPanel from '../components/CampaignsPanel'
+import ThreatIntelPanel from '../components/ThreatIntelPanel'
 
 const RISK_LABELS = ['low', 'medium', 'high', 'critical']
 
@@ -206,7 +207,10 @@ export default function Dashboard() {
           <UploadZone onAnalysisComplete={onNewAnalysis} />
         </section>
 
-        {/* Campagne */}
+        {/* Threat Intelligence: feed IOC, campagne note, bollettini CERT-AGID */}
+        <ThreatIntelPanel />
+
+        {/* Cluster simili (clustering interno grezzo — concetto distinto dalle Campagne Note sopra) */}
         <CampaignsPanel />
 
         {/* Analisi recenti */}
