@@ -328,7 +328,7 @@ export const translations = {
   "intel.known.field.id":        { it: "ID (es. brand-2026)", en: "ID (e.g. brand-2026)" },
   "intel.known.field.name":      { it: "Nome", en: "Name" },
   "intel.known.field.keywords":  { it: "Keyword (una per riga)", en: "Keywords (one per line)" },
-  "intel.known.field.required_keywords": { it: "Keyword obbligatorie (opzionale)", en: "Required keywords (optional)" },
+  "intel.known.field.required_keywords": { it: "Keyword di ancoraggio (campo facoltativo)", en: "Anchor keywords (optional field)" },
   "intel.known.field.risk":      { it: "Peso rischio (0-50)", en: "Risk weight (0-50)" },
   "intel.known.field.enabled":   { it: "Attiva", en: "Enabled" },
   "intel.known.field.description": { it: "Descrizione", en: "Description" },
