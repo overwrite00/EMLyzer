@@ -9,11 +9,10 @@ Analisi del corpo email:
 
 import re
 import base64
+import hashlib
 import logging
 import unicodedata
-import json
 from dataclasses import dataclass, field
-from pathlib import Path
 from bs4 import BeautifulSoup
 import bleach
 from langdetect import detect, LangDetectException
@@ -217,25 +216,12 @@ URL_SHORTENER_DOMAINS = {
 }
 
 
-# --- Load campaigns database (v0.15) ---
-def _load_campaigns_db() -> dict:
-    """Load known phishing campaigns from JSON config."""
-    try:
-        campaigns_path = Path(__file__).parent.parent.parent / "config" / "campaigns.json"
-        if campaigns_path.exists():
-            with open(campaigns_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-    except Exception as e:
-        _logger.error("[BODY] Failed to load campaigns database: %s", e)
-    return {"campaigns": []}
-
-CAMPAIGNS_DB = _load_campaigns_db()
-CAMPAIGNS_BY_KEYWORDS = {}  # Will be built below
-for campaign in CAMPAIGNS_DB.get("campaigns", []):
-    for keyword in campaign.get("keywords", []):
-        if keyword not in CAMPAIGNS_BY_KEYWORDS:
-            CAMPAIGNS_BY_KEYWORDS[keyword] = []
-        CAMPAIGNS_BY_KEYWORDS[keyword].append(campaign)
+# --- Known campaigns database (v0.15) ---
+# v0.17: non più globali di modulo costruite una sola volta all'import (che
+# rendevano impossibile un reload senza riavviare l'app). Il caricamento e il
+# reload vivono in core.analysis.campaign_registry, dietro uno Snapshot
+# thread-safe condiviso con il resto dell'infrastruttura Threat Intelligence.
+from core.analysis import campaign_registry as _campaign_registry
 
 
 @dataclass
@@ -246,6 +232,15 @@ class BodyFinding:
     evidence: str = ""
     count: int = 1
     matched_patterns: list[str] = field(default_factory=list)  # P1: pattern specifici trovati (urgency, CTA, credenziali)
+    # v0.17: peso esplicito in punti (scala 0-100 sul body score) che sostituisce
+    # la mappa fissa severity->punti in _compute_score quando presente. Permette
+    # a finding come il match di campagna nota di pesare in base al proprio
+    # risk_contribution invece di valere sempre gli stessi punti della severity.
+    score_override: float | None = None
+    # v0.17: se False, il finding non viene conteggiato da scorer._compute_floors
+    # tra gli "high" che fanno scattare i floor deterministici — usato per i
+    # finding a basso score_override che restano severity="high" solo per la UI.
+    counts_toward_floor: bool = True
 
 
 @dataclass
@@ -270,6 +265,15 @@ class BodyAnalysisResult:
     # Known campaign detection (v0.15)
     matched_campaign_id: str = ""
     matched_campaign_name: str = ""
+    # v0.17: token normalizzati/anti-PII della stessa superficie usata dal
+    # matcher, persistiti per permettere il backtest di nuove campagne contro
+    # il corpus storico (senza salvare il body integrale). Vedi _store_campaign_surface.
+    campaign_surface: list[str] = field(default_factory=list)
+    # v0.17: SHA256 del body reale (subject escluso), normalizzato. Sostituisce
+    # il proxy basato su contatori usato finora dal clustering in campaigns.py,
+    # che collideva su qualunque email con gli stessi 4 contatori a zero
+    # (bug: mega-cluster spurio sulla strategia body_hash di campaign_detector).
+    body_sha256: str = ""
 
 
 def _detect_language_mismatch(text: str, expected_lang: str = "it", accepted_langs: set[str] | None = None) -> dict:
@@ -309,34 +313,201 @@ def _detect_language_mismatch(text: str, expected_lang: str = "it", accepted_lan
         return {"language_mismatch": False, "detected_language": "", "risk_contribution": 0}
 
 
-def _detect_campaign_match(text_lower: str, subject_lower: str) -> dict | None:
+_WORD_BOUNDARY_CACHE: dict[str, "re.Pattern"] = {}
+
+
+def _keyword_pattern(keyword: str) -> "re.Pattern":
+    """Regex \\b...\\b compilata e cachata per una keyword (case-insensitive, testo già lowercase)."""
+    pat = _WORD_BOUNDARY_CACHE.get(keyword)
+    if pat is None:
+        pat = re.compile(r'\b' + re.escape(keyword.lower()) + r'\b')
+        _WORD_BOUNDARY_CACHE[keyword] = pat
+    return pat
+
+
+def _keyword_in_text(keyword: str, text: str) -> bool:
+    """Match a confini di parola — evita che 'poste' scatti dentro 'imposte'."""
+    return bool(_keyword_pattern(keyword).search(text))
+
+
+# Peso di una keyword nel punteggio di match: le keyword di brand (poche parole,
+# spesso il nome dell'ente/azienda spoofato) contano di più delle keyword generiche
+# ("conferma", "pagamento") che compaiono in email legittime.
+_GENERIC_KEYWORDS = {
+    "conferma", "verificare", "verifica", "pagamento", "pagamenti", "scaduto",
+    "dovuto", "avviso", "notifica", "urgente", "documento", "fattura", "account",
+    "servizio", "aggiornamento", "rinnovo", "sospetta", "sospetto", "accesso",
+}
+
+
+def _keyword_weight(keyword: str) -> float:
+    return 0.5 if keyword.lower() in _GENERIC_KEYWORDS else 1.0
+
+
+@dataclass
+class CampaignMatch:
+    campaign_id: str
+    campaign_name: str
+    risk_contribution: float
+    matched_keywords: list[str]
+    match_ratio: float          # matched_keywords pesati / keyword totali pesate
+    score: float                # match_ratio, eventualmente boostato da sender/subject pattern
+    confidence: str              # "low" / "medium" / "high"
+    sender_pattern_hit: bool = False
+    subject_pattern_hit: bool = False
+
+
+def match_campaigns(
+    text_lower: str,
+    subject_lower: str,
+    mail_from_lower: str = "",
+    registry: dict | None = None,
+) -> list["CampaignMatch"]:
     """
-    Detect if email matches known phishing campaign patterns.
+    Trova TUTTE le campagne note che matchano il testo, ordinate per score decrescente.
 
-    Args:
-        text_lower: Email body (lowercase)
-        subject_lower: Email subject (lowercase)
+    A differenza della vecchia _detect_campaign_match (che ritornava la prima
+    campagna che superava la soglia iterando l'ordine di inserimento del dict
+    CAMPAIGNS_BY_KEYWORDS), qui si valutano tutte le campagne candidate e si
+    sceglie in base al punteggio migliore, non all'ordine casuale delle keyword.
 
-    Returns:
-        Dict with campaign_id, campaign_name, risk_contribution; or None if no match
+    Regole:
+    - matching con confini di parola (word-boundary), non substring
+    - keyword pesate: brand > generiche (_keyword_weight)
+    - required_keywords (opzionale): almeno una deve essere presente, altrimenti
+      la campagna non è considerata anche se altre keyword matchano
+    - min_keyword_matches (opzionale): numero minimo assoluto di keyword uniche,
+      in aggiunta alla soglia proporzionale di default (metà delle keyword pesate)
+    - sender_patterns / subject_patterns (già presenti nei dati, prima ignorati):
+      se il mittente o il subject contengono uno di questi pattern, la confidenza
+      sale a "high" e lo score ottiene un boost — è il segnale anti-falsi-positivi
+      più forte già disponibile nei dati esistenti
     """
     combined_text = f"{subject_lower} {text_lower}"
+    db = registry if registry is not None else _campaign_registry.get()["db"]
+    campaigns = db.get("campaigns", []) if isinstance(db, dict) else []
 
-    for keyword, campaigns in CAMPAIGNS_BY_KEYWORDS.items():
-        if keyword.lower() in combined_text:
-            for campaign in campaigns:
-                campaign_keywords = campaign.get("keywords", [])
-                matches = sum(1 for kw in campaign_keywords if kw.lower() in combined_text)
-                threshold = max(1, len(campaign_keywords) // 2)
+    results: list[CampaignMatch] = []
+    for campaign in campaigns:
+        if campaign.get("enabled") is False:
+            continue
+        campaign_keywords = campaign.get("keywords", [])
+        if not campaign_keywords:
+            continue
 
-                if matches >= threshold:
-                    return {
-                        "campaign_id": campaign.get("id", "unknown"),
-                        "campaign_name": campaign.get("name", "Unknown Campaign"),
-                        "risk_contribution": campaign.get("risk_contribution", 40)
-                    }
+        matched = [kw for kw in campaign_keywords if _keyword_in_text(kw, combined_text)]
+        if not matched:
+            continue
 
-    return None
+        required = campaign.get("required_keywords") or []
+        if required and not any(_keyword_in_text(kw, combined_text) for kw in required):
+            continue
+
+        weighted_matched = sum(_keyword_weight(kw) for kw in matched)
+        weighted_total = sum(_keyword_weight(kw) for kw in campaign_keywords) or 1.0
+        match_ratio = weighted_matched / weighted_total
+
+        threshold_ratio = 0.5
+        min_matches = campaign.get("min_keyword_matches", max(1, len(campaign_keywords) // 2))
+        if match_ratio < threshold_ratio or len(matched) < min_matches:
+            continue
+
+        sender_hit = False
+        for pat in campaign.get("sender_patterns", []) or []:
+            if pat.lower() in mail_from_lower:
+                sender_hit = True
+                break
+        subject_hit = False
+        for pat in campaign.get("subject_patterns", []) or []:
+            if _keyword_in_text(pat, subject_lower) or pat.lower() in subject_lower:
+                subject_hit = True
+                break
+
+        score = match_ratio
+        confidence = "medium"
+        if sender_hit or subject_hit:
+            score = min(1.0, score + 0.25)
+            confidence = "high"
+        elif match_ratio < 0.7:
+            confidence = "low"
+
+        results.append(CampaignMatch(
+            campaign_id=campaign.get("id", "unknown"),
+            campaign_name=campaign.get("name", "Unknown Campaign"),
+            risk_contribution=campaign.get("risk_contribution", 25),
+            matched_keywords=matched,
+            match_ratio=match_ratio,
+            score=score,
+            confidence=confidence,
+            sender_pattern_hit=sender_hit,
+            subject_pattern_hit=subject_hit,
+        ))
+
+    results.sort(key=lambda m: m.score, reverse=True)
+    return results
+
+
+def best_campaign_match(
+    text_lower: str,
+    subject_lower: str,
+    mail_from_lower: str = "",
+    registry: dict | None = None,
+) -> "CampaignMatch | None":
+    """Ritorna il match con lo score migliore, o None. Usato da analyze_body."""
+    matches = match_campaigns(text_lower, subject_lower, mail_from_lower, registry)
+    return matches[0] if matches else None
+
+
+_SURFACE_TOKEN_RE = re.compile(r'\b[a-zà-ÿ]{3,30}\b')
+_SURFACE_MAX_TOKENS = 2000
+
+
+def _looks_like_pii(token: str) -> bool:
+    """Filtro anti-PII grezzo: cifre, o sequenze alfanumeriche tipiche di IBAN/CF/riferimenti."""
+    if any(ch.isdigit() for ch in token):
+        return True
+    return False
+
+
+def _store_campaign_surface(result: "BodyAnalysisResult", subject_lower: str, body_lower: str) -> None:
+    """
+    Salva in result.campaign_surface i token normalizzati usati dal matcher,
+    con filtro anti-PII, per abilitare il backtest di nuove campagne (Wave 6)
+    contro le email già analizzate senza dover salvare il body integrale.
+
+    Disattivabile via settings.INTEL_STORE_CAMPAIGN_SURFACE — quando disattivato
+    il backtest sarà cieco sulle email analizzate da quel momento in poi.
+    """
+    try:
+        from utils.config import settings as _settings
+        if not getattr(_settings, "INTEL_STORE_CAMPAIGN_SURFACE", True):
+            return
+    except Exception:
+        pass  # se il setting non esiste ancora, procedi col default (abilitato)
+
+    combined = f"{subject_lower} {body_lower}"
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for tok in _SURFACE_TOKEN_RE.findall(combined):
+        if tok in seen or _looks_like_pii(tok):
+            continue
+        seen.add(tok)
+        tokens.append(tok)
+        if len(tokens) >= _SURFACE_MAX_TOKENS:
+            break
+    result.campaign_surface = tokens
+
+
+def _detect_campaign_match(text_lower: str, subject_lower: str) -> dict | None:
+    """Thin wrapper legacy — mantenuto per compatibilità di eventuali chiamanti esterni."""
+    m = best_campaign_match(text_lower, subject_lower)
+    if not m:
+        return None
+    return {
+        "campaign_id": m.campaign_id,
+        "campaign_name": m.campaign_name,
+        "risk_contribution": m.risk_contribution,
+    }
 
 
 def _count_pattern_matches(pattern_list: list[str], text: str, max_match_len: int = 150) -> tuple[int, list[tuple[str, int]]]:
@@ -775,8 +946,20 @@ def _check_languagetool(body_text: str, result: BodyAnalysisResult):
 
 def _compute_score(result: BodyAnalysisResult) -> float:
     weights = {"info": 0, "low": 5, "medium": 15, "high": 25}
-    score = sum(weights.get(f.severity, 0) for f in result.findings)
+    score = sum(
+        f.score_override if f.score_override is not None else weights.get(f.severity, 0)
+        for f in result.findings
+    )
     return min(score, 100.0)
+
+
+def _severity_from_override(score: float) -> str:
+    """Deriva la severity 'display' da uno score_override esplicito (scala 0-100)."""
+    if score < 10:
+        return "low"
+    if score < 20:
+        return "medium"
+    return "high"
 
 
 def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = None) -> BodyAnalysisResult:
@@ -863,23 +1046,53 @@ def analyze_body(parsed: ParsedEmail, header_result: "HeaderAnalysisResult" = No
             ))
             _logger.info("[BODY] Language mismatch detected: %s (expected 'it')", lang_check["detected_language"])
 
-    # Known campaign detection (v0.15)
-    if CAMPAIGNS_DB.get("campaigns"):
-        subject_lower = (parsed.mail_subject or "").lower()
-        all_body_for_campaign = clean_body + " " + (result.extracted_html_text or "") + " " + (result.raw_hidden_content or "")
-        body_lower = all_body_for_campaign.lower()
-        campaign_match = _detect_campaign_match(body_lower, subject_lower)
+    # Known campaign detection (v0.15, matcher rifatto in v0.17 — vedi match_campaigns)
+    subject_lower = (parsed.mail_subject or "").lower()
+    all_body_for_campaign = clean_body + " " + (result.extracted_html_text or "") + " " + (result.raw_hidden_content or "")
+    body_lower = all_body_for_campaign.lower()
+    mail_from_lower = (parsed.mail_from or "").lower()
+
+    # Snapshot preso una volta sola e riusato per l'intera analisi (mai
+    # rileggere il registry in più punti: un reload a metà produrrebbe
+    # un'analisi con visione mista tra "c'è almeno una campagna" e il
+    # matching vero e proprio).
+    _campaigns_reg = _campaign_registry.get()
+    if _campaigns_reg["db"].get("campaigns"):
+        campaign_match = best_campaign_match(body_lower, subject_lower, mail_from_lower, registry=_campaigns_reg["db"])
 
         if campaign_match:
-            result.matched_campaign_id = campaign_match["campaign_id"]
-            result.matched_campaign_name = campaign_match["campaign_name"]
+            result.matched_campaign_id = campaign_match.campaign_id
+            result.matched_campaign_name = campaign_match.campaign_name
+            score_override = campaign_match.risk_contribution
+            display_severity = _severity_from_override(score_override)
             result.findings.append(BodyFinding(
                 category="campaign",
-                severity="high",
-                description=t("body.known_campaign", name=campaign_match["campaign_name"]),
-                evidence=f"Campaign ID: {campaign_match['campaign_id']}, Risk contribution: +{campaign_match['risk_contribution']}",
+                severity=display_severity,
+                description=t("body.known_campaign", name=campaign_match.campaign_name),
+                evidence=(
+                    f"Campaign ID: {campaign_match.campaign_id}, "
+                    f"Risk contribution: +{score_override:.0f}, "
+                    f"Confidence: {campaign_match.confidence}, "
+                    f"Matched keywords: {', '.join(campaign_match.matched_keywords)}"
+                ),
+                score_override=score_override,
+                # I match a bassa confidenza (sole keyword generiche, nessun
+                # riscontro su sender/subject pattern) non fanno scattare i floor
+                # deterministici in scorer.py — evita che una campagna proposta
+                # con keyword deboli forzi da sola il punteggio verso l'alto.
+                counts_toward_floor=(campaign_match.confidence != "low"),
             ))
-            _logger.info("[BODY] Known campaign detected: %s (id=%s)", campaign_match["campaign_name"], campaign_match["campaign_id"])
+            _logger.info(
+                "[BODY] Known campaign detected: %s (id=%s, confidence=%s, score=%.0f)",
+                campaign_match.campaign_name, campaign_match.campaign_id,
+                campaign_match.confidence, score_override,
+            )
+
+    _store_campaign_surface(result, subject_lower, body_lower)
+
+    if all_body_for_campaign.strip():
+        normalized = re.sub(r'\s+', ' ', all_body_for_campaign.lower().strip())
+        result.body_sha256 = hashlib.sha256(normalized.encode('utf-8', errors='replace')).hexdigest()
 
     # Deduplica URL
     result.extracted_urls = list(dict.fromkeys(result.extracted_urls))

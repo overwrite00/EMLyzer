@@ -112,7 +112,7 @@ python3.13 --version
 
 **Linux/macOS:**
 ```bash
-tar -xzf EMLyzer_v0.16.3.tar.gz
+tar -xzf EMLyzer_v0.17.1.tar.gz
 cd EMLyzer
 ```
 
@@ -139,7 +139,7 @@ A black console window opens showing progress:
 
 ```
 ============================================
-  EMLyzer v0.16.3
+  EMLyzer v0.17.1
 ============================================
 
 [INFO] Python found:
@@ -189,7 +189,8 @@ After the console shows "Application Ready", open your browser:
 You should see:
 - ✅ Email upload area
 - ✅ Recent analyses list
-- ✅ Campaign detection panel
+- ✅ Threat Intelligence panel (IOC feeds, known campaigns, CERT-AGID bulletins)
+- ✅ Similar Clusters panel (internal clustering)
 - ✅ IT/EN language selector (top right)
 
 ### 🔍 Test the API
@@ -200,7 +201,7 @@ Open this link in your browser to verify the backend:
 
 Expected response:
 ```json
-{"status": "ok", "version": "0.16.3", "app": "EMLyzer"}
+{"status": "ok", "version": "0.17.1", "app": "EMLyzer"}
 ```
 
 ---
@@ -341,5 +342,5 @@ To upgrade to a newer version:
 
 ---
 
-*Last updated: 2026-09-14*
+*Last updated: 2026-09-15*
 *← [Requirements](./REQUIREMENTS.md) | [Configuration →](./CONFIGURATION.md)*

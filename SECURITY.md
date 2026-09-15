@@ -65,6 +65,37 @@ EMLyzer is designed with security-first principles:
 - Rate limiting respected (no brute-force scanning)
 - Requests authenticated with user-provided credentials only
 
+### Threat Intelligence (IOC feeds, known campaigns) — v0.17
+
+EMLyzer does not implement an authentication/login system. Starting with
+v0.17, some endpoints modify configuration that affects the risk verdict of
+analyses (forcing a feed refresh, creating/editing a known campaign,
+approving an auto-generated proposal):
+
+- **Network default**: `start.sh`/`start.bat` now listen on `127.0.0.1`
+  (loopback) by default, no longer `0.0.0.0`. Exposing the app on other
+  interfaces is an explicit opt-in (`EMLYZER_BIND=0.0.0.0`) and prints a
+  console warning.
+- **Local admin token**: endpoints that write configuration
+  (`POST /api/intel/refresh`, `POST/PUT/DELETE /api/campaigns/known/*`,
+  `POST /api/campaigns/proposals/*`) accept requests from localhost without
+  any token; from any other address they require the `X-EMLyzer-Token`
+  header, generated at first startup and saved to `backend/data/admin_token`
+  (never in git). **This is not a full authentication system**: if you
+  expose the instance beyond localhost, put a reverse proxy with its own
+  authentication in front of it.
+- **External feeds**: downloading IOC feeds (OpenPhish, Spamhaus, URLhaus)
+  and the CERT-AGID RSS bulletin uses URLs hardcoded in the code (never
+  configurable via the API or `.env`), with a size cap, dedicated
+  timeout/deadline, and rejection of redirects toward private/loopback
+  addresses — defending against SSRF even if one of these domains were
+  ever compromised.
+- **Data persisted for the backtest**: if `INTEL_STORE_CAMPAIGN_SURFACE` is
+  enabled (default), each analysis saves normalized, filtered (basic
+  anti-PII) tokens of the email text to `body_indicators.campaign_surface`,
+  used only to validate new campaigns against the historical corpus.
+  Disable it in `.env`.
+
 ### Temporary File Cleanup
 
 - Uploaded emails: stored in `backend/uploads/` — deleted after analysis

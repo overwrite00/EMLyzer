@@ -155,6 +155,10 @@ All dependencies are installed **automatically** during first run via `start.bat
 - **python-docx** (0.8.11+) — Word document (.docx) generation
 - **tinycss2** (1.3.0+) — CSS parsing for HTML sanitization
 
+### 🛰️ Threat Intelligence (v0.17+)
+- **defusedxml** (0.7.1+) — safe XML parsing for the CERT-AGID RSS bulletin feed
+- **bleach** (already listed under Security) — sanitizes bulletin descriptions
+
 **Total installation footprint:** ~200 MB after all dependencies are installed.
 
 </details>
@@ -260,5 +264,5 @@ No. Python 3.11+ is required. Some dependencies don't support 3.10.
 
 ---
 
-*Last updated: 2026-06-29*
+*Last updated: 2026-09-14*
 *← [README](../README.md) | [Installation →](./INSTALLATION.md)*

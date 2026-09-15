@@ -222,7 +222,10 @@ def _compute_floors(
     # ── Body ─────────────────────────────────────────────────────────────────
     # 2+ finding HIGH indipendenti nel body (es. form + JS + NLP alto)
     if body_result:
-        high_body = sum(1 for f in body_result.findings if f.severity == "high")
+        high_body = sum(
+            1 for f in body_result.findings
+            if f.severity == "high" and getattr(f, "counts_toward_floor", True)
+        )
         if high_body >= 2:
             floor = max(floor, 30.0)
 

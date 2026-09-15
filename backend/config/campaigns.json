@@ -7,11 +7,29 @@
       "region": "IT",
       "brand_spoofed": "Lidl/Silvercrest",
       "theme": "Free air fryer, pay shipping",
-      "keywords": ["friggitrice", "silvercrest", "gratis", "spedizione", "paga solo", "vinto"],
-      "sender_patterns": ["spiaggiaweb24", "dessous-gh", "noreply"],
-      "subject_patterns": ["tutto bene", "hai vinto", "friggitrice", "air fryer"],
-      "risk_contribution": 40,
-      "description": "Prize scam targeting Italian users with Lidl/Silvercrest brand spoofing"
+      "keywords": [
+        "friggitrice",
+        "silvercrest",
+        "gratis",
+        "spedizione",
+        "paga solo",
+        "vinto"
+      ],
+      "sender_patterns": [
+        "spiaggiaweb24",
+        "dessous-gh",
+        "noreply"
+      ],
+      "subject_patterns": [
+        "tutto bene",
+        "hai vinto",
+        "friggitrice",
+        "air fryer"
+      ],
+      "risk_contribution": 25,
+      "description": "Prize scam targeting Italian users with Lidl/Silvercrest brand spoofing",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "inps-2024",
@@ -20,11 +38,29 @@
       "region": "IT",
       "brand_spoofed": "INPS",
       "theme": "Verify profile, claim benefit, legal threat",
-      "keywords": ["inps", "verificare", "profilo", "spid", "sussidio", "bonus", "conseguenze penali"],
-      "sender_patterns": ["inps.it", "comunicazioni"],
-      "subject_patterns": ["verifica profilo spid", "bonus inps", "riscuoti", "comunicazione inps"],
-      "risk_contribution": 40,
-      "description": "INPS impersonation collecting SPID credentials, fiscal code, IBAN, ID photos. 59 documented campaigns."
+      "keywords": [
+        "inps",
+        "verificare",
+        "profilo",
+        "spid",
+        "sussidio",
+        "bonus",
+        "conseguenze penali"
+      ],
+      "sender_patterns": [
+        "inps.it",
+        "comunicazioni"
+      ],
+      "subject_patterns": [
+        "verifica profilo spid",
+        "bonus inps",
+        "riscuoti",
+        "comunicazione inps"
+      ],
+      "risk_contribution": 25,
+      "description": "INPS impersonation collecting SPID credentials, fiscal code, IBAN, ID photos. 59 documented campaigns.",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "pagopa-2025",
@@ -33,11 +69,27 @@
       "region": "IT",
       "brand_spoofed": "PagoPA",
       "theme": "Payment notifications, false notices",
-      "keywords": ["pagopa", "pagamento", "notifica", "scaduto", "dovuto", "avviso"],
-      "sender_patterns": ["pagopa.it", "comunicazioni"],
-      "subject_patterns": ["notifica pagamento", "avviso scadenza", "pagamento dovuto"],
-      "risk_contribution": 40,
-      "description": "System-wide campaign with 328 documented instances targeting Italian users"
+      "keywords": [
+        "pagopa",
+        "pagamento",
+        "notifica",
+        "scaduto",
+        "dovuto",
+        "avviso"
+      ],
+      "sender_patterns": [
+        "pagopa.it",
+        "comunicazioni"
+      ],
+      "subject_patterns": [
+        "notifica pagamento",
+        "avviso scadenza",
+        "pagamento dovuto"
+      ],
+      "risk_contribution": 25,
+      "description": "System-wide campaign with 328 documented instances targeting Italian users",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "intesa-sanpaolo-2025",
@@ -46,11 +98,28 @@
       "region": "IT",
       "brand_spoofed": "Intesa Sanpaolo",
       "theme": "Identity verification, payment failed, account access",
-      "keywords": ["intesa", "sanpaolo", "verifica identità", "pagamento fallito", "accesso conto", "conferma"],
-      "sender_patterns": ["intesasanpaolo.it", "noreply"],
-      "subject_patterns": ["verifica conto", "accesso non autorizzato", "conferma identità", "aggiorna"],
-      "risk_contribution": 40,
-      "description": "#1 Italian bank targeted in phishing (32% of all Italian bank phishing attacks)"
+      "keywords": [
+        "intesa",
+        "sanpaolo",
+        "verifica identità",
+        "pagamento fallito",
+        "accesso conto",
+        "conferma"
+      ],
+      "sender_patterns": [
+        "intesasanpaolo.it",
+        "noreply"
+      ],
+      "subject_patterns": [
+        "verifica conto",
+        "accesso non autorizzato",
+        "conferma identità",
+        "aggiorna"
+      ],
+      "risk_contribution": 25,
+      "description": "#1 Italian bank targeted in phishing (32% of all Italian bank phishing attacks)",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "poste-italiane-2025",
@@ -59,11 +128,27 @@
       "region": "IT",
       "brand_spoofed": "Poste Italiane",
       "theme": "Package notification, failed delivery",
-      "keywords": ["poste", "italiane", "pacco", "recapito", "spedizione", "consegna fallita"],
-      "sender_patterns": ["poste.it", "noreply"],
-      "subject_patterns": ["pacco in attesa", "recapito fallito", "notifica consegna"],
-      "risk_contribution": 35,
-      "description": "Dual postal + banking service. 14% of Italian postal/banking phishing."
+      "keywords": [
+        "poste",
+        "italiane",
+        "pacco",
+        "recapito",
+        "spedizione",
+        "consegna fallita"
+      ],
+      "sender_patterns": [
+        "poste.it",
+        "noreply"
+      ],
+      "subject_patterns": [
+        "pacco in attesa",
+        "recapito fallito",
+        "notifica consegna"
+      ],
+      "risk_contribution": 25,
+      "description": "Dual postal + banking service. 14% of Italian postal/banking phishing.",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "aruba-2024",
@@ -72,11 +157,25 @@
       "region": "IT",
       "brand_spoofed": "Aruba S.p.A.",
       "theme": "Service renewal, payment failed",
-      "keywords": ["aruba", "rinnovo", "scaduto", "pagamento fallito", "servizio"],
-      "sender_patterns": ["aruba.it", "support"],
-      "iocs": ["CAPTCHA filtering", "Telegram bot exfiltration"],
-      "risk_contribution": 35,
-      "description": "Multi-stage phishing kit with CAPTCHA evasion and Telegram bot for data exfiltration"
+      "keywords": [
+        "aruba",
+        "rinnovo",
+        "scaduto",
+        "pagamento fallito",
+        "servizio"
+      ],
+      "sender_patterns": [
+        "aruba.it",
+        "support"
+      ],
+      "iocs": [
+        "CAPTCHA filtering",
+        "Telegram bot exfiltration"
+      ],
+      "risk_contribution": 25,
+      "description": "Multi-stage phishing kit with CAPTCHA evasion and Telegram bot for data exfiltration",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "health-card-2026",
@@ -85,10 +184,21 @@
       "region": "IT",
       "brand_spoofed": "Ministero della Salute",
       "theme": "Health card renewal, data update",
-      "keywords": ["tessera sanitaria", "rinnovo", "scaduta", "aggiornamento dati", "salute"],
-      "sender_patterns": ["salute.gov.it", "sanita"],
-      "risk_contribution": 40,
-      "description": "Collecting health data + identity info. Started January 2026."
+      "keywords": [
+        "tessera sanitaria",
+        "rinnovo",
+        "scaduta",
+        "aggiornamento dati",
+        "salute"
+      ],
+      "sender_patterns": [
+        "salute.gov.it",
+        "sanita"
+      ],
+      "risk_contribution": 25,
+      "description": "Collecting health data + identity info. Started January 2026.",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "agenzia-entrate-2025",
@@ -97,10 +207,21 @@
       "region": "IT",
       "brand_spoofed": "Agenzia delle Entrate",
       "theme": "Accedi Area Riservata, payment taxes",
-      "keywords": ["agenzia entrate", "accedi", "area riservata", "spid", "pagamento tasse"],
-      "sender_patterns": ["entrate.gov.it", "agenzia"],
-      "risk_contribution": 40,
-      "description": "SPID credential harvesting campaign targeting Italian taxpayers"
+      "keywords": [
+        "agenzia entrate",
+        "accedi",
+        "area riservata",
+        "spid",
+        "pagamento tasse"
+      ],
+      "sender_patterns": [
+        "entrate.gov.it",
+        "agenzia"
+      ],
+      "risk_contribution": 25,
+      "description": "SPID credential harvesting campaign targeting Italian taxpayers",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "qakbot-2024",
@@ -109,10 +230,22 @@
       "region": "GLOBAL",
       "malware": "QakBot",
       "delivery": "Email thread hijacking, ZIP with JS dropper",
-      "keywords": ["thread", "conversation", "document", "invoice", "discussione"],
-      "iocs": ["ZIP attachment", "JS dropper", "DarkGate payload"],
+      "keywords": [
+        "thread",
+        "conversation",
+        "document",
+        "invoice",
+        "discussione"
+      ],
+      "iocs": [
+        "ZIP attachment",
+        "JS dropper",
+        "DarkGate payload"
+      ],
       "risk_contribution": 45,
-      "description": "Resurrected banking trojan via email thread hijacking. Successor to Emotet."
+      "description": "Resurrected banking trojan via email thread hijacking. Successor to Emotet.",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "emotet-2025",
@@ -121,10 +254,22 @@
       "region": "GLOBAL",
       "malware": "Emotet",
       "delivery": "Email with XLS macro, OneNote, ZIP",
-      "keywords": ["documento", "fattura", "urgente", "xls", "onenote"],
-      "iocs": ["XLS Auto_Open macro", "OneNote attachment", "regsvr32.exe"],
+      "keywords": [
+        "documento",
+        "fattura",
+        "urgente",
+        "xls",
+        "onenote"
+      ],
+      "iocs": [
+        "XLS Auto_Open macro",
+        "OneNote attachment",
+        "regsvr32.exe"
+      ],
       "risk_contribution": 45,
-      "description": "Banking trojan + worm. 42% of all malware via email. Includes CobaltStrike payload."
+      "description": "Banking trojan + worm. 42% of all malware via email. Includes CobaltStrike payload.",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "venom-phaas-2025",
@@ -133,10 +278,22 @@
       "region": "GLOBAL",
       "target": "C-suite executives (CEO, CFO, Chairman, VP)",
       "theme": "SharePoint document, financial report",
-      "keywords": ["sharepoint", "document", "report", "financial", "approval"],
-      "iocs": ["QR code phishing", "Device Code flow MFA bypass", "Session relay"],
+      "keywords": [
+        "sharepoint",
+        "document",
+        "report",
+        "financial",
+        "approval"
+      ],
+      "iocs": [
+        "QR code phishing",
+        "Device Code flow MFA bypass",
+        "Session relay"
+      ],
       "risk_contribution": 50,
-      "description": "Advanced Phishing-as-a-Service targeting executives with Microsoft Device Code flow MFA bypass"
+      "description": "Advanced Phishing-as-a-Service targeting executives with Microsoft Device Code flow MFA bypass",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "diesel-vortex-2025",
@@ -145,11 +302,24 @@
       "region": "EU/USA",
       "target": "Freight & logistics companies (52 domains)",
       "theme": "Job offer, logistics communication, tracking",
-      "keywords": ["logistics", "freight", "tracking", "offer", "job", "shipment"],
-      "iocs": ["Dual-domain evasion", "Real-time MFA interception", "Telegram exfiltration"],
+      "keywords": [
+        "logistics",
+        "freight",
+        "tracking",
+        "offer",
+        "job",
+        "shipment"
+      ],
+      "iocs": [
+        "Dual-domain evasion",
+        "Real-time MFA interception",
+        "Telegram exfiltration"
+      ],
       "credentials_stolen": 1649,
       "risk_contribution": 45,
-      "description": "Phishing-as-a-Service targeting freight industry with real-time MFA code interception"
+      "description": "Phishing-as-a-Service targeting freight industry with real-time MFA code interception",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "amazon-phishing-2025",
@@ -158,11 +328,27 @@
       "region": "GLOBAL",
       "brand_spoofed": "Amazon",
       "theme": "Unauthorized order, payment verification",
-      "keywords": ["amazon", "ordine", "order", "verifica", "pagamento", "non autorizzato"],
-      "sender_patterns": ["amazon.com", "noreply"],
-      "subject_patterns": ["ordine non autorizzato", "verifica pagamento", "account suspended"],
-      "risk_contribution": 35,
-      "description": "Amazon brand phishing. 7-9% of global phishing attacks."
+      "keywords": [
+        "amazon",
+        "ordine",
+        "order",
+        "verifica",
+        "pagamento",
+        "non autorizzato"
+      ],
+      "sender_patterns": [
+        "amazon.com",
+        "noreply"
+      ],
+      "subject_patterns": [
+        "ordine non autorizzato",
+        "verifica pagamento",
+        "account suspended"
+      ],
+      "risk_contribution": 25,
+      "description": "Amazon brand phishing. 7-9% of global phishing attacks.",
+      "enabled": true,
+      "source": "builtin"
     },
     {
       "id": "paypal-phishing-2025",
@@ -171,11 +357,26 @@
       "region": "GLOBAL",
       "brand_spoofed": "PayPal",
       "theme": "Invoice, money request, transaction suspicious",
-      "keywords": ["paypal", "invoice", "money request", "transazione", "sospetta"],
-      "sender_patterns": ["paypal.com", "noreply"],
-      "subject_patterns": ["invoice from", "money request", "confirm payment"],
-      "risk_contribution": 35,
-      "description": "PayPal business profile abuse. 12% of smishing attacks."
+      "keywords": [
+        "paypal",
+        "invoice",
+        "money request",
+        "transazione",
+        "sospetta"
+      ],
+      "sender_patterns": [
+        "paypal.com",
+        "noreply"
+      ],
+      "subject_patterns": [
+        "invoice from",
+        "money request",
+        "confirm payment"
+      ],
+      "risk_contribution": 25,
+      "description": "PayPal business profile abuse. 12% of smishing attacks.",
+      "enabled": true,
+      "source": "builtin"
     }
   ]
 }

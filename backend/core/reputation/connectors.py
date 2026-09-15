@@ -19,10 +19,10 @@ import threading
 import logging
 from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
 from datetime import datetime, timezone
-from pathlib import Path
 import requests
 from dataclasses import dataclass, field
 from utils.config import settings
+from core.intel import feeds as intel_feeds
 
 logger = logging.getLogger(__name__)
 
@@ -31,48 +31,10 @@ REQUEST_TIMEOUT_ASN  = 4    # ASN lookup
 REQUEST_TIMEOUT_INFO = 8    # servizi informativi (crt.sh, redirect chain) — crt.sh può essere molto lento
 REQUEST_TIMEOUT_PULSEDIVE = 15  # Pulsedive può essere lento (free tier: 10 req/day, rate limit aggressivo)
 
-# ---------------------------------------------------------------------------
-# Disk cache per feed locali (Spamhaus DROP, OpenPhish)
-# ---------------------------------------------------------------------------
-# I feed vengono scaricati al primo avvio e salvati in backend/data/cache/.
-# Alla sessione successiva vengono letti dal disco se non scaduti (TTL).
-# Se il download fallisce ma il cache scaduto esiste, viene usato come fallback.
-
-_CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "cache"
-
-
-def _cache_load(name: str, ttl_hours: int | None = None) -> list | None:
-    """Carica dati dal cache su disco.
-    Se ttl_hours è None ignora l'età (fallback stale).
-    Restituisce la lista di dati o None se cache assente/corrotta/scaduta."""
-    try:
-        path = _CACHE_DIR / f"{name}.json"
-        if not path.exists():
-            return None
-        with path.open(encoding="utf-8") as f:
-            cached = json.load(f)
-        if ttl_hours is not None:
-            saved_at = datetime.fromisoformat(cached["saved_at"])
-            age_h = (datetime.now(timezone.utc) - saved_at).total_seconds() / 3600
-            if age_h > ttl_hours:
-                return None
-        return cached["data"]
-    except Exception:
-        return None
-
-
-def _cache_save(name: str, data: list) -> None:
-    """Salva dati su disco come JSON con timestamp UTC. Scrittura atomica."""
-    try:
-        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        path = _CACHE_DIR / f"{name}.json"
-        payload = {"saved_at": datetime.now(timezone.utc).isoformat(), "data": data}
-        tmp = path.with_suffix(".tmp")
-        with tmp.open("w", encoding="utf-8") as f:
-            json.dump(payload, f)
-        tmp.replace(path)
-    except Exception:
-        pass  # cache su disco è best-effort
+# v0.17: la disk cache di OpenPhish/Spamhaus è stata spostata in
+# core/intel/cache.py (versionata, con sanity check pre-swap) e il loro
+# refresh in core/intel/feeds.py (Snapshot condiviso con /api/intel/status
+# e lo scheduler). Vedi le funzioni _load_openphish/_load_spamhaus più sotto.
 
 
 # ---------------------------------------------------------------------------
@@ -538,48 +500,14 @@ def check_hash_virustotal(sha256: str) -> ReputationResult:
 # OpenPhish  (no API key)
 # ---------------------------------------------------------------------------
 
-_openphish_cache: set[str] = set()
-_openphish_loaded = False
-_openphish_error: str = ""
+# v0.17: la cache/refresh vivono ora in core.intel.feeds (Snapshot condiviso,
+# usato anche dallo status endpoint e dallo scheduler). _load_openphish()
+# resta come thin wrapper per compatibilità col chiamante eager in
+# run_fast_checks() più sotto.
 
 def _load_openphish():
-    """
-    Carica il feed OpenPhish di URL phishing confermati.
+    intel_feeds.ensure_loaded("openphish")
 
-    Strategie:
-    1. Memoria: ritorna subito se già caricato (_openphish_loaded=True)
-    2. Disco: carica da cache locale se presente e TTL<12h
-    3. Rete: scarica da https://openphish.com/feed.txt (feed pubblico)
-    4. Fallback: usa cache scaduta se il download fallisce
-
-    Cache formato: file JSON su disco, una URL per riga.
-    """
-    global _openphish_cache, _openphish_loaded, _openphish_error
-    if _openphish_loaded:
-        return
-    # Prova cache su disco (TTL 12h) prima di scaricare dalla rete
-    cached = _cache_load("openphish_feed", ttl_hours=12)
-    if cached is not None:
-        _openphish_cache = set(cached)
-        _openphish_loaded = True
-        return
-    try:
-        resp = _http_get_with_retry("https://openphish.com/feed.txt",
-            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)"},
-            timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
-        urls = [l.strip().lower() for l in resp.text.splitlines() if l.strip()]
-        _openphish_cache = set(urls)
-        _openphish_loaded = True
-        _cache_save("openphish_feed", urls)
-    except Exception as e:
-        _openphish_error = str(e)
-        # Fallback: cache scaduta piuttosto che feed vuoto
-        stale = _cache_load("openphish_feed")  # nessun controllo TTL
-        if stale is not None:
-            _openphish_cache = set(stale)
-            _openphish_error += " (usando cache scaduta)"
-        _openphish_loaded = True
 
 def check_url_openphish(url: str) -> ReputationResult:
     """
@@ -590,17 +518,37 @@ def check_url_openphish(url: str) -> ReputationResult:
     Confidence: 90% se trovato, 0% altrimenti.
 
     No API key richiesta — feed è pubblico e cachato localmente.
+
+    v0.17 FIX: prima, se il download falliva, il codice ritornava un errore
+    PRIMA di eseguire il lookup anche quando una cache scaduta con dati validi
+    era stata caricata in memoria — il fallback su cache stale non produceva
+    mai un verdetto. Ora il lookup avviene sempre se lo snapshot ha voci;
+    l'errore compare in `detail` solo come informazione sull'età del feed,
+    e blocca il verdetto solo se il feed è "unavailable" (nessun dato, oppure
+    stale oltre INTEL_STALE_HARD_HOURS).
     """
     r = ReputationResult(source="OpenPhish", entity=url, entity_type="url", queried=True)
     try:
-        _load_openphish()
-        if _openphish_error:
-            r.error = f"Feed non raggiungibile: {_openphish_error}"; return r
-        r.is_malicious = url.lower() in _openphish_cache
+        intel_feeds.ensure_loaded("openphish")
+        snap = intel_feeds.snapshot("openphish")
+        data = snap.get()
+        meta = snap.meta
+
+        if data is None or meta.state == "unavailable":
+            r.error = f"Feed non disponibile: {meta.last_error_message or 'nessun dato'}"
+            return r
+
+        r.is_malicious = url.lower() in data
         r.confidence = 90.0 if r.is_malicious else 0.0
-        r.detail = ("URL nel feed OpenPhish — phishing confermato"
-                    if r.is_malicious
-                    else f"URL non nel feed ({len(_openphish_cache):,} voci caricate)")
+        freshness = ""
+        if meta.state == "stale" and meta.loaded_at:
+            age_h = (datetime.now(timezone.utc) - meta.loaded_at).total_seconds() / 3600
+            freshness = f" — feed aggiornato {age_h/24:.1f} giorni fa (rete non raggiungibile)"
+        r.detail = (
+            ("URL nel feed OpenPhish — phishing confermato" if r.is_malicious
+             else f"URL non nel feed ({len(data):,} voci caricate)")
+            + freshness
+        )
     except Exception as e:
         error_type, error_msg = _categorize_error(e)
         r.error_type = error_type
@@ -725,85 +673,51 @@ def check_hash_malwarebazaar(sha256: str) -> ReputationResult:
 # Spamhaus DROP — blocklist IP pubblica, no API key
 # ---------------------------------------------------------------------------
 
-_spamhaus_cache: list[ipaddress.ip_network] = []
-_spamhaus_loaded = False
-_spamhaus_error: str = ""
+# v0.17: vedi nota sopra OpenPhish — cache/refresh in core.intel.feeds.
 
 def _load_spamhaus():
-    global _spamhaus_cache, _spamhaus_loaded, _spamhaus_error
-    if _spamhaus_loaded:
-        return
-    # Prova cache su disco (TTL 24h) prima di scaricare dalla rete
-    cached = _cache_load("spamhaus_drop", ttl_hours=24)
-    if cached is not None:
-        try:
-            _spamhaus_cache = [ipaddress.ip_network(c, strict=False) for c in cached]
-            _spamhaus_loaded = True
-            return
-        except Exception:
-            pass  # cache corrotta, riscarica
-    try:
-        # DROP list: singoli IP/CIDR malevoli di alto profilo
-        resp = _http_get_with_retry(
-            "https://www.spamhaus.org/drop/drop.txt",
-            headers={"User-Agent": f"EMLyzer/{settings.VERSION} (email analysis tool)"},
-            timeout=REQUEST_TIMEOUT,
-            rate_key="spamhaus",
-            max_retries=2,
-        )
-        resp.raise_for_status()
-        networks = []
-        cidr_strings = []
-        for line in resp.text.splitlines():
-            line = line.strip()
-            if not line or line.startswith(";"):
-                continue
-            cidr = line.split(";")[0].strip()
-            try:
-                networks.append(ipaddress.ip_network(cidr, strict=False))
-                cidr_strings.append(cidr)
-            except ValueError:
-                pass
-        _spamhaus_cache = networks
-        _spamhaus_loaded = True
-        _cache_save("spamhaus_drop", cidr_strings)
-    except Exception as e:
-        _spamhaus_error = str(e)
-        # Fallback: cache scaduta piuttosto che lista vuota
-        stale = _cache_load("spamhaus_drop")  # nessun controllo TTL
-        if stale is not None:
-            try:
-                _spamhaus_cache = [ipaddress.ip_network(c, strict=False) for c in stale]
-                _spamhaus_error += " (usando cache scaduta)"
-            except Exception:
-                pass
-        _spamhaus_loaded = True
+    intel_feeds.ensure_loaded("spamhaus")
+
 
 def check_ip_spamhaus(ip: str) -> ReputationResult:
     """
     Spamhaus DROP — controlla se l'IP è in una blocklist malevola di alto profilo.
     DROP è la lista gestita manualmente (alta precisione, pochi falsi positivi).
-    Feed cachato localmente con TTL 24h, si aggiorna al riavvio.
+    Feed cachato localmente con TTL 24h.
     Nessuna API key richiesta — servizio gratuito.
+
+    v0.17 FIX: stesso bug di OpenPhish — il fallback su cache stale ora
+    produce un verdetto valido invece di un errore bloccante.
     """
     r = ReputationResult(source="Spamhaus DROP", entity=ip, entity_type="ip", queried=True)
     try:
-        _load_spamhaus()
-        if _spamhaus_error:
-            r.error = f"Feed non raggiungibile: {_spamhaus_error}"
-            return r
         try:
             addr = ipaddress.ip_address(ip)
         except ValueError:
             r.detail = "Formato IP non valido"
             return r
-        for net in _spamhaus_cache:
+
+        intel_feeds.ensure_loaded("spamhaus")
+        snap = intel_feeds.snapshot("spamhaus")
+        networks = snap.get()
+        meta = snap.meta
+
+        if networks is None or meta.state == "unavailable":
+            r.error = f"Feed non disponibile: {meta.last_error_message or 'nessun dato'}"
+            return r
+
+        for net in networks:
             if addr in net:
                 r.is_malicious = True
                 r.confidence = 95.0
                 r.detail = f"IP in Spamhaus DROP ({net})"
                 return r
-        r.detail = f"IP non in Spamhaus DROP ({len(_spamhaus_cache)} reti caricate)"
+
+        freshness = ""
+        if meta.state == "stale" and meta.loaded_at:
+            age_h = (datetime.now(timezone.utc) - meta.loaded_at).total_seconds() / 3600
+            freshness = f" — feed aggiornato {age_h/24:.1f} giorni fa (rete non raggiungibile)"
+        r.detail = f"IP non in Spamhaus DROP ({len(networks)} reti caricate){freshness}"
     except Exception as e:
         error_type, error_msg = _categorize_error(e)
         r.error_type = error_type
@@ -1770,6 +1684,50 @@ def check_url_urlhaus(url: str) -> ReputationResult:
     return r
 
 
+def check_url_urlhaus_local(url: str) -> ReputationResult:
+    """
+    URLhaus — feed bulk locale (Wave 8), NO API key richiesta.
+
+    A differenza di check_url_urlhaus (API live, richiede ABUSECH_API_KEY e
+    per questo è skipped per la maggior parte degli utenti self-hosted senza
+    chiave configurata), questo connettore usa il download CSV pubblico
+    (core.intel.feeds, cache_key="urlhaus_recent") — nessuna configurazione
+    necessaria, copertura immediata anche senza registrazione su auth.abuse.ch.
+
+    I due connettori convivono con `source` distinti (vedi _FN_TO_SOURCE):
+    non si sovrascrivono a vicenda nella UI, e un mismatch tra i due
+    (raro: finestre temporali diverse tra CSV bulk e API live) è visibile
+    invece di nascosto.
+    """
+    r = ReputationResult(source="URLhaus (feed locale)", entity=url, entity_type="url", queried=True)
+    try:
+        intel_feeds.ensure_loaded("urlhaus")
+        snap = intel_feeds.snapshot("urlhaus")
+        data = snap.get()
+        meta = snap.meta
+
+        if data is None or meta.state == "unavailable":
+            r.error = f"Feed non disponibile: {meta.last_error_message or 'nessun dato'}"
+            return r
+
+        r.is_malicious = url.lower() in data
+        r.confidence = 85.0 if r.is_malicious else 0.0
+        freshness = ""
+        if meta.state == "stale" and meta.loaded_at:
+            age_h = (datetime.now(timezone.utc) - meta.loaded_at).total_seconds() / 3600
+            freshness = f" — feed aggiornato {age_h/24:.1f} giorni fa (rete non raggiungibile)"
+        r.detail = (
+            ("URL nel feed URLhaus recente — malware/phishing confermato" if r.is_malicious
+             else f"URL non nel feed ({len(data):,} voci caricate)")
+            + freshness
+        )
+    except Exception as e:
+        error_type, error_msg = _categorize_error(e)
+        r.error_type = error_type
+        r.error = f"URLhaus (feed locale): {error_msg}"
+    return r
+
+
 # ---------------------------------------------------------------------------
 # ThreatFox (abuse.ch) — database IOC: IP, URL e hash (richiede Auth-Key da auth.abuse.ch)
 # ---------------------------------------------------------------------------
@@ -2078,6 +2036,7 @@ _FAST_SERVICES = frozenset({
     "check_url_redirect_chain",    # 1 HTTP per URL, 0.2s rate, unlimited
     "check_url_phishtank",         # 1 HTTP, 0.5s rate, unlimited
     "check_url_urlhaus",           # 1 HTTP, 0.3s rate, unlimited (abuse.ch)
+    "check_url_urlhaus_local",     # feed locale bulk, 0s, no API key richiesta
     "check_url_threatfox",         # 1 HTTP, 0.3s rate, unlimited (abuse.ch)
     "check_url_urlscan",           # 1 HTTP, 1.0s rate, quota 1000/day OK
 
@@ -2121,6 +2080,7 @@ _FN_TO_SOURCE: dict[str, str] = {
     "check_url_redirect_chain":    "Redirect Chain",
     "check_url_phishtank":         "PhishTank",
     "check_url_urlhaus":           "URLhaus",
+    "check_url_urlhaus_local":     "URLhaus (feed locale)",
     "check_url_threatfox":         "ThreatFox",
     "check_url_urlscan":           "URLScan.io",
 
@@ -2209,6 +2169,7 @@ def _build_flat_tasks(
     # ── URL ─────────────────────────────────────────────────────────────────
     for url in urls[:20]:  # Cap at 20 to avoid overwhelming requests for spam emails with many URLs
         _c(check_url_openphish, url, "url")
+        _c(check_url_urlhaus_local, url, "url")  # feed bulk, sempre eseguito (no API key)
         if settings.ABUSECH_API_KEY:
             _c(check_url_urlhaus,   url, "url")
             _c(check_url_threatfox, url, "url")
@@ -2304,6 +2265,7 @@ def run_reputation_checks(ips: list[str], urls: list[str], hashes: list[str], do
     # Pre-carica i feed nel thread principale
     _load_spamhaus()
     _load_openphish()
+    intel_feeds.ensure_loaded("urlhaus")
 
     call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes, domains)
 
@@ -2393,6 +2355,7 @@ def run_fast_checks(ips: list[str], urls: list[str], hashes: list[str], domains:
     """
     _load_spamhaus()
     _load_openphish()
+    intel_feeds.ensure_loaded("urlhaus")
 
     call_tasks, skip_results = _build_flat_tasks(ips, urls, hashes, domains)
 

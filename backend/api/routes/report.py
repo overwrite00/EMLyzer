@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from models.database import get_session, EmailAnalysis
 from core.reporting.docx_reporter import generate_report
-from core.analysis.campaign_detector import detect_campaigns, EmailSummary, _hash_body
+from core.analysis.campaign_detector import detect_campaigns, EmailSummary
 from utils.config import settings
 from utils.i18n import t
 
@@ -44,14 +44,15 @@ async def _fetch_campaign_clusters(job_id: str, db: AsyncSession):
 
         summaries = []
         for r in rows:
+            # v0.17 FIX: stesso bug di campaigns.py — un hash reale (body_sha256),
+            # non più il proxy sui contatori che collideva su qualunque email
+            # con gli stessi 4 valori a zero.
             body_hash = ""
             if r.body_indicators:
                 bi = r.body_indicators if isinstance(r.body_indicators, dict) else {}
-                proxy = (
-                    f"{bi.get('urgency_count', 0)}_{bi.get('phishing_cta_count', 0)}"
-                    f"_{bi.get('forms_found', 0)}_{bi.get('js_found', False)}"
-                )
-                body_hash = _hash_body(proxy)
+                real_hash = bi.get("body_sha256", "")
+                if isinstance(real_hash, str) and len(real_hash) == 64:
+                    body_hash = real_hash
             summaries.append(EmailSummary(
                 job_id=r.id,
                 subject=r.mail_subject or "",

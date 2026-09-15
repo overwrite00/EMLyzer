@@ -16,7 +16,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from api.routes import upload, analysis, reputation, report, health, manual, settings as settings_route, campaigns
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+
+from api.routes import upload, analysis, reputation, report, health, manual, settings as settings_route, campaigns, intel
 from core.rate_limiting import limiter
 from models.database import init_db
 from utils.config import settings
@@ -131,9 +134,39 @@ async def lifespan(app: FastAPI):
     # Re-installa i filtri DOPO che uvicorn ha configurato i suoi handler
     _install_noise_filters()
 
+    # v0.17: genera/carica il token admin per gli endpoint mutanti di Threat
+    # Intelligence (Wave 3.5) e lo stampa in console — non richiede alcuna
+    # configurazione per l'uso locale (loopback passa sempre senza token).
+    from core.intel.auth import get_or_create_token
+    token = get_or_create_token()
+    logging.info(
+        "[STARTUP] Token amministrativo per gli endpoint di configurazione (feed/campagne): %s "
+        "(salvato anche in backend/data/admin_token — richiesto solo per richieste non da localhost)",
+        token,
+    )
+
+    # Carica il registry campagne note prima della prima richiesta.
+    from core.analysis import campaign_registry
+    campaign_registry.reload()
+
+    # v0.17: registra i job di Threat Intelligence e avvia lo scheduler
+    # (Wave 4/5) — un solo asyncio.Task con executor dedicato, separato da
+    # quello di default usato dall'analisi. Disattivabile via
+    # INTEL_AUTO_REFRESH=false (test, ambienti air-gapped).
+    from core.intel import feeds as intel_feeds
+    from core.intel import bulletins as intel_bulletins
+    from core.intel import scheduler as intel_scheduler
+    intel_feeds.register_jobs()
+    intel_bulletins.register_job()
+    intel_scheduler.start()
+
     yield
 
     # ── Shutdown pulito ────────────────────────────────────────────────────
+    # Ferma prima lo scheduler Threat Intelligence (cancellazione del task +
+    # chiusura del suo executor dedicato), poi l'executor di default.
+    await intel_scheduler.stop()
+
     # Chiude l'executor di default di asyncio con wait=False per evitare
     # che threading._shutdown() blocchi su CTRL+C aspettando i thread
     # della fase 2 (VirusTotal/AbuseIPDB possono impiegare decine di secondi).
@@ -157,8 +190,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Limiter middleware per rate limiting
+# Limiter middleware per rate limiting.
+# NOTA v0.17: senza questo handler, un 429 di slowapi (RateLimitExceeded, che
+# eredita da starlette HTTPException) veniva gestito dall'ExceptionMiddleware
+# di default: risposta text/plain senza corpo JSON {detail: ...} e senza header
+# Retry-After, che il frontend axios non poteva distinguere da un errore 500.
 app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -177,6 +215,7 @@ app.include_router(report.router,      prefix="/api/report",     tags=["report"]
 app.include_router(manual.router,         prefix="/api/manual",    tags=["manual"])
 app.include_router(settings_route.router, prefix="/api/settings",  tags=["settings"])
 app.include_router(campaigns.router,       prefix="/api/campaigns",  tags=["campaigns"])
+app.include_router(intel.router,           prefix="/api/intel",      tags=["intel"])
 
 # Serve il frontend compilato (assets JS/CSS/immagini)
 if STATIC_DIR.exists():
