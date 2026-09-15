@@ -7,6 +7,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Next Release
 
+### Fixed
+- **CERT-AGID bulletins never loaded on first visit**: the "Bollettini CERT-AGID"
+  tab only read the cached snapshot (`GET /api/intel/bulletins`), but the
+  bulletins job is registered `auto=False` by design, so a fresh install
+  showed a permanently empty list. The tab now triggers a refresh
+  automatically on first mount when the state is `never_fetched`, plus a
+  manual "Aggiorna" button.
+
+### Added
+- **Known-campaign form — example placeholders and mini-guide**: every field
+  in the "New/Edit Campaign" form now shows a realistic placeholder and a
+  short inline hint; a collapsible guide explains each field and the
+  backtest workflow, to help analysts fill it in correctly without leaving
+  the app.
+- **"Ri-analizza" (Re-analyze) button**: analysis results are computed once
+  at upload time and never recomputed afterward, so an email analyzed
+  *before* a matching known campaign was created (or edited) never picked up
+  that match when reopened. Reopening an existing analysis now shows a
+  "Ri-analizza" button that re-runs the pipeline against the current known
+  campaigns and IOC snapshots for that same `job_id`, preserving analyst
+  notes and prior reputation results.
+
 ### Roadmap (Low Priority)
 
 This section collects all planned but not yet implemented features.

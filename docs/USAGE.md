@@ -16,9 +16,10 @@ Learn how to analyze suspicious emails, interpret results, and generate professi
 5. [📝 Analyst Notes](#-save-analyst-notes)
 6. [📄 Generate Word Report](#-generate-word-report)
 7. [📋 Search & Filter](#-search-and-filter-analyses)
-8. [🕸 Campaign Detection](#-campaign-detection)
-9. [🌐 Change Language](#-change-language)
-10. [💡 Practical Examples](#-practical-examples)
+8. [🕸 Similar Clusters](#-similar-clusters)
+9. [🛰️ Threat Intelligence](#-threat-intelligence)
+10. [🌐 Change Language](#-change-language)
+11. [💡 Practical Examples](#-practical-examples)
 
 ---
 
@@ -30,7 +31,8 @@ After starting the application (`start.bat` on Windows / `./start.sh` on Linux),
 
 You should see:
 - ✅ Email upload area
-- ✅ Campaign detection panel
+- ✅ Threat Intelligence panel (IOC feeds, known campaigns, CERT-AGID bulletins)
+- ✅ Similar Clusters panel (internal clustering)
 - ✅ Recent analyses list
 - ✅ Language selector (IT/EN, top right)
 
@@ -134,6 +136,10 @@ Main overview. Contains:
 - **Email metadata** — sender, recipient, subject, date, Message-ID, file hash
 - **Risk explanation** — list of main indicators with severity
 - **Analyst notes** — free-text area (see dedicated section)
+
+**🔄 Ri-analizza / Re-analyze button** (top toolbar, next to the .docx report link):
+
+Analysis is computed once, when the email is first uploaded, and stored as-is — it is **not** recomputed automatically afterward. If you create or edit a [known campaign](#-threat-intelligence) that matches an email you already analyzed, reopening it won't show the match until you re-run the analysis. Click **"Ri-analizza"** to re-run the full pipeline (header/body/URL/attachment + known-campaign matching) against the current data for that same email. Analyst notes and any reputation results you already fetched are preserved.
 
 ---
 
@@ -381,9 +387,9 @@ To delete multiple analyses at once:
 
 ---
 
-## 🕸️ Campaign Detection
+## 🕸️ Similar Clusters
 
-The **"🕸 Detected Campaigns"** section groups similar emails to identify coordinated attacks.
+The **"🕸 Cluster Simili"** section groups similar emails **already analyzed in your database** to identify coordinated attacks. This is internal clustering — different from the curated "Known Campaigns" described below.
 
 Click **"Analyze campaigns"** to run analysis on all emails in the database.
 
@@ -391,7 +397,7 @@ System groups emails sharing:
 
 | 🔍 Criterion | 📝 Explanation |
 |---|---|
-| Identical body | Same text (same template) |
+| Identical body | Same text (same template) — real SHA256 hash of the body |
 | X-Campaign-ID | Same header identifier |
 | Message-ID pattern | Same domain in Message-ID |
 | Similar subject | Very similar subjects (threshold-based) |
@@ -403,6 +409,33 @@ System groups emails sharing:
 - 90% = nearly identical emails only
 
 Each cluster shows: correlation type, common value, email count, max risk, first/last date.
+
+---
+
+## 🛰️ Threat Intelligence
+
+The **"Threat Intelligence"** panel (above Similar Clusters) has three tabs:
+
+### 📡 Feed IOC
+
+Status of the local IOC feeds used automatically during analysis: **OpenPhish** (phishing URLs), **Spamhaus DROP** (malicious IP ranges), **URLhaus** (malware-distribution URLs). Each row shows freshness (`ok`/`stale`/`unavailable`/`never_fetched`), last-updated time, and entry count. Feeds refresh on a background schedule; click **"Aggiorna" / "Refresh"** on a row to force an immediate update.
+
+### 🗂️ Campagne Note / Known Campaigns
+
+Curated, manually-maintained phishing patterns (distinct from the auto-generated clusters above). For each campaign an email's body/subject/sender is matched against, a **known-campaign finding** is added to that email's risk score.
+
+- **List** — shows built-in campaigns (from EMLyzer's own database) and any you've added or overridden, with a badge distinguishing the two.
+- **➕ Nuova campagna / New campaign** — opens a form with keywords, sender/subject patterns, and a risk weight. Every field has an example placeholder and an inline hint; click the **ℹ️ guide toggle** at the top of the form for a short explanation of each field and how matching works.
+- **🧪 Backtest** — before saving, run the candidate pattern against your existing analyzed-email corpus to preview which emails would match and flag likely false positives (matches with a low risk score). This never modifies data; it's a dry run.
+- **Edit / Delete / Restore** — editing or deleting a built-in campaign creates a personal override; use **"Restore"** to revert to the built-in version.
+- **Proposals** — the system can suggest new campaigns based on clusters of similar emails it has seen repeatedly (never applied automatically — review and approve/reject each proposal, which pre-fills the creation form for you).
+
+> [!NOTE]
+> ℹ️ A known campaign only affects emails analyzed **after** it's created or edited. To apply it retroactively to an already-analyzed email, reopen that email and click **"Ri-analizza"** (see [Analysis Tabs](#-the-analysis-tabs)).
+
+### 📰 Bollettini CERT-AGID / CERT-AGID Bulletins
+
+A read-only news board of public phishing-related bulletins from CERT-AGID (the Italian national CERT). Shows title, date, and an excerpt with a link to the original article — never the full text, and it never auto-generates campaign keywords. Refreshes automatically on first visit; use the **"Aggiorna"** button to check for new bulletins manually.
 
 ---
 
@@ -443,9 +476,10 @@ or `LANGUAGE=en`, then restart.
 ### 💡 Example 3: Company Campaign
 
 1. Upload all suspicious emails (one at a time)
-2. Click **"Analyze campaigns"**
+2. Click **"Analyze campaigns"** in Similar Clusters
 3. Expand clusters to see correlated emails
 4. Use information to block domain on firewall or report to authorities
+5. If the pattern is likely to recur, add it as a **Known Campaign** (with backtest) so future emails are flagged automatically
 
 ---
 
@@ -457,5 +491,5 @@ or `LANGUAGE=en`, then restart.
 
 ---
 
-*Last updated: 2026-06-07*
+*Last updated: 2026-09-15*
 *← [Configuration](./CONFIGURATION.md) | [API →](./API.md)*

@@ -189,7 +189,8 @@ After the console shows "Application Ready", open your browser:
 You should see:
 - ✅ Email upload area
 - ✅ Recent analyses list
-- ✅ Campaign detection panel
+- ✅ Threat Intelligence panel (IOC feeds, known campaigns, CERT-AGID bulletins)
+- ✅ Similar Clusters panel (internal clustering)
 - ✅ IT/EN language selector (top right)
 
 ### 🔍 Test the API
@@ -341,5 +342,5 @@ To upgrade to a newer version:
 
 ---
 
-*Last updated: 2026-09-14*
+*Last updated: 2026-09-15*
 *← [Requirements](./REQUIREMENTS.md) | [Configuration →](./CONFIGURATION.md)*
