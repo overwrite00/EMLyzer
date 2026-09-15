@@ -414,9 +414,38 @@ const inputStyle = {
 function BulletinsTab({ t }) {
   const [data, setData] = useState(null)
   const [creatingFrom, setCreatingFrom] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const load = useCallback(async () => {
+    const result = await getBulletins().catch(err => { console.error(err); return null })
+    setData(result)
+    return result
+  }, [])
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await refreshIntelTarget('bulletins')
+      // il fetch del feed RSS gira in background: un breve polling basta per la UI
+      setTimeout(load, 1500)
+      setTimeout(load, 4000)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setTimeout(() => setRefreshing(false), 4000)
+    }
+  }, [load])
 
   useEffect(() => {
-    getBulletins().then(setData).catch(console.error)
+    load().then(result => {
+      // Primo utilizzo: il bollettino non è mai stato scaricato (a differenza
+      // dei feed IOC, non si aggiorna da solo in background) — lo scarichiamo
+      // automaticamente una volta, così il tab non appare vuoto senza spiegazione.
+      if (result?.status?.state === 'never_fetched') {
+        refresh()
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (creatingFrom) {
@@ -439,9 +468,13 @@ function BulletinsTab({ t }) {
 
   return (
     <div>
-      <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>{t('intel.bulletins.description')}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1, margin: 0 }}>{t('intel.bulletins.description')}</p>
+        {data.status && <StateBadge state={data.status.state} t={t} />}
+        <Button variant="ghost" onClick={refresh} loading={refreshing}>{t('intel.refresh_one')}</Button>
+      </div>
       {data.items.length === 0 ? (
-        <EmptyState message={t('intel.bulletins.empty')} />
+        <EmptyState message={refreshing ? t('intel.refreshing') : t('intel.bulletins.empty')} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {data.items.map((item, i) => (
