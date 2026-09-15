@@ -285,6 +285,7 @@ function CampaignForm({ initial, onDone, onCancel, t }) {
   const [backtest, setBacktest] = useState(null)
   const [backtesting, setBacktesting] = useState(false)
   const [error, setError] = useState('')
+  const [guideOpen, setGuideOpen] = useState(false)
 
   function update(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -338,30 +339,81 @@ function CampaignForm({ initial, onDone, onCancel, t }) {
 
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: 16 }}>
+      <div style={{ marginBottom: 14 }}>
+        <button
+          type="button"
+          onClick={() => setGuideOpen(o => !o)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'var(--accent-blue)', fontSize: 12, fontWeight: 600, padding: 0,
+          }}
+        >
+          <span>{guideOpen ? '▾' : '▸'}</span> ℹ️ {t('intel.known.guide.toggle')}
+        </button>
+        {guideOpen && (
+          <div style={{
+            marginTop: 8, padding: '10px 12px', borderRadius: 6,
+            background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+            fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6,
+          }}>
+            <div><strong>{t('intel.known.field.id')}:</strong> {t('intel.known.guide.id')}</div>
+            <div><strong>{t('intel.known.field.keywords')}:</strong> {t('intel.known.guide.keywords')}</div>
+            <div><strong>{t('intel.known.field.required_keywords')}:</strong> {t('intel.known.guide.required_keywords')}</div>
+            <div><strong>{t('intel.known.field.risk')}:</strong> {t('intel.known.guide.risk')}</div>
+            <div style={{ marginTop: 6 }}>💡 {t('intel.known.guide.backtest_tip')}</div>
+          </div>
+        )}
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-        <Field label={t('intel.known.field.id')}>
-          <input value={form.id} onChange={e => update('id', e.target.value)} disabled={!!initial.id} style={inputStyle} />
+        <Field label={t('intel.known.field.id')} hint={t('intel.known.hint.id')}>
+          <input
+            value={form.id} onChange={e => update('id', e.target.value)}
+            disabled={!!initial.id} placeholder={t('intel.known.placeholder.id')}
+            style={inputStyle}
+          />
         </Field>
         <Field label={t('intel.known.field.name')}>
-          <input value={form.name} onChange={e => update('name', e.target.value)} style={inputStyle} />
+          <input
+            value={form.name} onChange={e => update('name', e.target.value)}
+            placeholder={t('intel.known.placeholder.name')} style={inputStyle}
+          />
         </Field>
       </div>
-      <Field label={t('intel.known.field.keywords')}>
-        <textarea rows={4} value={form.keywords} onChange={e => update('keywords', e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+      <Field label={t('intel.known.field.keywords')} hint={t('intel.known.hint.keywords')}>
+        <textarea
+          rows={4} value={form.keywords} onChange={e => update('keywords', e.target.value)}
+          placeholder={t('intel.known.placeholder.keywords')}
+          style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
+        />
       </Field>
-      <Field label={t('intel.known.field.required_keywords')}>
-        <textarea rows={2} value={form.required_keywords} onChange={e => update('required_keywords', e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+      <Field label={t('intel.known.field.required_keywords')} hint={t('intel.known.hint.required_keywords')}>
+        <textarea
+          rows={2} value={form.required_keywords} onChange={e => update('required_keywords', e.target.value)}
+          placeholder={t('intel.known.placeholder.required_keywords')}
+          style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
+        />
       </Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-        <Field label={t('intel.known.field.risk')}>
+        <Field label={t('intel.known.field.risk')} hint={t('intel.known.hint.risk')}>
           <input type="number" min={0} max={50} value={form.risk_contribution} onChange={e => update('risk_contribution', e.target.value)} style={inputStyle} />
         </Field>
         <Field label={t('intel.known.field.enabled')}>
           <input type="checkbox" checked={!!form.enabled} onChange={e => update('enabled', e.target.checked)} />
         </Field>
       </div>
+      <Field label={t('intel.known.field.description')}>
+        <textarea
+          rows={2} value={form.description || ''} onChange={e => update('description', e.target.value)}
+          placeholder={t('intel.known.placeholder.description')} style={inputStyle}
+        />
+      </Field>
       <Field label={t('intel.known.field.reference_url')}>
-        <input value={form.reference_url} onChange={e => update('reference_url', e.target.value)} style={inputStyle} />
+        <input
+          value={form.reference_url} onChange={e => update('reference_url', e.target.value)}
+          placeholder={t('intel.known.placeholder.reference_url')} style={inputStyle}
+        />
       </Field>
 
       <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
@@ -392,11 +444,12 @@ function CampaignForm({ initial, onDone, onCancel, t }) {
   )
 }
 
-function Field({ label, children }) {
+function Field({ label, hint, children }) {
   return (
     <div style={{ marginBottom: 12 }}>
       <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{label}</label>
       {children}
+      {hint && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{hint}</div>}
     </div>
   )
 }

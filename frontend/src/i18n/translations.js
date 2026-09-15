@@ -329,6 +329,61 @@ export const translations = {
   "intel.known.empty":           { it: "Nessuna campagna nota configurata.", en: "No known campaigns configured." },
   "intel.known.delete_confirm":  { it: "Eliminare questa campagna personalizzata?", en: "Delete this custom campaign?" },
 
+  // Placeholder di esempio nel form (aiutano l'analista a capire il formato atteso)
+  "intel.known.placeholder.id":       { it: "es. banca-esempio-2026", en: "e.g. example-bank-2026" },
+  "intel.known.placeholder.name":     { it: "es. Phishing Banca Esempio 2026", en: "e.g. Example Bank Phishing 2026" },
+  "intel.known.placeholder.keywords": {
+    it: "es.\nbanca esempio\nverifica account\naccesso sospetto\nconferma identità\nblocco carta",
+    en: "e.g.\nexample bank\nverify account\nsuspicious access\nconfirm identity\ncard blocked",
+  },
+  "intel.known.placeholder.required_keywords": { it: "es. banca esempio", en: "e.g. example bank" },
+  "intel.known.placeholder.description": {
+    it: "es. Email che imitano comunicazioni di Banca Esempio, chiedendo di verificare l'account tramite un link a un sito clone.",
+    en: "e.g. Emails impersonating Example Bank, asking to verify the account via a link to a cloned site.",
+  },
+  "intel.known.placeholder.reference_url": { it: "es. https://cert-agid.gov.it/news/...", en: "e.g. https://cert-agid.gov.it/news/..." },
+
+  // Micro-suggerimenti sotto i campi più delicati
+  "intel.known.hint.id": {
+    it: "Solo minuscole, cifre e trattino, 3-64 caratteri. Non modificabile dopo la creazione.",
+    en: "Lowercase letters, digits and hyphen only, 3-64 characters. Not editable after creation.",
+  },
+  "intel.known.hint.keywords": {
+    it: "La campagna scatta se una parte sufficiente di queste keyword compare nel testo dell'email (soglia proporzionale automatica). Preferisci termini specifici del brand a parole generiche come \"pagamento\" o \"urgente\".",
+    en: "The campaign fires when enough of these keywords appear in the email text (automatic proportional threshold). Prefer brand-specific terms over generic words like \"payment\" or \"urgent\".",
+  },
+  "intel.known.hint.required_keywords": {
+    it: "Se compili questo campo, la campagna scatta SOLO se almeno una di queste è presente — utile per ancorare il match al brand ed evitare falsi positivi.",
+    en: "If filled in, the campaign only fires when at least one of these is present — useful to anchor the match to the brand and avoid false positives.",
+  },
+  "intel.known.hint.risk": {
+    it: "Punti aggiunti al rischio dell'email in caso di match. 25 = soglia standard per phishing di brand; 40-50 = campagne malware/APT più pericolose.",
+    en: "Points added to the email's risk score on a match. 25 = standard threshold for brand phishing; 40-50 = more dangerous malware/APT campaigns.",
+  },
+
+  // Mini-guida collassabile
+  "intel.known.guide.toggle": { it: "Come compilare questo form", en: "How to fill in this form" },
+  "intel.known.guide.id": {
+    it: "un identificativo univoco e stabile per questa campagna, es. \"brand-2026\".",
+    en: "a unique, stable identifier for this campaign, e.g. \"brand-2026\".",
+  },
+  "intel.known.guide.keywords": {
+    it: "le parole/frasi che il sistema cerca nel testo dell'email. Più sono specifiche del brand, meno falsi positivi genereranno.",
+    en: "the words/phrases the system looks for in the email text. The more brand-specific they are, the fewer false positives they'll generate.",
+  },
+  "intel.known.guide.required_keywords": {
+    it: "opzionale, ma consigliato: almeno una di queste deve essere presente perché la campagna scatti.",
+    en: "optional but recommended: at least one of these must be present for the campaign to fire.",
+  },
+  "intel.known.guide.risk": {
+    it: "quanto pesa un match sul punteggio di rischio finale dell'email (scala 0-50).",
+    en: "how much a match weighs on the email's final risk score (0-50 scale).",
+  },
+  "intel.known.guide.backtest_tip": {
+    it: "Esegui sempre il backtest prima di salvare: ti mostra subito se le keyword catturano email che dovrebbero essere considerate innocue.",
+    en: "Always run the backtest before saving: it immediately shows whether the keywords catch emails that should be considered harmless.",
+  },
+
   // Backtest
   "intel.backtest.title":        { it: "Backtest sul corpus", en: "Backtest against corpus" },
   "intel.backtest.run":          { it: "Esegui backtest", en: "Run backtest" },
