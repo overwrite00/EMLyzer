@@ -7,6 +7,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Next Release
 
+### Roadmap (Low Priority)
+
+This section collects all planned but not yet implemented features.
+Features are ordered by implementation priority.
+
+#### Infrastructure (Low Priority)
+
+- [ ] **PostgreSQL** — Alternative database support to SQLite for multi-user deployments
+- [ ] **Plugin System** — Modular architecture for adding connectors and analyzers without modifying core
+- [ ] **YARA Rules** — Pattern detection in attachments via customizable YARA rules
+- [ ] **SIEM Integration** — Export in SIEM-compatible formats (CEF, structured JSON, syslog)
+- [ ] **Optional External Sandbox** — Send attachments to sandbox services (Cuckoo, Any.run) as optional plugin
+
+---
+
+## [0.17.1] — 2026-09-15
+
 ### Fixed
 - **CERT-AGID bulletins never loaded on first visit**: the "Bollettini CERT-AGID"
   tab only read the cached snapshot (`GET /api/intel/bulletins`), but the
@@ -29,18 +46,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   campaigns and IOC snapshots for that same `job_id`, preserving analyst
   notes and prior reputation results.
 
-### Roadmap (Low Priority)
-
-This section collects all planned but not yet implemented features.
-Features are ordered by implementation priority.
-
-#### Infrastructure (Low Priority)
-
-- [ ] **PostgreSQL** — Alternative database support to SQLite for multi-user deployments
-- [ ] **Plugin System** — Modular architecture for adding connectors and analyzers without modifying core
-- [ ] **YARA Rules** — Pattern detection in attachments via customizable YARA rules
-- [ ] **SIEM Integration** — Export in SIEM-compatible formats (CEF, structured JSON, syslog)
-- [ ] **Optional External Sandbox** — Send attachments to sandbox services (Cuckoo, Any.run) as optional plugin
+### Documentation
+- Documented the Threat Intelligence UI panel (IOC feeds, known campaigns
+  with backtest, CERT-AGID bulletins) and the "Ri-analizza" button in
+  `docs/USAGE.md`, previously only covered by the changelog and API docs.
 
 ---
 

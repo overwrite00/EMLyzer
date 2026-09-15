@@ -112,7 +112,7 @@ python3.13 --version
 
 **Linux/macOS:**
 ```bash
-tar -xzf EMLyzer_v0.17.0.tar.gz
+tar -xzf EMLyzer_v0.17.1.tar.gz
 cd EMLyzer
 ```
 
@@ -139,7 +139,7 @@ A black console window opens showing progress:
 
 ```
 ============================================
-  EMLyzer v0.17.0
+  EMLyzer v0.17.1
 ============================================
 
 [INFO] Python found:
@@ -201,7 +201,7 @@ Open this link in your browser to verify the backend:
 
 Expected response:
 ```json
-{"status": "ok", "version": "0.17.0", "app": "EMLyzer"}
+{"status": "ok", "version": "0.17.1", "app": "EMLyzer"}
 ```
 
 ---

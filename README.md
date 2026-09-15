@@ -98,6 +98,8 @@ Email (.eml / .msg / plain text)
 
 ## 🔧 Version
 
+**v0.17.1** — 🐛 Follow-up to the Threat Intelligence release: fixed CERT-AGID bulletins not loading on first visit, added example placeholders and a collapsible mini-guide to the known-campaign form, and added a "Ri-analizza" (Re-analyze) button so an already-analyzed email can pick up a known campaign created or edited afterward. Documented the whole Threat Intelligence panel in `docs/USAGE.md`.
+
 **v0.17.0** — 🛰️ Threat Intelligence release: automatic refresh of local IOC feeds (OpenPhish, Spamhaus, URLhaus) with a shared caching/scheduling infrastructure, a curated "Known Campaigns" system with manual CRUD, corpus backtesting, CERT-AGID bulletin board, and internal auto-learning proposals — all backed by a new "Threat Intelligence" UI panel. Fixed several correctness bugs along the way (word-boundary campaign matching, dead `risk_contribution` weight, a spurious mega-cluster in internal clustering, JSON-less rate-limit responses) and hardened write endpoints with a local admin token; the app now binds to `127.0.0.1` by default. All 189 tests passing ✅ (1 skipped), zero regressions.
 
 **v0.16.3** — 📦 Dependency release: Updated backend (mail-parser, scikit-learn) and frontend (React, Vite, ESLint and more) dependencies, hardened the `actions/checkout` CI action, and reserialized the tabular phishing model with scikit-learn 1.9.1. All 124 tests passing ✅ (1 skipped), zero regressions.
@@ -212,5 +214,5 @@ Distributed with MIT License · [View License](LICENSE)
 
 ---
 
-*Last updated: 2026-09-14*
+*Last updated: 2026-09-15*
 *← [Contributing](./CONTRIBUTING.md) | [Docs →](./docs/)*
