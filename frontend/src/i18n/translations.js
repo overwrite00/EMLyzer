@@ -69,6 +69,13 @@ export const translations = {
   // ── Detail modal ─────────────────────────────────────────────────────────────
   "detail.no_subject": { it: "(nessun oggetto)", en: "(no subject)" },
   "detail.report_btn": { it: "Report .docx", en: ".docx Report" },
+  "detail.reanalyze_btn": { it: "↻ Ri-analizza", en: "↻ Re-analyze" },
+  "detail.reanalyzing": { it: "Ri-analisi in corso…", en: "Re-analyzing…" },
+  "detail.reanalyze_hint": {
+    it: "Rilancia l'analisi su questa email con le regole/campagne attuali (utile dopo aver creato o modificato una campagna nota). Note e controlli di reputazione già fatti non vengono persi.",
+    en: "Re-runs the analysis on this email with the current rules/campaigns (useful after creating or editing a known campaign). Existing notes and reputation checks are preserved.",
+  },
+  "detail.reanalyze_error": { it: "Ri-analisi fallita", en: "Re-analysis failed" },
   "detail.tab_summary": { it: "Riepilogo", en: "Summary" },
   "detail.tab_header": { it: "Header", en: "Header" },
   "detail.tab_body": { it: "Body", en: "Body" },

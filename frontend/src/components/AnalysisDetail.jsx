@@ -1,13 +1,13 @@
 // src/components/AnalysisDetail.jsx
 /* eslint-disable react-hooks/set-state-in-effect,react-hooks/rules-of-hooks */
 import { useState, useRef, useEffect } from 'react'
-import { runReputation, getReportUrl, updateNotes, getAnalysis } from '../api/client'
+import { runReputation, getReportUrl, updateNotes, getAnalysis, runAnalysis } from '../api/client'
 import { Section, KeyValue, FindingRow, EmptyState, Button, SeverityBadge } from './ui'
 import RiskMeter from './RiskMeter'
 import { useLang } from '../i18n/LangContext'
 import TabReputation from './TabReputation'
 
-export default function AnalysisDetail({ data, onClose }) {
+export default function AnalysisDetail({ data, onClose, onReanalyzed }) {
   const { t, lang } = useLang()
   const TABS = [
     t('detail.tab_summary'), t('detail.tab_header'), t('detail.tab_body'),
@@ -21,6 +21,8 @@ export default function AnalysisDetail({ data, onClose }) {
   const [notes, setNotes]         = useState(data?.analyst_notes || '')
   const [notesSaving, setNotesSaving] = useState(false)
   const [notesSaved, setNotesSaved]   = useState(false)
+  const [reanalyzing, setReanalyzing] = useState(false)
+  const [reanalyzeError, setReanalyzeError] = useState('')
 
   if (!data) return null
   const { email, risk, header_analysis, body_analysis, url_analysis, attachment_analysis } = data
@@ -66,6 +68,22 @@ export default function AnalysisDetail({ data, onClose }) {
     }
   }
 
+  async function handleReanalyze() {
+    setReanalyzing(true); setReanalyzeError('')
+    try {
+      // Rilancia l'intera pipeline (header/body/url/attachment/score) sullo
+      // stesso job_id: prende in considerazione le campagne note create o
+      // modificate dopo la prima analisi. db.merge() lato backend preserva
+      // analyst_notes e reputation_results già presenti, non li sovrascrive.
+      const result = await runAnalysis(data.job_id)
+      onReanalyzed?.(result)
+    } catch (err) {
+      setReanalyzeError(err.response?.data?.detail || err.message || t('detail.reanalyze_error'))
+    } finally {
+      setReanalyzing(false)
+    }
+  }
+
   // Cleanup polling allo smontaggio
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
@@ -103,7 +121,12 @@ export default function AnalysisDetail({ data, onClose }) {
             </div>
             <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>{email?.from} · {email?.date}</div>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+            <span title={t('detail.reanalyze_hint')}>
+              <Button variant="ghost" onClick={handleReanalyze} loading={reanalyzing} style={{ fontSize: 12, padding: '6px 12px' }}>
+                {t('detail.reanalyze_btn')}
+              </Button>
+            </span>
             <a href={getReportUrl(data.job_id)} download style={{
               padding: '6px 12px', borderRadius: 'var(--radius)',
               background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -113,6 +136,12 @@ export default function AnalysisDetail({ data, onClose }) {
             <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text-muted)', fontSize:20, cursor:'pointer' }}>×</button>
           </div>
         </div>
+
+        {reanalyzeError && (
+          <div style={{ padding: '8px 24px', background: 'var(--risk-high-bg)', color: 'var(--risk-high)', fontSize: 12 }}>
+            {reanalyzeError}
+          </div>
+        )}
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 24px', overflowX: 'auto' }}>

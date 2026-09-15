@@ -511,7 +511,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {selected && <AnalysisDetail data={selected} onClose={() => { setSelected(null); setSelectedJobId(null) }} />}
+      {selected && <AnalysisDetail data={selected} onClose={() => { setSelected(null); setSelectedJobId(null) }} onReanalyzed={onNewAnalysis} />}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
