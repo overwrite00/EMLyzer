@@ -6,7 +6,7 @@
 fastapi==0.141.1
 pydantic==2.13.5
 pydantic-settings==2.15.0
-uvicorn[standard]==0.52.4
+uvicorn[standard]==0.53.0
 python-multipart==0.0.32
 
 # Email parsing
@@ -23,7 +23,7 @@ tldextract==5.3.2
 dnspython==2.8.0
 python-whois==0.9.6
 requests==2.34.2
-urllib3==2.7.0
+urllib3==2.8.0
 
 # File type detection (pure Python, no libmagic)
 filetype==1.2.0
@@ -32,7 +32,7 @@ filetype==1.2.0
 python-docx==1.2.0
 
 # Database (SQLAlchemy >= 2.0.36 richiesto per Python 3.13+)
-sqlalchemy==2.0.52
+sqlalchemy==2.0.54
 aiosqlite==0.22.1
 
 # Security / sanitization
@@ -45,7 +45,7 @@ defusedxml==0.7.1
 pytest==9.1.1
 pytest-asyncio==1.4.0
 httpx==0.28.1
-coverage==7.16.0
+coverage==7.16.1
 
 # Language detection
 langdetect==1.0.9
