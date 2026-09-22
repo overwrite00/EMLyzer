@@ -13,8 +13,7 @@ updates:
     directory: "/backend"
     target-branch: "develop"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "02:00"
       timezone: "UTC"
     open-pull-requests-limit: 5
@@ -53,8 +52,7 @@ updates:
     directory: "/frontend"
     target-branch: "develop"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "03:00"
       timezone: "UTC"
     open-pull-requests-limit: 5
