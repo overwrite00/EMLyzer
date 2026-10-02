@@ -73,6 +73,19 @@ class ParsedEmail:
     parse_errors: list[str] = field(default_factory=list)
 
 
+# ParsedEmail fields that _parse_msg takes from a .msg's transport headers.
+# test_core.TestMsgBackend checks this list against ParsedEmail so a new header
+# field cannot be silently left out of .msg parsing again.
+_MSG_HEADER_DERIVED_FIELDS = (
+    "message_id", "return_path", "reply_to", "x_mailer", "x_originating_ip",
+    "x_campaign_id", "list_unsubscribe", "received_chain",
+    "spf_result", "dkim_result", "dmarc_result",
+    "dkim_signatures_raw", "received_spf_raw", "auth_results_raw",
+    "arc_seal_raw", "arc_message_signature_raw", "arc_authentication_results_raw",
+    "raw_headers",
+)
+
+
 def _compute_hashes(data: bytes) -> tuple[str, str, str]:
     """
     Calcola MD5, SHA-1 e SHA-256 di un file binario.
@@ -371,17 +384,19 @@ def _parse_msg(raw: bytes, filename: str) -> ParsedEmail:
         parsed.body_text = f.body_text
         parsed.body_html = f.body_html
 
-        # Bonus: if transport headers available, reuse EML parser for auth headers
+        # The RFC 822 transport headers of a .msg are parsed exactly like an .eml header block.
+        # MAPI properties stay authoritative for From/Subject/Date and the recipient table;
+        # every other header-derived field comes from the transport headers.
         if f.transport_headers.strip():
             try:
                 eml_view = _parse_eml(f.transport_headers.encode("utf-8", "replace"), filename)
-                parsed.spf_result = eml_view.spf_result
-                parsed.dkim_result = eml_view.dkim_result
-                parsed.dmarc_result = eml_view.dmarc_result
-                parsed.received_chain = eml_view.received_chain
-                parsed.raw_headers = eml_view.raw_headers
-                if eml_view.message_id:
-                    parsed.message_id = eml_view.message_id
+                parsed.parse_errors.extend(eml_view.parse_errors)
+                for name in _MSG_HEADER_DERIVED_FIELDS:
+                    setattr(parsed, name, getattr(eml_view, name))
+                if not parsed.mail_to:
+                    parsed.mail_to = eml_view.mail_to
+                if not parsed.mail_cc:
+                    parsed.mail_cc = eml_view.mail_cc
             except Exception as e:
                 parsed.parse_errors.append(f"Transport header parsing: {e}")
 
