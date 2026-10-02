@@ -70,6 +70,10 @@ Features are ordered by implementation priority.
 - The test job installs RTFDE (LGPL-3.0, pinned) so the end-to-end RTF-only `.msg`
   test runs against the real library instead of being skipped. RTFDE stays out of
   `requirements.txt`: it is optional and is not distributed with EMLyzer.
+- Dependabot pull requests are now assigned natively (`assignees` in `dependabot.yml`):
+  they had never been assigned, because GitHub gives Dependabot-triggered workflows a
+  read-only token. The automation skips the edits that token cannot make, with an
+  explicit message, instead of failing.
 - Dependabot now checks pip and npm monthly instead of weekly.
 - Project automation: assignee, reviewer and label assignment had been failing silently
   on every pull request (the repository-scoped edits were made with the Projects-only
