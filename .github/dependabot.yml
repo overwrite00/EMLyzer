@@ -21,6 +21,8 @@ updates:
       - "dependencies"
       - "lang:python"
       - "scope:backend"
+    assignees:
+      - "overwrite00"
     commit-message:
       prefix: "chore(deps-backend)"
       include: "scope"
@@ -60,6 +62,8 @@ updates:
       - "dependencies"
       - "lang:javascript"
       - "scope:frontend"
+    assignees:
+      - "overwrite00"
     commit-message:
       prefix: "chore(deps-frontend)"
       include: "scope"
@@ -113,6 +117,8 @@ updates:
       - "dependencies"
       - "type:ci"
       - "scope:deps"
+    assignees:
+      - "overwrite00"
     commit-message:
       prefix: "chore(ci)"
       include: "scope"

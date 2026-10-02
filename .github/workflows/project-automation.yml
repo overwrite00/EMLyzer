@@ -181,9 +181,21 @@ jobs:
 
             echo "Processing PR #$PR_NUM ($PR_ACTION) by @$PR_AUTHOR..."
 
+            # GitHub gives Dependabot-triggered workflows a read-only GITHUB_TOKEN, so
+            # repository edits cannot work for its PRs. Its assignee and labels are set
+            # natively by Dependabot from .github/dependabot.yml instead.
+            IS_DEPENDABOT=0
+            if [ "$PR_AUTHOR" = "dependabot[bot]" ] || [ "$PR_AUTHOR" = "app/dependabot" ]; then
+              IS_DEPENDABOT=1
+            fi
+
             # Assign
             echo "  - Assigning to $ASSIGNEE..."
-            repo_edit "Assigned" pr edit "$PR_NUM" --add-assignee "$ASSIGNEE"
+            if [ "$IS_DEPENDABOT" = "1" ]; then
+              echo "    Skipped: Dependabot sets the assignee from dependabot.yml"
+            else
+              repo_edit "Assigned" pr edit "$PR_NUM" --add-assignee "$ASSIGNEE"
+            fi
 
             # Add to Project and request reviewer (only on open/reopen)
             if [ "$PR_ACTION" = "opened" ] || [ "$PR_ACTION" = "reopened" ]; then
@@ -192,7 +204,9 @@ jobs:
 
               # Request reviewer (GitHub rejects a review request for the PR's own author)
               echo "  - Requesting reviewer..."
-              if [ "$PR_AUTHOR" = "$ASSIGNEE" ]; then
+              if [ "$IS_DEPENDABOT" = "1" ]; then
+                echo "    Skipped: the read-only Dependabot token cannot request reviewers"
+              elif [ "$PR_AUTHOR" = "$ASSIGNEE" ]; then
                 echo "    Reviewer request skipped: @$ASSIGNEE is the PR author"
               else
                 repo_edit "Reviewer requested" pr edit "$PR_NUM" --add-reviewer "$ASSIGNEE"
@@ -203,17 +217,8 @@ jobs:
             if [ "$PR_ACTION" = "opened" ] || [ "$PR_ACTION" = "reopened" ]; then
               echo "  - Adding labels..."
 
-              # Special handling for Dependabot
-              if [ "$PR_AUTHOR" = "dependabot[bot]" ] || [ "$PR_AUTHOR" = "app/dependabot" ]; then
-                LABELS="dependencies"
-                # Detect scope/lang from title for Dependabot
-                if echo "$PR_TITLE" | grep -q "frontend"; then
-                  LABELS=$(printf "%s\nscope:frontend\nlang:javascript" "$LABELS")
-                elif echo "$PR_TITLE" | grep -q "backend"; then
-                  LABELS=$(printf "%s\nscope:backend\nlang:python" "$LABELS")
-                elif echo "$PR_TITLE" | grep -q "actions"; then
-                  LABELS=$(printf "%s\ntype:ci\nscope:deps" "$LABELS")
-                fi
+              if [ "$IS_DEPENDABOT" = "1" ]; then
+                echo "    Skipped: Dependabot applies the labels from dependabot.yml"
               else
                 # Detect files changed
                 FILES=$(detect_files_changed "$PR_NUM")
@@ -223,14 +228,14 @@ jobs:
                 if [ -n "$FILES" ]; then
                   LABELS=$(printf "%s\n%s" "$LABELS" "$(detect_scope_and_lang "$FILES" 0)")
                 fi
-              fi
 
-              # Add each label
-              while IFS= read -r label; do
-                if [ -n "$label" ]; then
-                  repo_edit "Added label: $label" pr edit "$PR_NUM" --add-label "$label"
-                fi
-              done <<< "$LABELS"
+                # Add each label
+                while IFS= read -r label; do
+                  if [ -n "$label" ]; then
+                    repo_edit "Added label: $label" pr edit "$PR_NUM" --add-label "$label"
+                  fi
+                done <<< "$LABELS"
+              fi
             fi
 
             # Handle closed PRs
