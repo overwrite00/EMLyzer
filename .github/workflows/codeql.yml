@@ -7,12 +7,10 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/**"
+  # No `paths` filter on pull_request: the Analyze jobs are required status checks in
+  # the branch rulesets, so they must report on every pull request (see tests.yml).
   pull_request:
     branches: [ main, develop ]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/**"
 
 jobs:
   analyze:

@@ -10,15 +10,11 @@ on:
       - "pyproject.toml"
       - "package.json"
       - "package-lock.json"
+  # No `paths` filter on pull_request: these jobs are required status checks in the
+  # branch rulesets, and a filtered-out workflow never reports, which would leave
+  # documentation-only pull requests blocked forever waiting for them.
   pull_request:
     branches: [develop, main]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/**"
-      - "pyproject.toml"
-      - "package.json"
-      - "package-lock.json"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
