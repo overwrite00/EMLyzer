@@ -6,7 +6,7 @@
 fastapi==0.141.1
 pydantic==2.13.5
 pydantic-settings==2.15.0
-uvicorn[standard]==0.53.0
+uvicorn[standard]==0.54.0
 python-multipart==0.0.32
 
 # Email parsing
@@ -32,7 +32,8 @@ filetype==1.2.0
 python-docx==1.2.0
 
 # Database (SQLAlchemy >= 2.0.36 richiesto per Python 3.13+)
-sqlalchemy==2.0.54
+# L'extra [asyncio] installa greenlet, non più dipendenza di default da SQLAlchemy 2.1
+sqlalchemy[asyncio]==2.1.1
 aiosqlite==0.22.1
 
 # Security / sanitization
@@ -45,7 +46,7 @@ defusedxml==0.7.1
 pytest==9.1.1
 pytest-asyncio==1.4.0
 httpx==0.28.1
-coverage==7.16.1
+coverage==7.16.2
 
 # Language detection
 langdetect==1.0.9

@@ -133,6 +133,7 @@ All dependencies are installed **automatically** during first run via `start.bat
 - **mail-parser** (3.15.0+) — RFC 5322 parser for .eml files
 - **python-oxmsg** (0.0.2+) — Microsoft Outlook .msg parser (MIT license, Unstructured-IO maintained)
 - **beautifulsoup4** (4.14.0+) — HTML parsing and analysis
+- **RTFDE** (optional, LGPL-3.0) — recovers the body of RTF-only Outlook 97-2003 `.msg` files. Not installed by default; run `pip install RTFDE` only if you receive such files. Without it, EMLyzer analyzes the rest of the message and reports that the body could not be read
 
 ### 🌐 URL & Domain Analysis
 - **tldextract** (5.1.0+) — Domain and TLD extraction
@@ -148,7 +149,7 @@ All dependencies are installed **automatically** during first run via `start.bat
 - **aiohttp** (3.9.0+) — Async HTTP for parallel requests
 
 ### 💾 Data Persistence
-- **sqlalchemy** (2.0.34+) — ORM with async support
+- **sqlalchemy[asyncio]** (2.1.1+) — ORM with async support (the `asyncio` extra pulls in `greenlet`, which SQLAlchemy 2.1 no longer installs by default)
 - **aiosqlite** (3.1.0+) — Async SQLite driver
 
 ### 📄 Report Generation
