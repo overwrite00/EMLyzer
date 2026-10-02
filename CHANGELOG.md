@@ -84,9 +84,10 @@ Features are ordered by implementation priority.
 ### Tests
 - Added a synthetic, deterministic Outlook `.msg` fixture
   (`backend/tests/fixtures/sample.msg`, reserved example domains only) and its
-  generator. The previous `.msg` end-to-end test looked for `samples/sample.msg`, a
-  git-ignored directory, so it was skipped everywhere including CI. A test now checks
-  that the committed binary matches the generator output.
+  generator. The previous `.msg` end-to-end test looked for `samples/sample.msg`, which
+  never existed (the tracked `samples/` folder only holds two `.eml` files), so it was
+  skipped everywhere including CI. A test now checks that the committed binary matches
+  the generator output.
 - New tests: full `.msg` field contract, header-analysis results on a `.msg`, an
   LZFu reference vector produced by an independent implementation, invalid RTF
   streams, and RTF-only `.msg` files with and without RTFDE (the HTML, empty and
