@@ -41,6 +41,10 @@ jobs:
           PR_NODE_ID: ${{ github.event.pull_request.node_id }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          # The step-level GH_TOKEN above is the Projects PAT, which cannot edit issues or
+          # PRs. Assignee, reviewer and label edits use the workflow's own token instead
+          # (the permissions block grants it issues/pull-requests write).
+          REPO_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -63,13 +67,26 @@ jobs:
             echo "    Added to Project"
           }
 
+          # Repository edit with the workflow token. A failure is reported as a warning
+          # with gh's own error message; it never fails the job, but it is never hidden.
+          repo_edit() {
+            local description="$1"
+            shift
+            local output
+            if output=$(GH_TOKEN="$REPO_TOKEN" gh "$@" 2>&1); then
+              echo "    $description"
+            else
+              echo "::warning::$description failed: $output"
+            fi
+          }
+
           detect_files_changed() {
             local PR_NUM="$1"
             if [ -z "$PR_NUM" ]; then
               return
             fi
 
-            gh pr diff "$PR_NUM" --name-only 2>/dev/null | grep -E '.*' || true
+            GH_TOKEN="$REPO_TOKEN" gh pr diff "$PR_NUM" --name-only || true
           }
 
           detect_scope_and_lang() {
@@ -142,7 +159,7 @@ jobs:
 
             # Assign
             echo "  - Assigning to $ASSIGNEE..."
-            gh issue edit "$ISSUE_NUM" --add-assignee "$ASSIGNEE" 2>/dev/null && echo "    Assigned" || echo "    Assignment skipped"
+            repo_edit "Assigned" issue edit "$ISSUE_NUM" --add-assignee "$ASSIGNEE"
 
             # Add to Project
             echo "  - Adding to Project..."
@@ -154,7 +171,7 @@ jobs:
             if [ -n "$LABELS" ]; then
               while IFS= read -r label; do
                 if [ -n "$label" ]; then
-                  gh issue edit "$ISSUE_NUM" --add-label "$label" 2>/dev/null && echo "    Added label: $label"
+                  repo_edit "Added label: $label" issue edit "$ISSUE_NUM" --add-label "$label"
                 fi
               done <<< "$LABELS"
             fi
@@ -166,16 +183,20 @@ jobs:
 
             # Assign
             echo "  - Assigning to $ASSIGNEE..."
-            gh pr edit "$PR_NUM" --add-assignee "$ASSIGNEE" 2>/dev/null && echo "    Assigned" || echo "    Assignment skipped"
+            repo_edit "Assigned" pr edit "$PR_NUM" --add-assignee "$ASSIGNEE"
 
             # Add to Project and request reviewer (only on open/reopen)
             if [ "$PR_ACTION" = "opened" ] || [ "$PR_ACTION" = "reopened" ]; then
               echo "  - Adding to Project..."
               add_to_project "$PR_NODE_ID"
 
-              # Request reviewer
+              # Request reviewer (GitHub rejects a review request for the PR's own author)
               echo "  - Requesting reviewer..."
-              gh pr edit "$PR_NUM" --add-reviewer "$ASSIGNEE" 2>/dev/null && echo "    Reviewer requested" || echo "    Reviewer request skipped"
+              if [ "$PR_AUTHOR" = "$ASSIGNEE" ]; then
+                echo "    Reviewer request skipped: @$ASSIGNEE is the PR author"
+              else
+                repo_edit "Reviewer requested" pr edit "$PR_NUM" --add-reviewer "$ASSIGNEE"
+              fi
             fi
 
             # Label on open/reopen
@@ -207,7 +228,7 @@ jobs:
               # Add each label
               while IFS= read -r label; do
                 if [ -n "$label" ]; then
-                  gh pr edit "$PR_NUM" --add-label "$label" 2>/dev/null && echo "    Added label: $label" || true
+                  repo_edit "Added label: $label" pr edit "$PR_NUM" --add-label "$label"
                 fi
               done <<< "$LABELS"
             fi
