@@ -7,6 +7,7 @@ Eseguire con: pytest tests/ -v
 
 import sys
 import os
+import hashlib
 from pathlib import Path
 
 # Aggiungi backend al path
@@ -1193,21 +1194,36 @@ class TestMsgBackend:
         assert isinstance(result.body_text, str)
 
     def test_msg_parsing_via_email_parser(self):
-        """Full .msg parsing via parse_email_file (if sample available)."""
-        samples_dir = Path(__file__).parent.parent.parent / "samples"
-        msg_sample = samples_dir / "sample.msg"
-
-        if not msg_sample.exists():
-            pytest.skip(f"Sample .msg not found: {msg_sample}")
-
-        raw = msg_sample.read_bytes()
+        """Full .msg parsing via parse_email_file against the synthetic fixture."""
+        raw = (Path(__file__).parent / "fixtures" / "sample.msg").read_bytes()
         parsed = parse_email_file(raw, "sample.msg")
 
-        # Should not crash and should return ParsedEmail
         assert isinstance(parsed, ParsedEmail)
-        # Core fields should be populated (may be empty if .msg is minimal)
-        assert isinstance(parsed.mail_from, str)
-        assert isinstance(parsed.body_text, str)
+        assert parsed.parse_errors == []
+        assert "billing@example.com" in parsed.mail_from
+        assert parsed.mail_subject == "Urgent: verify your account"
+        assert "suspended within 24 hours" in parsed.body_text
+        assert "http://example.com/verify" in parsed.body_html
+
+        expected = b"Synthetic attachment content for EMLyzer parser tests.\n"
+        assert len(parsed.attachments) == 1
+        att = parsed.attachments[0]
+        assert att["filename"] == "invoice.txt"
+        assert att["declared_mime"] == "text/plain"
+        assert att["data"] == expected
+        assert att["size_bytes"] == len(expected)
+        assert att["hash_sha256"] == hashlib.sha256(expected).hexdigest()
+
+    def test_msg_sample_matches_generator(self):
+        """The committed binary fixture must be exactly what its generator produces."""
+        import importlib.util
+
+        fixtures = Path(__file__).parent / "fixtures"
+        spec = importlib.util.spec_from_file_location("make_sample_msg", fixtures / "make_sample_msg.py")
+        generator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(generator)
+
+        assert (fixtures / "sample.msg").read_bytes() == generator.build_sample()
 
     def test_msg_rtf_only_warning(self):
         """RTF-only .msg should populate errors with RTF warning (if RTFDE not installed)."""
