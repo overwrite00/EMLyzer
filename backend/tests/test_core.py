@@ -1205,6 +1205,22 @@ class TestMsgBackend:
         assert "suspended within 24 hours" in parsed.body_text
         assert "http://example.com/verify" in parsed.body_html
 
+        # Recipients come from the MAPI recipient table (type 1 = To, 2 = Cc)
+        assert parsed.mail_to == ["user@example.org"]
+        assert parsed.mail_cc == ["cc@example.org"]
+
+        # Everything below lives only in the RFC 822 transport headers of the .msg
+        assert parsed.spf_result == "fail"
+        assert parsed.dkim_result == "none"
+        assert parsed.dmarc_result == "fail"
+        assert parsed.message_id == "<synthetic-sample-0001@example.com>"
+        assert parsed.return_path == "<billing@example.com>"
+        assert parsed.reply_to == "<replies@example.net>"
+        assert parsed.x_mailer == "Synthetic Sample Generator"
+        assert len(parsed.received_chain) == 1
+        assert len(parsed.auth_results_raw) == 1
+        assert "authentication-results" in parsed.raw_headers
+
         expected = b"Synthetic attachment content for EMLyzer parser tests.\n"
         assert len(parsed.attachments) == 1
         att = parsed.attachments[0]
@@ -1214,27 +1230,125 @@ class TestMsgBackend:
         assert att["size_bytes"] == len(expected)
         assert att["hash_sha256"] == hashlib.sha256(expected).hexdigest()
 
-    def test_msg_sample_matches_generator(self):
-        """The committed binary fixture must be exactly what its generator produces."""
+    def test_msg_authentication_failures_reach_header_analysis(self):
+        """Auth results found in a .msg's transport headers must drive header scoring."""
+        raw = (Path(__file__).parent / "fixtures" / "sample.msg").read_bytes()
+        result = analyze_headers(parse_email_file(raw, "sample.msg"))
+
+        assert (result.spf_result, result.dkim_result, result.dmarc_result) == ("fail", "none", "fail")
+        assert not result.spf_ok and not result.dkim_ok and not result.dmarc_ok
+        assert len(result.identity_mismatches) > 0  # Reply-To domain differs from From
+
+    @staticmethod
+    def _msg_generator():
         import importlib.util
 
-        fixtures = Path(__file__).parent / "fixtures"
-        spec = importlib.util.spec_from_file_location("make_sample_msg", fixtures / "make_sample_msg.py")
-        generator = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(generator)
+        path = Path(__file__).parent / "fixtures" / "make_sample_msg.py"
+        spec = importlib.util.spec_from_file_location("make_sample_msg", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
 
-        assert (fixtures / "sample.msg").read_bytes() == generator.build_sample()
+    def test_msg_sample_matches_generator(self):
+        """The committed binary fixture must be exactly what its generator produces."""
+        sample = Path(__file__).parent / "fixtures" / "sample.msg"
+        assert sample.read_bytes() == self._msg_generator().build_sample()
 
-    def test_msg_rtf_only_warning(self):
-        """RTF-only .msg should populate errors with RTF warning (if RTFDE not installed)."""
-        from core.analysis.msg_backends import get_msg_backend, OxMsgBackend
+    def test_msg_header_derived_fields_cover_parsed_email(self):
+        """Every ParsedEmail field must be classified, so none is silently dropped for .msg files."""
+        import dataclasses
+        from core.analysis.email_parser import _MSG_HEADER_DERIVED_FIELDS
 
-        # This test verifies the warning mechanism
-        # A real RTF-only .msg would trigger the warning
-        backend = get_msg_backend()
-        if backend is None or not isinstance(backend, OxMsgBackend):
-            pytest.skip("OxMsgBackend not available")
+        from_mapi_file_or_body = {
+            "filename", "file_size_bytes", "file_hash_md5", "file_hash_sha1", "file_hash_sha256",
+            "mail_from", "mail_to", "mail_cc", "mail_subject", "mail_date",
+            "body_text", "body_html", "attachments", "parse_errors",
+        }
+        all_fields = {f.name for f in dataclasses.fields(ParsedEmail)}
+        assert all_fields == set(_MSG_HEADER_DERIVED_FIELDS) | from_mapi_file_or_body
 
-        # We can't easily create a synthetic RTF-only .msg without OleFile manipulation
-        # This test documents the expected behavior
-        # In practice, RTF-only warnings are caught during real .msg parsing
+    RTF_TEXT = (rb"{\rtf1\ansi\ansicpg1252\fromtext \deff0{\fonttbl{\f0\fnil\fcharset0 Calibri;}}"
+                rb"\pard Hello RTF body\par }")
+
+    def test_msg_rtf_decompression_reference_vector(self):
+        """LZFu stream with back-references, produced by the independent `compressed-rtf` package."""
+        from core.analysis.msg_backends import decompress_rtf
+
+        vector = bytes.fromhex(
+            "74000000380100004c5a4675b94cdcdc03000a0072637067313235e23203437465780541010301f713"
+            "02a7020063680ac0736574c83020430740696205100280c27d0af32048656c090007f0c854462006e0"
+            "64790aa30291ff0d1f0e2f0f3f104f115f0900128f0d1f7f0e2f0f3f104f115f0900128d2070"
+        )
+        assert decompress_rtf(vector) == self.RTF_TEXT * 3
+
+    def test_msg_rtf_decompression_rejects_invalid_streams(self):
+        from core.analysis.msg_backends import decompress_rtf
+
+        good = self._msg_generator().lzfu_literals_only(self.RTF_TEXT)
+        assert decompress_rtf(good) == self.RTF_TEXT
+        with pytest.raises(ValueError):
+            decompress_rtf(b"short")
+        with pytest.raises(ValueError):
+            decompress_rtf(good[:8] + b"XXXX" + good[12:])  # unknown signature
+        with pytest.raises(ValueError):
+            decompress_rtf(good[:-6])  # truncated before the end marker
+
+    def test_msg_rtf_only_without_rtfde_reports_clear_error(self, monkeypatch):
+        """RTFDE is an optional dependency: its absence must be reported, not hidden."""
+        monkeypatch.setitem(sys.modules, "RTFDE", None)  # makes `import RTFDE...` raise ImportError
+        raw = self._msg_generator().build_rtf_only_sample(self.RTF_TEXT)
+        parsed = parse_email_file(raw, "rtf_only.msg")
+
+        assert parsed.body_text == "" and parsed.body_html == ""
+        assert any("Install RTFDE" in e for e in parsed.parse_errors)
+
+    def test_msg_rtf_only_body_recovered_with_rtfde(self):
+        """Against the real RTFDE package (installed in CI; skipped locally if absent)."""
+        pytest.importorskip("RTFDE", reason="optional LGPL dependency, installed only by the CI test job")
+        raw = self._msg_generator().build_rtf_only_sample(self.RTF_TEXT)
+        parsed = parse_email_file(raw, "rtf_only.msg")
+
+        assert parsed.parse_errors == []
+        assert "Hello RTF body" in parsed.body_text
+
+    @staticmethod
+    def _stub_rtfde(monkeypatch, *, content_type="text", text=None, html=None, error=None):
+        """Replace RTFDE with a stub so our own handling is tested whether or not it is installed."""
+        import types
+
+        class DeEncapsulator:
+            def __init__(self, rtf):
+                self.content_type, self.text, self.html = content_type, text, html
+
+            def deencapsulate(self):
+                if error:
+                    raise error
+
+        module = types.ModuleType("RTFDE.deencapsulate")
+        module.DeEncapsulator = DeEncapsulator
+        monkeypatch.setitem(sys.modules, "RTFDE", types.ModuleType("RTFDE"))
+        monkeypatch.setitem(sys.modules, "RTFDE.deencapsulate", module)
+
+    def test_msg_rtf_only_html_body_is_decoded(self, monkeypatch):
+        # b"\xe9" is not valid UTF-8: the Windows-1252 fallback must kick in
+        self._stub_rtfde(monkeypatch, content_type="html", html=b"<p>caf\xe9</p>")
+        raw = self._msg_generator().build_rtf_only_sample(self.RTF_TEXT)
+        parsed = parse_email_file(raw, "rtf_only.msg")
+
+        assert parsed.body_html == "<p>café</p>"
+        assert parsed.body_text == ""
+        assert parsed.parse_errors == []
+
+    def test_msg_rtf_only_without_content_reports_error(self, monkeypatch):
+        self._stub_rtfde(monkeypatch, content_type="text", text=b"")
+        raw = self._msg_generator().build_rtf_only_sample(self.RTF_TEXT)
+        parsed = parse_email_file(raw, "rtf_only.msg")
+
+        assert any("no encapsulated text or HTML" in e for e in parsed.parse_errors)
+
+    def test_msg_rtf_deencapsulation_failure_is_reported(self, monkeypatch):
+        self._stub_rtfde(monkeypatch, error=RuntimeError("boom"))
+        raw = self._msg_generator().build_rtf_only_sample(self.RTF_TEXT)
+        parsed = parse_email_file(raw, "rtf_only.msg")
+
+        assert any("de-encapsulation failed: boom" in e for e in parsed.parse_errors)

@@ -288,6 +288,36 @@ def build_sample() -> bytes:
     return build_cfb(Node("Root Entry", children=children))
 
 
+_RTF_INIT_DICT_LEN = 207  # size of the LZFu initial dictionary (MS-OXRTFCP)
+
+
+def lzfu_literals_only(rtf: bytes) -> bytes:
+    """Wrap `rtf` in a valid LZFu stream that uses literals only, plus the end marker."""
+    marker = struct.pack(">H", ((_RTF_INIT_DICT_LEN + len(rtf)) % 4096) << 4)
+    payload = bytearray()
+    for start in range(0, len(rtf), 8):
+        chunk = rtf[start:start + 8]
+        if len(chunk) < 8:  # end marker follows the last literal inside the same control group
+            payload += bytes([1 << len(chunk)]) + chunk + marker
+            break
+        payload += b"\x00" + chunk
+    else:  # no partial group: the end marker opens a new control group
+        payload += b"\x01" + marker
+    return struct.pack("<II4sI", len(payload) + 12, len(rtf), b"LZFu", 0) + bytes(payload)
+
+
+def build_rtf_only_sample(rtf: bytes) -> bytes:
+    """Outlook 97-2003 style .msg: only PidTagRtfCompressed, no plain-text or HTML body."""
+    props = (
+        Props()
+        .string(0x001A, "IPM.Note")
+        .string(0x0037, "RTF only message")
+        .binary(0x1009, lzfu_literals_only(rtf))
+    )
+    header = struct.pack("<8x4I8x", 0, 0, 0, 0)
+    return build_cfb(Node("Root Entry", children=props.nodes(header)))
+
+
 if __name__ == "__main__":
     target = Path(__file__).with_name("sample.msg")
     target.write_bytes(build_sample())

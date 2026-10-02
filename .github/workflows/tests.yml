@@ -45,6 +45,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
+          # RTFDE (LGPL-3.0) is an optional runtime dependency, deliberately not in
+          # requirements.txt. Install it for the test job only, so the end-to-end test
+          # of the RTF-only .msg path runs against the real library instead of skipping.
+          pip install RTFDE==0.1.2.2
 
       - name: Run pytest with coverage
         run: |

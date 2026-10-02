@@ -133,6 +133,7 @@ All dependencies are installed **automatically** during first run via `start.bat
 - **mail-parser** (3.15.0+) — RFC 5322 parser for .eml files
 - **python-oxmsg** (0.0.2+) — Microsoft Outlook .msg parser (MIT license, Unstructured-IO maintained)
 - **beautifulsoup4** (4.14.0+) — HTML parsing and analysis
+- **RTFDE** (optional, LGPL-3.0) — recovers the body of RTF-only Outlook 97-2003 `.msg` files. Not installed by default; run `pip install RTFDE` only if you receive such files. Without it, EMLyzer analyzes the rest of the message and reports that the body could not be read
 
 ### 🌐 URL & Domain Analysis
 - **tldextract** (5.1.0+) — Domain and TLD extraction

@@ -22,6 +22,77 @@ Features are ordered by implementation priority.
 
 ---
 
+## [0.17.2] — 2026-10-02
+
+### Fixed
+- **`.msg` files lost their recipients and every transport-header field**: three
+  independent bugs in `msg_backends.py` / `email_parser._parse_msg`, all hidden by
+  bare `except:` clauses, so they failed silently:
+  - recipients were read from `recip.email`, which does not exist in python-oxmsg
+    (the attribute is `email_address`): `mail_to`/`mail_cc` were always empty;
+  - the raw transport headers were read with `msg.properties.get(...)`, a method
+    `Properties` does not have, so they were always empty: SPF/DKIM/DMARC,
+    `Message-ID` and the `Received` chain were never extracted from a `.msg`, and
+    header scoring ran with no authentication data at all (the "transport headers
+    bonus" announced in 0.16.0 never worked);
+  - even when headers were available, only 6 of the 18 header-derived fields were
+    copied into `ParsedEmail`: `Reply-To`, `Return-Path`, `X-Mailer`,
+    `X-Originating-IP`, `X-Campaign-ID`, `List-Unsubscribe`, the raw
+    authentication/DKIM/SPF/ARC headers were dropped.
+  All of them are now read correctly, the bare `except:` clauses are gone (failures
+  are logged and reported in `parse_errors`), and a test fails if a new `ParsedEmail`
+  field is added without being classified for `.msg` parsing.
+  Analyses of `.msg` files made before this release keep their old, incomplete
+  results: use "Ri-analizza" to recompute them.
+- **RTF-only `.msg` bodies (Outlook 97-2003) could never be recovered**: the code
+  imported a class (`from RTFDE import RTFDE`) that does not exist, and reported the
+  resulting `ImportError` as "RTFDE not installed" even when it was. The compressed
+  RTF (`PidTagRtfCompressed`) is now decompressed (MS-OXRTFCP, "LZFu" and "MELA") and
+  de-encapsulated through the real RTFDE API. RTFDE remains an optional dependency.
+  The RTF fallback no longer fires for `.msg` files that already have an HTML body.
+- **SQLAlchemy 2.1 broke the async engine**: 2.1 no longer installs `greenlet`, which
+  `sqlalchemy.ext.asyncio` needs at import time. `requirements.txt` now pins
+  `sqlalchemy[asyncio]==2.1.1`.
+
+### Security
+- Frontend development dependency `brace-expansion` 5.0.9 → 5.0.12, resolving three
+  high-severity denial-of-service advisories (GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7,
+  GHSA-6j4f-fj2g-mc7p). It is pulled in by ESLint and is not part of the production bundle.
+
+### Dependencies
+- Backend: uvicorn 0.52.4 → 0.54.0, SQLAlchemy 2.0.52 → 2.1.1 (now with the `asyncio`
+  extra), urllib3 2.7.0 → 2.8.0, coverage 7.16.0 → 7.16.2
+- Frontend runtime: lucide-react 1.44.0 → 1.48.0, react-router-dom 7.18.3 → 7.18.4
+- Frontend development: ESLint 10.10.0 → 10.11.0, Vite 8.3.0 → 8.3.1,
+  eslint-plugin-react-refresh 0.5.6 → 0.5.7
+
+### CI
+- The test job installs RTFDE (LGPL-3.0, pinned) so the end-to-end RTF-only `.msg`
+  test runs against the real library instead of being skipped. RTFDE stays out of
+  `requirements.txt`: it is optional and is not distributed with EMLyzer.
+- Dependabot now checks pip and npm monthly instead of weekly.
+- Project automation: assignee, reviewer and label assignment had been failing silently
+  on every pull request (the repository-scoped edits were made with the Projects-only
+  token and their errors were discarded). Repository edits now use the workflow's own
+  token, only the Projects mutation uses `GH_PROJECT_TOKEN`, and failures are reported
+  instead of hidden.
+
+### Tests
+- Added a synthetic, deterministic Outlook `.msg` fixture
+  (`backend/tests/fixtures/sample.msg`, reserved example domains only) and its
+  generator. The previous `.msg` end-to-end test looked for `samples/sample.msg`, a
+  git-ignored directory, so it was skipped everywhere including CI. A test now checks
+  that the committed binary matches the generator output.
+- New tests: full `.msg` field contract, header-analysis results on a `.msg`, an
+  LZFu reference vector produced by an independent implementation, invalid RTF
+  streams, and RTF-only `.msg` files with and without RTFDE (the HTML, empty and
+  failure branches use a stub, so they run everywhere). The placeholder
+  `test_msg_rtf_only_warning`, which asserted nothing, was removed.
+- 199 tests pass in CI. The end-to-end RTFDE test is skipped on a machine without the
+  optional package (198 pass, 1 skipped).
+
+---
+
 ## [0.17.1] — 2026-09-15
 
 ### Fixed
