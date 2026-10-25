@@ -23,6 +23,7 @@ import requests
 from dataclasses import dataclass, field
 from utils.config import settings
 from core.intel import feeds as intel_feeds
+from core.intel.fetch import FetchError, check_url_safety
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,33 @@ REQUEST_TIMEOUT      = 8    # servizi di sicurezza (AbuseIPDB, VirusTotal, ecc.)
 REQUEST_TIMEOUT_ASN  = 4    # ASN lookup
 REQUEST_TIMEOUT_INFO = 8    # servizi informativi (crt.sh, redirect chain) — crt.sh può essere molto lento
 REQUEST_TIMEOUT_PULSEDIVE = 15  # Pulsedive può essere lento (free tier: 10 req/day, rate limit aggressivo)
+
+
+def normalize_url_host(url: str) -> str:
+    """Estrae un hostname normalizzato senza alterare prefissi validi.
+
+    ``urlparse().hostname`` gestisce correttamente porte, userinfo e IPv6;
+    ``removeprefix`` rimuove solo l'etichetta ``www.`` completa.
+    """
+    try:
+        return (urllib.parse.urlparse(url).hostname or "").lower().removeprefix("www.")
+    except (TypeError, ValueError):
+        return ""
+
+
+def _redacted_url(url: str) -> str:
+    """URL adatto a log/UI: niente credenziali, query o frammenti."""
+    try:
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.hostname or ""
+        if not host:
+            return "<invalid>"
+        display_host = f"[{host}]" if ":" in host else host
+        if parsed.port is not None:
+            display_host = f"{display_host}:{parsed.port}"
+        return urllib.parse.urlunparse((parsed.scheme, display_host, parsed.path, "", "", ""))
+    except (TypeError, ValueError):
+        return "<invalid>"
 
 # v0.17: la disk cache di OpenPhish/Spamhaus è stata spostata in
 # core/intel/cache.py (versionata, con sanity check pre-swap) e il loro
@@ -1059,7 +1087,7 @@ def check_url_urlscan(url: str) -> ReputationResult:
     URLSCAN_API_KEY opzionale per search (ma aumenta il rate limit).
     """
     try:
-        host = urllib.parse.urlparse(url).netloc.split(":")[0].lstrip("www.")
+        host = normalize_url_host(url)
         if not host:
             return ReputationResult(
                 source="URLScan.io", entity=url, entity_type="url",
@@ -1082,7 +1110,7 @@ def check_url_urlscan(url: str) -> ReputationResult:
     has_api_key = bool(settings.URLSCAN_API_KEY)
 
     # Diagnostic logging (v0.14.3+): Log request details (NO sensitive data exposed)
-    logger.debug(f"[URLScan.io] Processing URL: {url}, host: {host}, is_ip: {is_ip}, query: {query}")
+    logger.debug("[URLScan.io] Processing host=%s, is_ip=%s", host, is_ip)
 
     try:
         resp = _http_get_with_retry(
@@ -1095,7 +1123,7 @@ def check_url_urlscan(url: str) -> ReputationResult:
         )
         if resp.status_code == 401:
             # Diagnostic logging per 401 error
-            logger.warning(f"URLScan.io 401 Unauthorized for {url}")
+            logger.warning("URLScan.io 401 Unauthorized for host=%s", host)
             if has_api_key:
                 return ReputationResult(
                     source="URLScan.io", entity=url, entity_type="url",
@@ -1111,7 +1139,7 @@ def check_url_urlscan(url: str) -> ReputationResult:
         # Phase 2B: Fallback retry senza API-Key header se HTTP 403 con API key (v0.14.3+)
         # URLScan.io rifiuta custom sort values senza auth. Rimuovi sort per retry pubblico
         if resp.status_code == 403 and has_api_key:
-            logger.debug(f"URLScan.io HTTP 403 con API-Key header, ritentando senza sort param per {url}")
+            logger.debug("URLScan.io HTTP 403, retry without sort for host=%s", host)
             resp = _http_get_with_retry(
                 "https://urlscan.io/api/v1/search/",
                 params={
@@ -1124,9 +1152,9 @@ def check_url_urlscan(url: str) -> ReputationResult:
                 rate_key="urlscan",
             )
             if resp.status_code == 200:
-                logger.debug(f"URLScan.io: retry senza sort riuscito per {url}")
+                logger.debug("URLScan.io retry without sort succeeded for host=%s", host)
             else:
-                logger.debug(f"URLScan.io: retry senza sort fallito (HTTP {resp.status_code}) per {url}")
+                logger.debug("URLScan.io retry without sort failed (HTTP %s) for host=%s", resp.status_code, host)
 
         resp.raise_for_status()
         data = resp.json()
@@ -1169,7 +1197,7 @@ def check_url_urlscan(url: str) -> ReputationResult:
         except Exception:
             pass
 
-        logger.warning(f"URLScan.io HTTP {code} for {url}. Response: {body}")
+        logger.warning("URLScan.io HTTP %s for host=%s. Response: %s", code, host, body)
 
         # Categorize error and provide service-specific message
         error_type, error_msg = _categorize_error(e, code, has_api_key=has_api_key)
@@ -1191,7 +1219,7 @@ def check_url_urlscan(url: str) -> ReputationResult:
     except Exception as exc:
         # Categorize error type
         error_type, error_msg = _categorize_error(exc)
-        logger.exception(f"URLScan.io error for {url}: {type(exc).__name__}")
+        logger.exception("URLScan.io error for host=%s: %s", host, type(exc).__name__)
         return ReputationResult(
             source="URLScan.io", entity=url, entity_type="url",
             error_type=error_type,
@@ -1513,41 +1541,73 @@ def check_url_redirect_chain(url: str) -> ReputationResult:
     Utile per URL shortener (bit.ly, t.co, ecc.) che nascondono la destinazione.
     """
     r = ReputationResult(source="Redirect Chain", entity=url, entity_type="url", queried=True)
+    response = None
     try:
         _rate_limit("redirectchain")
-        resp = requests.get(
-            url,
-            headers={
-                "User-Agent": f"Mozilla/5.0 (compatible; EMLyzer/{settings.VERSION})",
-                "Accept": "text/html,application/xhtml+xml,*/*",
-            },
-            allow_redirects=True,
-            timeout=REQUEST_TIMEOUT_INFO,
-            stream=True,   # non scarica il body
-        )
-        resp.close()
+        current_url = url
+        previous_scheme = None
+        chain: list[str] = []
+        max_redirects = 5
 
-        chain = [str(r.url) for r in resp.history] + [str(resp.url)]
-        final = str(resp.url)
+        while True:
+            check_url_safety(current_url, previous_scheme=previous_scheme)
+            response = requests.get(
+                current_url,
+                headers={
+                    "User-Agent": f"Mozilla/5.0 (compatible; EMLyzer/{settings.VERSION})",
+                    "Accept": "text/html,application/xhtml+xml,*/*",
+                },
+                allow_redirects=False,
+                timeout=REQUEST_TIMEOUT_INFO,
+                stream=True,
+            )
+            effective_url = str(response.url or current_url)
+            chain.append(_redacted_url(effective_url))
+
+            if not response.is_redirect:
+                response.close()
+                response = None
+                final = effective_url
+                break
+
+            if len(chain) > max_redirects:
+                raise FetchError("too_many_redirects", "Troppi redirect")
+
+            location = response.headers.get("Location", "")
+            if not location:
+                raise FetchError("malformed_response", "Redirect senza destinazione")
+            next_url = urllib.parse.urljoin(effective_url, location)
+            previous_scheme = urllib.parse.urlparse(effective_url).scheme
+            check_url_safety(next_url, previous_scheme=previous_scheme)
+            response.close()
+            response = None
+            current_url = next_url
 
         if len(chain) <= 1:
-            r.detail = f"Nessun redirect — URL finale: {final}"
+            r.detail = f"Nessun redirect — URL finale: {_redacted_url(final)}"
         else:
             hops = " → ".join(chain)
             r.detail = f"{len(chain)-1} redirect: {hops[:300]}"
             # Se la destinazione finale è diversa dall'originale, segnala
             if final != url:
                 r.confidence = 50.0  # neutro ma merita attenzione
+    except FetchError as e:
+        r.error_type = e.category
+        r.error = e.message
     except requests.exceptions.SSLError as e:
         error_type, error_msg = _categorize_error(e)
         r.error_type = error_type
         r.error = error_msg
     except requests.exceptions.ConnectionError as e:
-        r.error = f"Connessione fallita: {e}"
+        r.error_type = "connection_error"
+        r.error = "Connessione fallita"
     except Exception as e:
         error_type, error_msg = _categorize_error(e)
         r.error_type = error_type
         r.error = error_msg
+    finally:
+        if response is not None:
+            response.close()
     return r
 
 
@@ -2187,17 +2247,17 @@ def _build_flat_tasks(
         # Redirect chain — solo shortener o HTTP
         try:
             parsed = urllib.parse.urlparse(url)
-            host = parsed.netloc.lower().lstrip("www.")
+            host = normalize_url_host(url)
             if host in URL_SHORTENERS or parsed.scheme == "http":
                 _c(check_url_redirect_chain, url, "url")
         except Exception:
             pass
         # crt.sh e CIRCL Passive DNS — solo domini (non IP diretti)
         try:
-            host = urllib.parse.urlparse(url).netloc.split(":")[0]
+            host = normalize_url_host(url)
             ipaddress.ip_address(host)   # se è un IP → ValueError → salta
         except ValueError:
-            domain = host.lstrip("www.")
+            domain = host
             if domain:
                 _c(check_domain_crtsh, domain, "domain")
                 if settings.CIRCL_API_KEY:

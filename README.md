@@ -98,6 +98,8 @@ Email (.eml / .msg / plain text)
 
 ## 🔧 Version
 
+**v0.17.3** — 🔒 Security and correctness release: resolves the open frontend dependency advisories for Vite, `source-map-js`, `follow-redirects` and Zod; protects the URLScan diagnostic endpoint; blocks SSRF in redirect-chain analysis; anchors the bundled NLP model to a reviewed SHA-256 digest; fixes hostname extraction in reputation checks; and restores CodeQL result uploads on pull requests while pinning GitHub Actions to full commit SHAs. The suite contains 214 tests (213 pass locally and 1 optional RTFDE test is skipped).
+
 **v0.17.2** — 🛠️ Bugfix release for Outlook `.msg` files: recipients, SPF/DKIM/DMARC results, `Message-ID`, the `Received` chain and the other transport-header fields were silently dropped, so header scoring ran without authentication data (re-analyze older `.msg` analyses to recompute them); RTF-only `.msg` bodies (Outlook 97-2003) are now recoverable with the optional RTFDE package. Also: SQLAlchemy 2.1 with the `asyncio` extra, a high-severity dev-dependency advisory (`brace-expansion`) resolved, other dependency updates, and a repaired project-automation workflow. All 199 tests passing ✅ in CI (the one end-to-end test that needs the optional RTFDE package is skipped where it is not installed), zero regressions.
 
 **v0.17.1** — 🐛 Follow-up to the Threat Intelligence release: fixed CERT-AGID bulletins not loading on first visit, added example placeholders and a collapsible mini-guide to the known-campaign form, and added a "Ri-analizza" (Re-analyze) button so an already-analyzed email can pick up a known campaign created or edited afterward. Documented the whole Threat Intelligence panel in `docs/USAGE.md`.
@@ -216,5 +218,5 @@ Distributed with MIT License · [View License](LICENSE)
 
 ---
 
-*Last updated: 2026-09-15*
+*Last updated: 2026-10-25*
 *← [Contributing](./CONTRIBUTING.md) | [Docs →](./docs/)*

@@ -22,6 +22,52 @@ Features are ordered by implementation priority.
 
 ---
 
+## [0.17.3] — 2026-10-25
+
+### Security
+
+- Frontend dependency fixes: `source-map-js` 1.2.1 → 1.2.2, Vite 8.3.1 →
+  8.3.5, and `follow-redirects` 1.16.0 → 1.16.1 resolve all nine open
+  Dependabot alerts (denial of service, development-server command/path issues,
+  and cross-origin credential-header disclosure).
+- Updated transitive development dependency Zod 4.3.6 → 4.6.7, resolving an
+  additional high-severity memory-exhaustion advisory detected by `npm audit`
+  before GitHub opened a repository alert.
+- The URLScan diagnostic endpoint now requires a loopback client or the admin
+  token, is limited to two requests per minute, and performs its blocking HTTP
+  diagnostics in a worker thread instead of blocking FastAPI's event loop.
+- Redirect-chain analysis now validates the initial URL and every redirect hop,
+  blocks loopback/private/link-local/reserved destinations, limits redirect
+  depth, and removes credentials and query tokens from its result detail.
+- Replaced the ineffective model-file HMAC (whose public, filename-derived key
+  provided no authenticity) with a release-anchored SHA-256 digest checked
+  before `pickle.loads`. Retraining now prints the digest that must be reviewed.
+- Pinned every GitHub Action to a reviewed full commit SHA. CodeQL now uploads
+  SARIF on pull requests instead of reporting a green check without publishing
+  its findings.
+
+### Fixed
+
+- Reputation hostname extraction now uses `urlparse().hostname` and an exact
+  `www.` prefix removal. Hosts such as `web.example.com`, URLs with userinfo or
+  ports, and IPv6 literals are no longer mangled before URLScan, redirect-chain,
+  crt.sh, CIRCL or SecurityTrails checks.
+- Reputation and URL-analysis logs no longer record full URLs, avoiding leakage
+  of userinfo, query tokens and fragments into application logs.
+- Corrected the Dependabot configuration comments: security updates always
+  target GitHub's default branch, so they must be reproduced and validated on
+  permanent `develop` before promotion to `main`.
+
+### Tests
+
+- Added regression coverage for hostname normalization and trusted-model digest
+  validation.
+- Backend suite: 213 passed, 1 skipped without the optional RTFDE package.
+- `npm audit` and `npm audit --omit=dev` report zero vulnerabilities; the Python
+  requirements report no known vulnerabilities with `pip-audit`.
+
+---
+
 ## [0.17.2] — 2026-10-02
 
 ### Fixed
