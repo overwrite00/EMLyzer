@@ -56,3 +56,6 @@ AGENTS.md
 
 # Log
 *.log
+
+# Dump temporanei di risposte API usati durante la diagnostica
+backend/*temprep*.json
