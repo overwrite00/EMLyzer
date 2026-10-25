@@ -24,6 +24,7 @@ Output:
 import csv
 import json
 import pickle
+import hashlib
 import logging
 from pathlib import Path
 from typing import List, Tuple, Dict
@@ -240,6 +241,12 @@ class TabularNLPRetrainer:
             with open(output_path, 'wb') as f:
                 pickle.dump(model_data, f)
             logger.info(f"Model saved to {output_path}")
+            model_sha256 = hashlib.sha256(Path(output_path).read_bytes()).hexdigest()
+            logger.info(
+                "Model SHA-256: %s (review and update _TABULAR_MODEL_SHA256 in "
+                "core/analysis/nlp_classifier.py before committing a retrained model)",
+                model_sha256,
+            )
             return True
         except Exception as e:
             logger.error(f"Failed to save model: {e}")

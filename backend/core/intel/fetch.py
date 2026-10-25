@@ -77,7 +77,7 @@ def _is_unsafe_host(hostname: str) -> bool:
     return False
 
 
-def _check_url_safety(url: str, *, previous_scheme: str | None = None) -> None:
+def check_url_safety(url: str, *, previous_scheme: str | None = None) -> None:
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme != "https":
         if previous_scheme == "https" and parsed.scheme == "http":
@@ -108,7 +108,7 @@ def fetch_bytes(
     deadline = deadline if deadline is not None else settings.INTEL_DOWNLOAD_DEADLINE
     started = time.monotonic()
 
-    _check_url_safety(url)
+    check_url_safety(url)
 
     try:
         resp = requests.get(
@@ -135,7 +135,7 @@ def fetch_bytes(
         if not location:
             break
         next_url = urllib.parse.urljoin(resp.url, location)
-        _check_url_safety(next_url, previous_scheme=current_scheme)
+        check_url_safety(next_url, previous_scheme=current_scheme)
         current_scheme = urllib.parse.urlparse(next_url).scheme
         try:
             resp = requests.get(

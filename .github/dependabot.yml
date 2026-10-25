@@ -1,7 +1,8 @@
 version: 2
 
-# Dependabot auto-creates PRs against `develop` (not `main`).
-# `main` is reserved for releases and is protected — all updates flow through develop.
+# Gli aggiornamenti di versione puntano a `develop`. GitHub forza invece le PR di
+# sicurezza Dependabot sul branch predefinito (`main`): vanno replicate su `develop`,
+# validate e promosse con la normale PR develop -> main; la PR bot viene poi chiusa.
 # Configuration strategy:
 # - production deps: minor/patch updates auto-applied (fasttrack)
 # - dev deps: only minor/patch (no majors — prevents breaking CI changes)

@@ -26,6 +26,14 @@ from utils.i18n import t
 _logger = logging.getLogger(__name__)
 
 
+def _safe_log_host(url: str) -> str:
+    """Restituisce solo l'host per i log, senza credenziali, query o frammenti."""
+    try:
+        return urllib.parse.urlparse(url).hostname or "<invalid>"
+    except (TypeError, ValueError):
+        return "<invalid>"
+
+
 # URL shortener noti (stesso set usato in body_analyzer).
 # Rilevamento shortener è indicatore di URL offuscato → rischio MEDIUM.
 URL_SHORTENER_DOMAINS = {
@@ -311,7 +319,7 @@ def _analyze_single_url(
                 "description": t("url.malicious_cdn", cdn=cdn_check["cdn"]),
                 "evidence": f"CDN: {cdn_check['cdn']} — {cdn_check['reason']}",
             })
-            _logger.warning("[URL] Malicious CDN detected: %s in URL: %s", cdn_check["cdn"], url)
+            _logger.warning("[URL] Malicious CDN detected: %s on host: %s", cdn_check["cdn"], clean_host)
 
         # DNS lookup con timeout
         ip, dns_err = _resolve_ip(clean_host)
@@ -457,7 +465,7 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
                     analyses.append(future.result())
                 except Exception as e:
                     url = future_map[future]
-                    _logger.warning("[URL] Failed to analyze URL %s: %s", url, str(e))
+                    _logger.warning("[URL] Failed to analyze host %s: %s", _safe_log_host(url), type(e).__name__)
         except concurrent.futures.TimeoutError:
             # Raccoglie i risultati già disponibili entro il timeout di batch
             _logger.warning("[URL] Batch analysis timeout (%ds) - collecting partial results", URL_BATCH_TIMEOUT)
@@ -467,7 +475,7 @@ def analyze_urls(urls: list[str], do_whois: bool = True) -> URLAnalysisResult:
                         analyses.append(future.result())
                     except Exception as e:
                         url = future_map[future]
-                        _logger.warning("[URL] Failed to analyze URL %s after timeout: %s", url, str(e))
+                        _logger.warning("[URL] Failed to analyze host %s after timeout: %s", _safe_log_host(url), type(e).__name__)
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
 

@@ -24,7 +24,7 @@ import re
 import asyncio
 import ipaddress
 import logging
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sqlalchemy.orm.attributes import flag_modified
@@ -35,7 +35,10 @@ from core.reputation.connectors import (
     run_slow_checks,
     finalize_fast_only,
     ReputationSummary,
+    normalize_url_host,
 )
+from core.intel.auth import require_trusted_client
+from core.rate_limiting import limiter
 from dataclasses import asdict
 import json
 
@@ -179,8 +182,7 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
 
         # Estrai hostname dall'URL
         try:
-            from urllib.parse import urlparse
-            hostname = urlparse(url).netloc.split(":")[0].removeprefix("www.")
+            hostname = normalize_url_host(url)
         except Exception:
             hostname = ""
 
@@ -193,7 +195,7 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
 
         # Altrimenti, escludi URL da CDN/trusted domains
         if _is_trusted_cdn(hostname):
-            _logger.debug(f"[FILTRO] URL {url} da CDN legittima - escluso")
+            _logger.debug("[FILTRO] Host %s da CDN legittima - escluso", hostname)
             return
 
         seen_urls.add(url)
@@ -211,8 +213,7 @@ def _extract_indicators(record: EmailAnalysis) -> tuple[list[str], list[str], li
         if not raw:
             return
         try:
-            from urllib.parse import urlparse
-            hostname = urlparse(raw).netloc.split(":")[0].removeprefix("www.")
+            hostname = normalize_url_host(raw)
             # Scarta IP diretti
             if hostname and not (hostname.count(".") < 1 or hostname.replace(".", "").isdigit()):
                 if hostname not in seen_domains and not _is_trusted_cdn(hostname):
@@ -370,13 +371,12 @@ def _extract_priority_indicators(
 
         # Estrai hostname e controlla se trusted CDN (escludi sempre)
         try:
-            from urllib.parse import urlparse
-            hostname = urlparse(url_str).netloc.split(":")[0].removeprefix("www.")
+            hostname = normalize_url_host(url_str)
         except Exception:
             hostname = ""
 
         if _is_trusted_cdn(hostname):
-            _logger.debug(f"[FILTRO SLOW] URL {url_str} da trusted CDN - esclusa")
+            _logger.debug("[FILTRO SLOW] Host %s da trusted CDN - escluso", hostname)
             return
 
         # Determina se è sospetta (per logging)
@@ -394,9 +394,9 @@ def _extract_priority_indicators(
         seen_urls.add(url_str)
         urls.append(url_str)
         if is_suspicious:
-            _logger.debug(f"[FILTRO SLOW] URL {url_str} (sospetta, risk_score={u.get('risk_score', 0)}) - inclusa")
+            _logger.debug("[FILTRO SLOW] Host %s sospetto (risk_score=%s) incluso", hostname, u.get("risk_score", 0))
         else:
-            _logger.debug(f"[FILTRO SLOW] URL {url_str} (normale, non da CDN) - inclusa per coverage")
+            _logger.debug("[FILTRO SLOW] Host %s non-CDN incluso per coverage", hostname)
 
     # ─────────────────────────────────────────────────────────────────────────
     # IP: Sender IP + primi 2 hop (mittente -> intermediari prossimi)
@@ -451,8 +451,7 @@ def _extract_priority_indicators(
         url_str = u.get("original_url") or u.get("url", "")
         if url_str:
             try:
-                from urllib.parse import urlparse
-                hostname = urlparse(url_str).netloc.split(":")[0].removeprefix("www.")
+                hostname = normalize_url_host(url_str)
                 is_suspicious = (
                     u.get("is_ip_address") or u.get("is_ip") or
                     u.get("is_shortener") or u.get("is_new_domain") or
@@ -667,8 +666,7 @@ def _dict_to_summary(d: dict) -> ReputationSummary:
 # Phase 2C: Health Check Endpoint per URLScan.io (v0.14.3+)
 # ---------------------------------------------------------------------------
 
-@router.get("/test-urlscan")
-async def test_urlscan_health():
+def _test_urlscan_health_sync() -> dict:
     """
     Testa la connessione a URLScan.io e verifica la configurazione dell'API key.
     Utile per diagnosticare problemi di autenticazione o rate limiting.
@@ -737,3 +735,10 @@ async def test_urlscan_health():
         result["suggestions"].append("URLSCAN_API_KEY non configurato in .env. Registrati su https://urlscan.io/user/signup e configura la chiave per aumentare il limite a 1000 req/giorno")
 
     return result
+
+
+@router.get("/test-urlscan", dependencies=[Depends(require_trusted_client)])
+@limiter.limit("2/minute")
+async def test_urlscan_health(request: Request):
+    """Esegue la diagnostica URLScan fuori dall'event loop per client fidati."""
+    return await asyncio.to_thread(_test_urlscan_health_sync)
